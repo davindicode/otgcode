@@ -1,0 +1,26 @@
+.DS_Store
+.env
+/node_modules/
+
+
+# React Router
+/.react-router/
+/build/
+
+# Editor / OS
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+Thumbs.db
+
+# Local binaries (cloudflared etc.)
+/.bin/
+
+# Claude Code local settings
+.claude/
+
+# Logs
+*.log
+/tmp/
