@@ -50,6 +50,8 @@ const NAV_TAIL: QuickKey[] = [
   { label: "Tab", key: "\t", title: "Autocomplete" },
   { label: "PgUp", key: "\x1b[5~", title: "Page up" },
   { label: "PgDn", key: "\x1b[6~", title: "Page down" },
+  { label: "y", key: "y", title: "Yes — approve / confirm (tmux kill-pane, Claude prompts, etc.)" },
+  { label: "n", key: "n", title: "No — deny / decline" },
 ];
 
 const NANO_KEYS: QuickKey[] = [
@@ -107,13 +109,13 @@ const TMUX_KEYS: QuickKey[] = [
 ];
 
 // Common key combos shared across all coding CLIs
+// (y/n live in NAV_TAIL — always-visible below the input — since they're also
+// useful for tmux confirms and other action contexts.)
 const CODE_COMMON_KEYS: QuickKey[] = [
   { label: "Ctrl+C", key: "\x03", title: "Cancel / interrupt / quit" },
   { label: "Ctrl+L", key: "\x0c", title: "Clear screen (Claude/Codex) / View logs (OpenCode)" },
   { label: "Ctrl+G", key: "\x07", title: "Open external editor (Claude/Codex)" },
   { label: "Esc Esc", key: "\x1b\x1b", title: "Rewind history (Claude) / Edit prev message (Codex)" },
-  { label: "y", key: "y", title: "Yes (approve)" },
-  { label: "n", key: "n", title: "No (deny)" },
 ];
 
 // Per-vendor CLI groups: launch commands, keys, and slash commands
