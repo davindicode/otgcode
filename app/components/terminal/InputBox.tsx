@@ -258,7 +258,6 @@ export default function InputBox() {
   const [tmuxNewName, setTmuxNewName] = useState("");
   const [editorFileName, setEditorFileName] = useState("");
   const [cdDirs, setCdDirs] = useState<string[]>([]);
-  const [cdCwd, setCdCwd] = useState("");
   const [cdLoading, setCdLoading] = useState(false);
   const [stickyMode, setStickyMode] = useState<StickyMode>("ctrl");
   const [codeVendorIdx, setCodeVendorIdx] = useState(0);
@@ -273,6 +272,7 @@ export default function InputBox() {
   const sendInput = useTerminalStore((s) => s.sendInput);
   const setInTmux = useTerminalStore((s) => s.setInTmux);
   const setInEditor = useTerminalStore((s) => s.setInEditor);
+  const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
 
   // Close vendor dropdown on outside click
@@ -290,6 +290,7 @@ export default function InputBox() {
   const activeSession = activeSessionId ? sessions[activeSessionId] : null;
   const inTmux = activeSession?.inTmux ?? false;
   const inEditor = activeSession?.inEditor ?? null;
+  const cdCwd = activeSession?.cdCwd ?? "";
 
   // --- Handlers ---
   const handleSend = () => {
@@ -382,13 +383,22 @@ export default function InputBox() {
     fetchToolVersions();
   }, []);
 
+  // When the active terminal tab changes while the cd picker is open, resync
+  // to that terminal's current cwd (the cd panel is per-terminal stateful).
+  useEffect(() => {
+    if (activeGroup !== CD_TAB) return;
+    setCdDirs([]);
+    if (activeSessionId) fetchDirs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId]);
+
   const toggleGroup = (id: string) => {
     if (activeGroup === id) {
       setActiveGroup(null);
     } else {
       setActiveGroup(id);
       if (id === TMUX_TAB && !inTmux) fetchTmuxSessions();
-      if (id === CD_TAB) fetchDirs(cdCwd || undefined);
+      if (id === CD_TAB) fetchDirs();
       if ([TMUX_TAB, NANO_TAB, VIM_TAB, CODE_TAB].includes(id)) fetchToolVersions();
     }
   };
@@ -430,16 +440,17 @@ export default function InputBox() {
     }, 50);
   };
 
-  // cd directory picker
+  // cd directory picker — always scoped to the currently-active terminal session
   const fetchDirs = async (dir?: string) => {
+    const sessionId = activeSessionId;
+    if (!sessionId) return;
     setCdLoading(true);
     try {
-      // If no dir specified, detect the terminal's actual CWD first
+      // If no dir specified, detect this terminal's actual CWD first
       let targetDir = dir;
       if (!targetDir) {
         try {
-          const cwdQuery = activeSessionId ? `?sessionId=${activeSessionId}&inTmux=${inTmux}` : "";
-          const cwdRes = await fetch(`/api/terminal/cwd${cwdQuery}`);
+          const cwdRes = await fetch(`/api/terminal/cwd?sessionId=${sessionId}&inTmux=${inTmux}`);
           const cwdData = await cwdRes.json();
           if (cwdData.cwd) targetDir = cwdData.cwd;
         } catch {}
@@ -448,12 +459,15 @@ export default function InputBox() {
       const res = await fetch(`/api/files/list${query}`);
       const data = await res.json();
       if (!data.error) {
-        setCdCwd(data.dir);
-        setCdDirs(
-          (data.entries || [])
-            .filter((e: { isDirectory: boolean }) => e.isDirectory)
-            .map((e: { name: string }) => e.name)
-        );
+        // Only apply the result if the user hasn't switched to a different tab while we were fetching
+        if (useTerminalStore.getState().activeSessionId === sessionId) {
+          setCdCwd(sessionId, data.dir);
+          setCdDirs(
+            (data.entries || [])
+              .filter((e: { isDirectory: boolean }) => e.isDirectory)
+              .map((e: { name: string }) => e.name)
+          );
+        }
       }
     } catch { setCdDirs([]); }
     setCdLoading(false);

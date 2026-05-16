@@ -14,6 +14,7 @@ interface TerminalSession {
   outputBuffer: string[];
   inTmux: boolean;
   inEditor: "nano" | "vim" | null;
+  cdCwd: string;
 }
 
 interface TerminalState {
@@ -35,6 +36,7 @@ interface TerminalState {
   setDefaultCwd: (cwd: string) => void;
   setInTmux: (sessionId: string, inTmux: boolean) => void;
   setInEditor: (sessionId: string, editor: "nano" | "vim" | null) => void;
+  setCdCwd: (sessionId: string, cwd: string) => void;
 }
 
 let socketInitialized = false;
@@ -186,6 +188,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           outputBuffer: [],
           inTmux: false,
           inEditor: null,
+          cdCwd: "",
         },
       },
       activeSessionId: sessionId,
@@ -303,5 +306,11 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     const session = sessions[sessionId];
     if (!session) return;
     set({ sessions: { ...sessions, [sessionId]: { ...session, inEditor: editor } } });
+  },
+  setCdCwd: (sessionId, cwd) => {
+    const { sessions } = get();
+    const session = sessions[sessionId];
+    if (!session) return;
+    set({ sessions: { ...sessions, [sessionId]: { ...session, cdCwd: cwd } } });
   },
 }));
