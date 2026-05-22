@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "child_process";
-import { existsSync, mkdtempSync } from "fs";
+import { existsSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -7,21 +7,16 @@ import { tmpdir } from "os";
 let mainTunnelProcess: ChildProcess | null = null;
 let mainTunnelUrl: string | null = null;
 
-// Check if ~/.cloudflared/config.yml exists (named tunnel config that would override quick tunnels)
-function hasNamedTunnelConfig(): boolean {
-  const home = process.env.HOME || process.env.USERPROFILE || "";
-  if (!home) return false;
-  return existsSync(join(home, ".cloudflared", "config.yml")) ||
-         existsSync(join(home, ".cloudflared", "config.yaml"));
-}
-
-// Build spawn options — use temp HOME to bypass named tunnel config if present
-function tunnelSpawnOptions(): { env?: Record<string, string> } {
-  if (hasNamedTunnelConfig()) {
-    const cfHome = mkdtempSync(join(tmpdir(), "cloudflared-"));
-    return { env: { ...process.env, HOME: cfHome } as Record<string, string> };
+// Cloudflared loads ~/.cloudflared/config.yml AND /etc/cloudflared/config.yml (plus
+// /usr/local/etc/cloudflared/...) by default. If any of those configs define an
+// ingress catch-all (e.g. `http_status: 404`), it will hijack our quick-tunnel
+// traffic. Passing an explicit --config to a stub bypasses all default search paths.
+function stubConfigPath(): string {
+  const stub = join(tmpdir(), `otgcode-cloudflared-stub-${process.pid}.yml`);
+  if (!existsSync(stub)) {
+    writeFileSync(stub, "no-autoupdate: true\n");
   }
-  return {};
+  return stub;
 }
 
 function findCloudflared(): string {
@@ -42,9 +37,8 @@ export async function startTunnel(port: number): Promise<string | null> {
     const cfBin = findCloudflared();
 
     try {
-      const args = ["tunnel", "--no-autoupdate", "--protocol", "http2", "--url", `http://localhost:${port}`];
+      const args = ["tunnel", "--config", stubConfigPath(), "--no-autoupdate", "--protocol", "http2", "--url", `http://localhost:${port}`];
       mainTunnelProcess = spawn(cfBin, args, {
-        ...tunnelSpawnOptions(),
         stdio: ["ignore", "pipe", "pipe"],
       });
     } catch {
