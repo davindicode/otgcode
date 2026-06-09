@@ -15,6 +15,7 @@ interface FileListProps {
   onDelete: (entry: FileEntry) => void;
   onInfo: (entry: FileEntry) => void;
   onRename: (entry: FileEntry) => void;
+  onDownload: (entry: FileEntry) => void;
   uploadQueue?: UploadFile[];
   cancelUpload?: (index: number) => void;
   disabled?: boolean;
@@ -33,7 +34,7 @@ interface ContextMenuState {
   y: number;
 }
 
-export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, uploadQueue, cancelUpload, disabled }: FileListProps) {
+export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, onDownload, uploadQueue, cancelUpload, disabled }: FileListProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -198,6 +199,14 @@ export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, 
           >
             Rename
           </button>
+          {!menu.entry.isDirectory && (
+            <button
+              onClick={() => menuAction(onDownload)}
+              className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+            >
+              Download
+            </button>
+          )}
           <button
             onClick={() => menuAction(onInfo)}
             className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"

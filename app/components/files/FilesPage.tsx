@@ -126,6 +126,16 @@ function FileSessionView({ session }: { session: FileSession }) {
 
   const fullPath = (name: string) => (cwd === "/" ? `/${name}` : `${cwd}/${name}`);
 
+  const handleDownload = (entry: FileEntry) => {
+    if (entry.isDirectory) return;
+    const a = document.createElement("a");
+    a.href = `/api/files/download?path=${encodeURIComponent(fullPath(entry.name))}`;
+    a.download = entry.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
   const handleOpen = async (entry: FileEntry) => {
     if (entry.isDirectory) {
       await loadDirectory(fullPath(entry.name));
@@ -501,7 +511,7 @@ function FileSessionView({ session }: { session: FileSession }) {
           <span className="text-sm">Loading...</span>
         </div>
       ) : (
-        <FileList entries={entries} onOpen={handleOpen} onDelete={handleDelete} onInfo={handleInfo} onRename={handleRename} uploadQueue={uploadQueue} cancelUpload={cancelUpload} disabled={uploading} />
+        <FileList entries={entries} onOpen={handleOpen} onDelete={handleDelete} onInfo={handleInfo} onRename={handleRename} onDownload={handleDownload} uploadQueue={uploadQueue} cancelUpload={cancelUpload} disabled={uploading} />
       )}
 
       {/* Dialogs */}
