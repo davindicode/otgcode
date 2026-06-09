@@ -38,10 +38,6 @@ const TERMINAL_GROUPS: QuickKeyGroup[] = [
 const NAV_KEYS: QuickKey[] = [
   { label: "Enter", key: "\r", title: "Enter / Confirm" },
   { label: "Bksp", key: "\x7f", title: "Backspace" },
-  { label: "\u2191", key: "\x1b[A", title: "Up / Previous command" },
-  { label: "\u2193", key: "\x1b[B", title: "Down / Next command" },
-  { label: "\u2190", key: "\x1b[D", title: "Cursor left" },
-  { label: "\u2192", key: "\x1b[C", title: "Cursor right" },
 ];
 
 // Less common nav keys (shown after NAV_KEYS)
@@ -52,6 +48,14 @@ const NAV_TAIL: QuickKey[] = [
   { label: "PgDn", key: "\x1b[6~", title: "Page down" },
   { label: "y", key: "y", title: "Yes — approve / confirm (tmux kill-pane, Claude prompts, etc.)" },
   { label: "n", key: "n", title: "No — deny / decline" },
+];
+
+// Arrow keys pinned to the end of the bar
+const NAV_ARROWS: QuickKey[] = [
+  { label: "↑", key: "\x1b[A", title: "Up / Previous command" },
+  { label: "↓", key: "\x1b[B", title: "Down / Next command" },
+  { label: "←", key: "\x1b[D", title: "Cursor left" },
+  { label: "→", key: "\x1b[C", title: "Cursor right" },
 ];
 
 const NANO_KEYS: QuickKey[] = [
@@ -1031,6 +1035,11 @@ export default function InputBox() {
           </button>
         ))}
         {NAV_TAIL.map((qk) => (
+          <button key={qk.label} {...repeatProps(qk.key)} disabled={!activeSessionId} title={qk.title} className={`${keyBtn} text-[10px] px-1.5`}>
+            {qk.label}
+          </button>
+        ))}
+        {NAV_ARROWS.map((qk) => (
           <button key={qk.label} {...repeatProps(qk.key)} disabled={!activeSessionId} title={qk.title} className={`${keyBtn} text-[10px] px-1.5`}>
             {qk.label}
           </button>

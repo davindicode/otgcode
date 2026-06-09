@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import type { FileEntry } from "~/stores/fileStore";
 
 interface UploadFile {
@@ -30,14 +30,56 @@ function formatSize(bytes: number): string {
 
 interface ContextMenuState {
   entry: FileEntry;
-  x: number;
-  y: number;
+  rightAlign: boolean; // 3-dot button: right-edge align; point menus: left-align
+  anchorX: number;     // content-x: button right edge (rightAlign) or click point
+  topDown: number;     // content-y for the menu top when opening downward
+  bottomUp: number;    // content-y of the anchor top, used when flipping upward
+  vpTop: number;       // anchor top within the visible container (flip decision)
+  vpBottom: number;    // anchor bottom within the visible container (flip decision)
 }
 
 export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, onDownload, uploadQueue, cancelUpload, disabled }: FileListProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  const [menuStyle, setMenuStyle] = useState<{ left: number; top: number; visible: boolean }>({ left: 0, top: 0, visible: false });
+  const scrollRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Open the menu anchored to a point (right-click / long-press), stored in the
+  // scroll container's content coordinates so it stays attached on scroll.
+  const openMenuAtPoint = (clientX: number, clientY: number, entry: FileEntry) => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const cRect = container.getBoundingClientRect();
+    setMenuStyle((s) => ({ ...s, visible: false }));
+    setMenu({
+      entry,
+      rightAlign: false,
+      anchorX: clientX - cRect.left + container.scrollLeft,
+      topDown: clientY - cRect.top + container.scrollTop,
+      bottomUp: clientY - cRect.top + container.scrollTop,
+      vpTop: clientY - cRect.top,
+      vpBottom: clientY - cRect.top,
+    });
+  };
+
+  // Open the menu from the 3-dot button, right-aligned to the button.
+  const openMenuFromButton = (e: React.MouseEvent, entry: FileEntry) => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const cRect = container.getBoundingClientRect();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuStyle((s) => ({ ...s, visible: false }));
+    setMenu({
+      entry,
+      rightAlign: true,
+      anchorX: rect.right - cRect.left + container.scrollLeft,
+      topDown: rect.bottom - cRect.top + container.scrollTop,
+      bottomUp: rect.top - cRect.top + container.scrollTop,
+      vpTop: rect.top - cRect.top,
+      vpBottom: rect.bottom - cRect.top,
+    });
+  };
 
   // Close menu on outside click
   useEffect(() => {
@@ -51,15 +93,47 @@ export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, 
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menu]);
 
+  // Measure the rendered menu and resolve its final position: clamp within the
+  // container's right edge (pane boundary) and flip upward when the entry is
+  // near the bottom and there isn't room below. Runs before paint to avoid flicker.
+  useLayoutEffect(() => {
+    if (!menu || !menuRef.current || !scrollRef.current) return;
+    const container = scrollRef.current;
+    const mw = menuRef.current.offsetWidth;
+    const mh = menuRef.current.offsetHeight;
+    const visW = container.clientWidth;
+    const visH = container.clientHeight;
+    const pad = 8;
+
+    // Horizontal: right-align to the button, then clamp inside the pane.
+    let left = menu.rightAlign ? menu.anchorX - mw : menu.anchorX;
+    const minLeft = container.scrollLeft + pad;
+    const maxLeft = container.scrollLeft + visW - mw - pad;
+    left = Math.max(minLeft, Math.min(left, maxLeft));
+
+    // Vertical: prefer downward; flip up if not enough room; else clamp to view.
+    const roomBelow = visH - menu.vpBottom;
+    let top: number;
+    if (roomBelow >= mh + pad) {
+      top = menu.topDown;
+    } else if (menu.vpTop >= mh + pad) {
+      top = menu.bottomUp - mh;
+    } else {
+      top = container.scrollTop + Math.max(pad, visH - mh - pad);
+    }
+
+    setMenuStyle({ left, top, visible: true });
+  }, [menu]);
+
   const handleContextMenu = (e: React.MouseEvent, entry: FileEntry) => {
     e.preventDefault();
-    setMenu({ entry, x: e.clientX, y: e.clientY });
+    openMenuAtPoint(e.clientX, e.clientY, entry);
   };
 
   const handleTouchStart = (e: React.TouchEvent, entry: FileEntry) => {
     const touch = e.touches[0];
     longPressTimer.current = setTimeout(() => {
-      setMenu({ entry, x: touch.clientX, y: touch.clientY });
+      openMenuAtPoint(touch.clientX, touch.clientY, entry);
     }, 500);
   };
 
@@ -86,7 +160,7 @@ export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, 
   }
 
   return (
-    <div className="overflow-y-auto flex-1 relative">
+    <div ref={scrollRef} className="overflow-y-auto flex-1 relative">
       <div className={disabled ? "pointer-events-none opacity-50" : ""}>
       {entries.map((entry) => (
         <div
@@ -124,10 +198,7 @@ export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, 
           {/* Three-dot menu button — separate from file click */}
           <button
             className="shrink-0 p-2 text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 active:bg-gray-700 transition-colors"
-            onClick={(e) => {
-              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-              setMenu({ entry, x: rect.right, y: rect.bottom });
-            }}
+            onClick={(e) => openMenuFromButton(e, entry)}
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
@@ -178,10 +249,11 @@ export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, 
       {menu && (
         <div
           ref={menuRef}
-          className="fixed z-50 bg-[#1e1e3a] border border-gray-600 rounded-lg shadow-xl py-1 min-w-[160px]"
+          className="absolute z-50 bg-[#1e1e3a] border border-gray-600 rounded-lg shadow-xl py-1 min-w-[160px]"
           style={{
-            left: Math.min(menu.x, window.innerWidth - 180),
-            top: Math.min(menu.y, window.innerHeight - 200),
+            left: menuStyle.left,
+            top: menuStyle.top,
+            visibility: menuStyle.visible ? "visible" : "hidden",
           }}
         >
           <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700 truncate">
