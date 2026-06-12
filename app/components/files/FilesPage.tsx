@@ -5,6 +5,24 @@ import FileList from "./FileList";
 import FileViewer from "./FileViewer";
 import RenamableTab from "~/components/RenamableTab";
 
+// Clipboard fallback for insecure contexts / older mobile browsers where
+// navigator.clipboard is unavailable. Must run within a user gesture.
+function fallbackCopy(text: string): void {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand("copy");
+  } catch {
+    /* nothing more we can do */
+  }
+  ta.remove();
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + " B";
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
@@ -125,6 +143,15 @@ function FileSessionView({ session }: { session: FileSession }) {
 
 
   const fullPath = (name: string) => (cwd === "/" ? `/${name}` : `${cwd}/${name}`);
+
+  const handleCopyPath = (entry: FileEntry) => {
+    const path = fullPath(entry.name);
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(path).catch(() => fallbackCopy(path));
+    } else {
+      fallbackCopy(path);
+    }
+  };
 
   const handleDownload = (entry: FileEntry) => {
     if (entry.isDirectory) return;
@@ -511,7 +538,7 @@ function FileSessionView({ session }: { session: FileSession }) {
           <span className="text-sm">Loading...</span>
         </div>
       ) : (
-        <FileList entries={entries} onOpen={handleOpen} onDelete={handleDelete} onInfo={handleInfo} onRename={handleRename} onDownload={handleDownload} uploadQueue={uploadQueue} cancelUpload={cancelUpload} disabled={uploading} />
+        <FileList entries={entries} onOpen={handleOpen} onDelete={handleDelete} onInfo={handleInfo} onRename={handleRename} onDownload={handleDownload} onCopyPath={handleCopyPath} uploadQueue={uploadQueue} cancelUpload={cancelUpload} disabled={uploading} />
       )}
 
       {/* Dialogs */}

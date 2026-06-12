@@ -16,6 +16,7 @@ interface FileListProps {
   onInfo: (entry: FileEntry) => void;
   onRename: (entry: FileEntry) => void;
   onDownload: (entry: FileEntry) => void;
+  onCopyPath: (entry: FileEntry) => void;
   uploadQueue?: UploadFile[];
   cancelUpload?: (index: number) => void;
   disabled?: boolean;
@@ -38,7 +39,7 @@ interface ContextMenuState {
   vpBottom: number;    // anchor bottom within the visible container (flip decision)
 }
 
-export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, onDownload, uploadQueue, cancelUpload, disabled }: FileListProps) {
+export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, onDownload, onCopyPath, uploadQueue, cancelUpload, disabled }: FileListProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [menuStyle, setMenuStyle] = useState<{ left: number; top: number; visible: boolean }>({ left: 0, top: 0, visible: false });
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -270,6 +271,12 @@ export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, 
             className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
           >
             Rename
+          </button>
+          <button
+            onClick={() => menuAction(onCopyPath)}
+            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+          >
+            Copy path
           </button>
           {!menu.entry.isDirectory && (
             <button
