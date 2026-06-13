@@ -38,6 +38,32 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
     lastDistance.current = 0;
   }, []);
 
+  // Desktop drag-to-pan (hand tool): drag scrolls the overflow container.
+  // window listeners so releasing outside the pane still ends the drag.
+  const [grabbing, setGrabbing] = useState(false);
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const container = containerRef.current;
+    if (!container || e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startLeft = container.scrollLeft;
+    const startTop = container.scrollTop;
+    setGrabbing(true);
+
+    const onMove = (ev: MouseEvent) => {
+      container.scrollLeft = startLeft - (ev.clientX - startX);
+      container.scrollTop = startTop - (ev.clientY - startY);
+    };
+    const onUp = () => {
+      setGrabbing(false);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 bg-[#16162a] border-b border-gray-700 shrink-0">
@@ -91,7 +117,8 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
       </div>
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto bg-[#0d0d1a]"
+        className={`flex-1 overflow-auto bg-[#0d0d1a] select-none ${grabbing ? "cursor-grabbing" : "cursor-grab"}`}
+        onMouseDown={handleMouseDown}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
