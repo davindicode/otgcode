@@ -1,0 +1,41 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.1.1] - 2026-06-13
+
+### Added
+- **Download** action in the file explorer dropdown — download any file without
+  opening it first (works on mobile and desktop).
+- **Copy path** action in the file explorer dropdown — copy the absolute path of
+  a file or folder to paste into the CLI, with a clipboard fallback for contexts
+  where the Clipboard API is unavailable.
+
+### Changed
+- Arrow keys are now pinned to the end of the persistent terminal key bar
+  (Enter · Bksp → Esc · Tab · PgUp · PgDn · y · n → ↑ · ↓ · ← · →).
+- Moved y/n keys into the persistent nav bar and removed duplicate code-tab keys.
+
+### Fixed
+- Cloudflare quick tunnel robustness: cloudflared output is now logged, the
+  promise resolves immediately on early exit instead of a 30s silent wait, and
+  startup retries up to 3 times before falling back to local-only.
+- Quick tunnel is isolated from any system-wide `cloudflared` config so a global
+  ingress catch-all can no longer hijack quick-tunnel traffic.
+- File explorer dropdown menu now stays attached to its entry on scroll, clamps
+  to the pane boundary instead of overflowing on mobile, and flips upward for
+  bottom entries so it is never clipped.
+- Per-terminal `cd` picker state and correct tmux pane resolution.
+
+## [0.1.0] - 2026-04-19
+
+- Initial public release.
+
+[Unreleased]: https://github.com/davindicode/otgcode/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/davindicode/otgcode/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/davindicode/otgcode/releases/tag/v0.1.0
