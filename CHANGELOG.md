@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - File explorer dropdown menu now stays attached to its entry on scroll, clamps
   to the pane boundary instead of overflowing on mobile, and flips upward for
   bottom entries so it is never clipped.
+- Markdown preview now renders local images/video referenced by relative or
+  absolute on-disk paths (e.g. a README's `public/logo.png`) by routing them
+  through the file API, instead of showing a broken-media icon.
 - Per-terminal `cd` picker state and correct tmux pane resolution.
 
 ## [0.1.0] - 2026-04-19

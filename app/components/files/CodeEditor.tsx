@@ -1,6 +1,7 @@
 import { marked } from "marked";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { copyText } from "~/lib/clipboard";
+import { rewriteLocalAssets } from "~/lib/markdown";
 import CopyPathButton from "./CopyPathButton";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
@@ -54,11 +55,11 @@ function getLanguage(path: string): string {
   return map[ext] || "plaintext";
 }
 
-function MarkdownPreview({ content, fontSize }: { content: string; fontSize: number }) {
+function MarkdownPreview({ content, fontSize, path }: { content: string; fontSize: number; path: string }) {
   const html = useMemo(() => {
     marked.setOptions({ breaks: true, gfm: true });
-    return marked.parse(content) as string;
-  }, [content]);
+    return rewriteLocalAssets(marked.parse(content) as string, path);
+  }, [content, path]);
 
   return (
     <div
@@ -367,7 +368,7 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
           ) : ext === "html" || ext === "htm" ? (
             <HtmlPreview content={value} zoom={htmlZoom} />
           ) : (
-            <MarkdownPreview content={value} fontSize={editorFontSize} />
+            <MarkdownPreview content={value} fontSize={editorFontSize} path={path} />
           )
         ) : mode === "plain" ? (
           // Native textarea: mobile gets real selection handles + OS "Select All",
