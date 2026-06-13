@@ -1,6 +1,5 @@
 import { marked } from "marked";
 import { lazy, Suspense, useMemo, useState } from "react";
-import { copyText } from "~/lib/clipboard";
 import { rewriteLocalAssets } from "~/lib/markdown";
 import CopyPathButton from "./CopyPathButton";
 
@@ -196,13 +195,6 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
   const [editorFontSize, setEditorFontSize] = useState(6);
   const isHtml = ext === "html" || ext === "htm";
   const [htmlZoom, setHtmlZoom] = useState(100);
-  const [copied, setCopied] = useState(false);
-
-  const handleCopyAll = () => {
-    copyText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
 
   const handleChange = (v: string | undefined) => {
     if (v !== undefined) {
@@ -227,28 +219,6 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
           {path}
         </span>
         <CopyPathButton path={path} />
-        <button
-          onClick={handleCopyAll}
-          className="p-1 text-gray-400 hover:text-white transition-colors shrink-0"
-          title={copied ? "Copied!" : "Copy file contents"}
-        >
-          {copied ? (
-            <svg
-              className="w-3.5 h-3.5 text-green-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          ) : (
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-            </svg>
-          )}
-        </button>
         <div className="flex items-center gap-1.5 shrink-0">
           <div className="flex items-center bg-[#0d0d1a] rounded overflow-hidden border border-gray-700">
             <button
