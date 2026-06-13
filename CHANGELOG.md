@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Copy path** action in the file explorer dropdown — copy the absolute path of
   a file or folder to paste into the CLI, with a clipboard fallback for contexts
   where the Clipboard API is unavailable.
+- Editor **Copy** button (copies the whole file) and a **Plain** view mode backed
+  by a native textarea, so mobile native selection and Select-All work for
+  copying code/logs (Monaco's custom-rendered editor does not support this on touch).
 
 ### Changed
 - Arrow keys are now pinned to the end of the persistent terminal key bar
