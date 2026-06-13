@@ -9,6 +9,10 @@
     "type": "git",
     "url": "https://github.com/davindicode/otgcode.git"
   },
+  "engines": {
+    "node": ">=20.19",
+    "pnpm": ">=10"
+  },
   "scripts": {
     "build": "react-router build",
     "dev": "tsx server/dev.ts",
