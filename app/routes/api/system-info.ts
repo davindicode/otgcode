@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { platform, release, arch, hostname, totalmem, freemem, cpus, uptime } from "os";
+import { arch, cpus, freemem, hostname, platform, release, totalmem, uptime } from "os";
 import type { Route } from "./+types/system-info";
 
 function run(cmd: string): string {
@@ -37,12 +37,18 @@ export async function loader({ request }: Route.LoaderArgs) {
     shell: run("echo $SHELL") || run("echo %COMSPEC%") || null,
     node: process.version,
     tmux: run("tmux -V")?.replace(/^tmux\s+/i, "") || null,
-    nano: os === "darwin"
-      ? (run("which nano") ? "pico" : null)
-      : (run("nano --version")?.match(/nano\s+([\d.]+)/i)?.[1] || (run("which nano") ? "installed" : null)),
+    nano:
+      os === "darwin"
+        ? run("which nano")
+          ? "pico"
+          : null
+        : run("nano --version")?.match(/nano\s+([\d.]+)/i)?.[1] || (run("which nano") ? "installed" : null),
     vim: run("vim --version").match(/Vi IMproved\s+([\d.]+)/)?.[1] || null,
     git: run("git --version")?.replace(/^git version\s+/i, "") || null,
-    python: run("python3 --version")?.replace(/^Python\s+/i, "") || run("python --version")?.replace(/^Python\s+/i, "") || null,
+    python:
+      run("python3 --version")?.replace(/^Python\s+/i, "") ||
+      run("python --version")?.replace(/^Python\s+/i, "") ||
+      null,
   };
 
   // Linux-specific: try to get distro name

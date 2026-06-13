@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback } from "react";
-import CopyPathButton from "./CopyPathButton";
+import { useCallback, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
+import CopyPathButton from "./CopyPathButton";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import CodeEditor from "./CodeEditor";
@@ -28,7 +28,12 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 bg-[#16162a] border-b border-gray-700 shrink-0">
-        <span className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none" title={path}>{path}</span>
+        <span
+          className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
+          title={path}
+        >
+          {path}
+        </span>
         <CopyPathButton path={path} />
         <div className="flex items-center gap-2 shrink-0">
           <a
@@ -37,14 +42,22 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
             download
             title="Download"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"
+              />
+            </svg>
           </a>
           <button
             onClick={onClose}
             className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
             title="Close"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
       </div>
@@ -77,16 +90,28 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 bg-[#16162a] border-b border-gray-700 shrink-0">
-        <span className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none" title={path}>{path}</span>
+        <span
+          className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
+          title={path}
+        >
+          {path}
+        </span>
         <CopyPathButton path={path} />
         <div className="flex items-center gap-2 shrink-0">
-          {numPages > 0 && (
-            <span className="text-[10px] text-gray-500">{numPages} pg</span>
-          )}
+          {numPages > 0 && <span className="text-[10px] text-gray-500">{numPages} pg</span>}
           <div className="flex items-center gap-1 border border-gray-700 rounded overflow-hidden">
-            <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">-</button>
-            <button onClick={zoomFit} className="px-2 py-0.5 text-[10px] text-gray-400 hover:text-white hover:bg-gray-700 tabular-nums">{Math.round(scale * 100)}%</button>
-            <button onClick={zoomIn} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">+</button>
+            <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">
+              -
+            </button>
+            <button
+              onClick={zoomFit}
+              className="px-2 py-0.5 text-[10px] text-gray-400 hover:text-white hover:bg-gray-700 tabular-nums"
+            >
+              {Math.round(scale * 100)}%
+            </button>
+            <button onClick={zoomIn} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">
+              +
+            </button>
           </div>
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
@@ -94,14 +119,22 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
             download
             title="Download"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"
+              />
+            </svg>
           </a>
           <button
             onClick={onClose}
             className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
             title="Close"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
       </div>
@@ -109,12 +142,8 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
         <Document
           file={pdfUrl}
           onLoadSuccess={onDocumentLoadSuccess}
-          loading={
-            <div className="flex items-center justify-center h-full text-gray-500 text-sm">Loading PDF...</div>
-          }
-          error={
-            <div className="flex items-center justify-center h-full text-red-400 text-sm">Failed to load PDF</div>
-          }
+          loading={<div className="flex items-center justify-center h-full text-gray-500 text-sm">Loading PDF...</div>}
+          error={<div className="flex items-center justify-center h-full text-red-400 text-sm">Failed to load PDF</div>}
         >
           <div className="flex flex-col items-center gap-2 p-4">
             {Array.from({ length: numPages }, (_, i) => (
@@ -161,7 +190,12 @@ export default function FileViewer({ path, content, onSave, onClose }: FileViewe
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 bg-[#16162a] border-b border-gray-700 shrink-0">
-        <span className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none" title={path}>{path}</span>
+        <span
+          className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
+          title={path}
+        >
+          {path}
+        </span>
         <CopyPathButton path={path} />
         <div className="flex items-center gap-2 shrink-0">
           <a
@@ -170,14 +204,22 @@ export default function FileViewer({ path, content, onSave, onClose }: FileViewe
             download
             title="Download"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"
+              />
+            </svg>
           </a>
           <button
             onClick={onClose}
             className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
             title="Close"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
       </div>

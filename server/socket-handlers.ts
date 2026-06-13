@@ -1,5 +1,5 @@
 import type { Server, Socket } from "socket.io";
-import { createPty, writePty, resizePty, killPty } from "./pty-manager.js";
+import { createPty, killPty, resizePty, writePty } from "./pty-manager.js";
 
 export function registerSocketHandlers(io: Server): void {
   io.on("connection", (socket: Socket) => {

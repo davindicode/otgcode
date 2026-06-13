@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface BreadcrumbsProps {
   path: string;
@@ -40,7 +40,9 @@ export default function Breadcrumbs({ path, onNavigate, onGoUp, canGoUp, disable
   const parts = path.split("/").filter(Boolean);
 
   return (
-    <div className={`flex items-center gap-1 bg-[#16162a] border-b border-gray-700 shrink-0 min-h-[36px] ${disabled ? "opacity-50 pointer-events-none" : ""}`}>
+    <div
+      className={`flex items-center gap-1 bg-[#16162a] border-b border-gray-700 shrink-0 min-h-[36px] ${disabled ? "opacity-50 pointer-events-none" : ""}`}
+    >
       {/* Back button */}
       <button
         onClick={onGoUp}
@@ -71,10 +73,7 @@ export default function Breadcrumbs({ path, onNavigate, onGoUp, canGoUp, disable
           onDoubleClick={() => setTextMode(true)}
           className="flex-1 flex items-center gap-0.5 text-sm overflow-x-auto whitespace-nowrap px-1 scrollbar-none select-text"
         >
-          <button
-            onClick={() => onNavigate("/")}
-            className="text-gray-400 hover:text-white px-0.5 shrink-0"
-          >
+          <button onClick={() => onNavigate("/")} className="text-gray-400 hover:text-white px-0.5 shrink-0">
             /
           </button>
           {parts.map((part, i) => {
@@ -108,7 +107,11 @@ export default function Breadcrumbs({ path, onNavigate, onGoUp, canGoUp, disable
           </svg>
         ) : (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+            />
           </svg>
         )}
       </button>

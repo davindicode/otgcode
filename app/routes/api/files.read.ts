@@ -29,10 +29,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       return Response.json({ path: filePath, content, mimeType, size: stats.size });
     }
 
-    return Response.json(
-      { error: "File too large for text preview", size: stats.size, mimeType },
-      { status: 413 }
-    );
+    return Response.json({ error: "File too large for text preview", size: stats.size, mimeType }, { status: 413 });
   } catch (err: any) {
     return Response.json({ error: err.message }, { status: 400 });
   }

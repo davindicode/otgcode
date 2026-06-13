@@ -1,6 +1,6 @@
 import type { Express } from "express";
-import { createProxyMiddleware, type RequestHandler } from "http-proxy-middleware";
 import type { Server } from "http";
+import { createProxyMiddleware, type RequestHandler } from "http-proxy-middleware";
 
 const BLOCKED_PORTS = new Set<number>();
 for (let p = 1; p <= 1023; p++) {
@@ -47,46 +47,31 @@ function getProxy(port: number): RequestHandler {
               const prefix = `/proxy/${port}`;
 
               // Rewrite absolute paths in src, href, action attributes (HTML)
-              body = body.replace(
-                /((?:src|href|action)\s*=\s*["'])\/((?!proxy\/)[^"']*["'])/gi,
-                `$1${prefix}/$2`
-              );
+              body = body.replace(/((?:src|href|action)\s*=\s*["'])\/((?!proxy\/)[^"']*["'])/gi, `$1${prefix}/$2`);
 
               // Rewrite CSS url() with absolute paths
-              body = body.replace(
-                /url\(\s*['"]?\/((?!proxy\/)[^'")]+)['"]?\s*\)/gi,
-                `url('${prefix}/$1')`
-              );
+              body = body.replace(/url\(\s*['"]?\/((?!proxy\/)[^'")]+)['"]?\s*\)/gi, `url('${prefix}/$1')`);
 
               // Rewrite ES module imports: import "x", import x from "x", import * as x from "x"
               body = body.replace(
                 /(\bimport\s+(?:[\w*{}\s,]+\s+from\s+)?["'])\/((?!proxy\/)[^"']+["'])/g,
-                `$1${prefix}/$2`
+                `$1${prefix}/$2`,
               );
 
               // Rewrite dynamic import("/path")
-              body = body.replace(
-                /(\bimport\s*\(\s*["'])\/((?!proxy\/)[^"']+["']\s*\))/g,
-                `$1${prefix}/$2`
-              );
+              body = body.replace(/(\bimport\s*\(\s*["'])\/((?!proxy\/)[^"']+["']\s*\))/g, `$1${prefix}/$2`);
 
               // Rewrite export ... from "/path"
               body = body.replace(
                 /(\bexport\s+(?:[\w*{}\s,]+\s+)?from\s+["'])\/((?!proxy\/)[^"']+["'])/g,
-                `$1${prefix}/$2`
+                `$1${prefix}/$2`,
               );
 
               // Rewrite manifest/config paths
-              body = body.replace(
-                /"manifestPath"\s*:\s*"\/((?!proxy\/)[^"]+)"/g,
-                `"manifestPath":"${prefix}/$1"`
-              );
+              body = body.replace(/"manifestPath"\s*:\s*"\/((?!proxy\/)[^"]+)"/g, `"manifestPath":"${prefix}/$1"`);
 
               // Rewrite new URL("/path", ...) patterns
-              body = body.replace(
-                /(new\s+URL\s*\(\s*["'])\/((?!proxy\/)[^"']+["'])/g,
-                `$1${prefix}/$2`
-              );
+              body = body.replace(/(new\s+URL\s*\(\s*["'])\/((?!proxy\/)[^"']+["'])/g, `$1${prefix}/$2`);
 
               (res as any).end(body);
             });
