@@ -1,5 +1,5 @@
-import * as pty from "node-pty";
 import { existsSync } from "fs";
+import * as pty from "node-pty";
 
 function getDefaultShell(): string {
   if (process.platform === "win32") {
@@ -33,7 +33,7 @@ export function createPty(
     rows?: number;
     onData: (data: string) => void;
     onExit: (exitCode: number) => void;
-  }
+  },
 ): void {
   if (sessions.has(sessionId)) {
     killPty(sessionId);

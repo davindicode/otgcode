@@ -1,13 +1,13 @@
 import "dotenv/config";
-import express from "express";
-import { createServer } from "http";
-import { createWriteStream, createReadStream, unlinkSync, mkdirSync, existsSync, readdirSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
 import Busboy from "busboy";
+import express from "express";
+import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, unlinkSync } from "fs";
+import { createServer } from "http";
+import { tmpdir } from "os";
+import { join } from "path";
 import { Server as SocketIOServer } from "socket.io";
-import { registerSocketHandlers } from "./socket-handlers.js";
 import { mountProxy } from "./proxy.js";
+import { registerSocketHandlers } from "./socket-handlers.js";
 
 const PORT = parseInt(process.env.OTG_PORT || "7777", 10);
 
@@ -123,7 +123,10 @@ async function main() {
 
   app.post("/api/files/upload-finalize", express.json(), (req, res) => {
     const { uploadId, dir, fileName, totalChunks } = req.body as {
-      uploadId: string; dir: string; fileName: string; totalChunks: number;
+      uploadId: string;
+      dir: string;
+      fileName: string;
+      totalChunks: number;
     };
 
     if (!uploadId || !dir || !fileName || !totalChunks) {
@@ -157,7 +160,10 @@ async function main() {
           if (!res.headersSent) res.status(500).json({ error: `Chunk ${i} missing: ${err.message}` });
         });
         rs.pipe(ws, { end: false });
-        rs.on("end", () => { i++; writeNext(); });
+        rs.on("end", () => {
+          i++;
+          writeNext();
+        });
       };
 
       ws.on("error", (err: Error) => {
@@ -175,11 +181,7 @@ async function main() {
 
   // Reject known noise paths before they hit React Router
   app.use((req, res, next) => {
-    if (
-      req.url.startsWith("/apple-touch-icon") ||
-      req.url.startsWith("/.well-known/") ||
-      req.url === "/favicon.ico"
-    ) {
+    if (req.url.startsWith("/apple-touch-icon") || req.url.startsWith("/.well-known/") || req.url === "/favicon.ico") {
       res.status(404).end();
       return;
     }

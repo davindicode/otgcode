@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useUiStore } from "~/stores/uiStore";
+import BrowserPage from "./browser/BrowserPage";
+import FilesPage from "./files/FilesPage";
 import Header from "./Header";
 import MobileTabBar from "./MobileTabBar";
 import ResizablePanels from "./ResizablePanels";
-import TerminalPage from "./terminal/TerminalPage";
-import FilesPage from "./files/FilesPage";
-import BrowserPage from "./browser/BrowserPage";
 import InputBox from "./terminal/InputBox";
-import { useUiStore } from "~/stores/uiStore";
+import TerminalPage from "./terminal/TerminalPage";
 
 // Desktop layout requires landscape orientation AND at least 768px width,
 // OR at least 1024px width in any orientation.
@@ -15,7 +15,7 @@ const DESKTOP_QUERY = "(min-width: 1024px), (min-width: 768px) and (orientation:
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(
-    typeof window !== "undefined" ? window.matchMedia(DESKTOP_QUERY).matches : true
+    typeof window !== "undefined" ? window.matchMedia(DESKTOP_QUERY).matches : true,
   );
   useEffect(() => {
     const mq = window.matchMedia(DESKTOP_QUERY);
@@ -59,10 +59,7 @@ export default function AppShell() {
               <TerminalPage />
               <InputBox />
             </div>
-            <div
-              className="flex-1 flex flex-col min-h-0"
-              style={{ display: activeTab === "files" ? "flex" : "none" }}
-            >
+            <div className="flex-1 flex flex-col min-h-0" style={{ display: activeTab === "files" ? "flex" : "none" }}>
               <FilesPage />
             </div>
             <div

@@ -1,9 +1,9 @@
-import { useEffect, useCallback, useState, useRef } from "react";
-import { useFileStore, type FileEntry, type FileSession } from "~/stores/fileStore";
+import { useCallback, useEffect, useRef, useState } from "react";
+import RenamableTab from "~/components/RenamableTab";
+import { type FileEntry, type FileSession, useFileStore } from "~/stores/fileStore";
 import Breadcrumbs from "./Breadcrumbs";
 import FileList from "./FileList";
 import FileViewer from "./FileViewer";
-import RenamableTab from "~/components/RenamableTab";
 
 // Clipboard fallback for insecure contexts / older mobile browsers where
 // navigator.clipboard is unavailable. Must run within a user gesture.
@@ -52,7 +52,12 @@ function FileTabs() {
 
   const folderIcon = (
     <svg className="w-3 h-3 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+      />
     </svg>
   );
 
@@ -92,10 +97,7 @@ function FileSessionView({ session }: { session: FileSession }) {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [inputValue, setInputValue] = useState("");
 
-  const patch = useCallback(
-    (p: Partial<FileSession>) => updateSession(id, p),
-    [id, updateSession]
-  );
+  const patch = useCallback((p: Partial<FileSession>) => updateSession(id, p), [id, updateSession]);
 
   const loadDirectory = useCallback(
     async (dir: string, showHidden?: boolean) => {
@@ -113,7 +115,7 @@ function FileSessionView({ session }: { session: FileSession }) {
         patch({ error: err.message, loading: false });
       }
     },
-    [id, session.showHidden]
+    [id, session.showHidden],
   );
 
   const didInit = useRef(false);
@@ -140,7 +142,6 @@ function FileSessionView({ session }: { session: FileSession }) {
   const uploadXhrs = useRef<Map<number, XMLHttpRequest>>(new Map());
   const cancelledIndices = useRef<Set<number>>(new Set());
   const uploading = uploadQueue.some((f) => f.status === "pending" || f.status === "uploading");
-
 
   const fullPath = (name: string) => (cwd === "/" ? `/${name}` : `${cwd}/${name}`);
 
@@ -215,7 +216,10 @@ function FileSessionView({ session }: { session: FileSession }) {
     }
   };
 
-  const handleCloseFile = () => { patch({ selectedFile: null, fileContent: null }); setFileError(null); };
+  const handleCloseFile = () => {
+    patch({ selectedFile: null, fileContent: null });
+    setFileError(null);
+  };
 
   const toggleHidden = (val: boolean) => {
     patch({ showHidden: val });
@@ -223,27 +227,47 @@ function FileSessionView({ session }: { session: FileSession }) {
   };
 
   // --- Actions ---
-  const handleNewFolder = () => { setInputValue(""); setDialog({ type: "newFolder" }); };
+  const handleNewFolder = () => {
+    setInputValue("");
+    setDialog({ type: "newFolder" });
+  };
   const confirmNewFolder = async () => {
     const name = inputValue.trim();
     if (!name) return;
     try {
-      const res = await fetch("/api/files/mkdir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: fullPath(name) }) });
+      const res = await fetch("/api/files/mkdir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: fullPath(name) }),
+      });
       const data = await res.json();
-      if (data.error) patch({ error: data.error }); else await loadDirectory(cwd);
-    } catch (err: any) { patch({ error: err.message }); }
+      if (data.error) patch({ error: data.error });
+      else await loadDirectory(cwd);
+    } catch (err: any) {
+      patch({ error: err.message });
+    }
     setDialog(null);
   };
 
-  const handleNewFile = () => { setInputValue(""); setDialog({ type: "newFile" }); };
+  const handleNewFile = () => {
+    setInputValue("");
+    setDialog({ type: "newFile" });
+  };
   const confirmNewFile = async () => {
     const name = inputValue.trim();
     if (!name) return;
     try {
-      const res = await fetch("/api/files/write", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: fullPath(name), content: "" }) });
+      const res = await fetch("/api/files/write", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: fullPath(name), content: "" }),
+      });
       const data = await res.json();
-      if (data.error) patch({ error: data.error }); else await loadDirectory(cwd);
-    } catch (err: any) { patch({ error: err.message }); }
+      if (data.error) patch({ error: data.error });
+      else await loadDirectory(cwd);
+    } catch (err: any) {
+      patch({ error: err.message });
+    }
     setDialog(null);
   };
 
@@ -251,23 +275,43 @@ function FileSessionView({ session }: { session: FileSession }) {
   const confirmDelete = async () => {
     if (dialog?.type !== "delete") return;
     try {
-      const res = await fetch("/api/files/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: fullPath(dialog.entry.name) }) });
+      const res = await fetch("/api/files/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: fullPath(dialog.entry.name) }),
+      });
       const data = await res.json();
-      if (data.error) patch({ error: data.error }); else await loadDirectory(cwd);
-    } catch (err: any) { patch({ error: err.message }); }
+      if (data.error) patch({ error: data.error });
+      else await loadDirectory(cwd);
+    } catch (err: any) {
+      patch({ error: err.message });
+    }
     setDialog(null);
   };
 
-  const handleRename = (entry: FileEntry) => { setInputValue(entry.name); setDialog({ type: "rename", entry }); };
+  const handleRename = (entry: FileEntry) => {
+    setInputValue(entry.name);
+    setDialog({ type: "rename", entry });
+  };
   const confirmRename = async () => {
     if (dialog?.type !== "rename") return;
     const newName = inputValue.trim();
-    if (!newName || newName === dialog.entry.name) { setDialog(null); return; }
+    if (!newName || newName === dialog.entry.name) {
+      setDialog(null);
+      return;
+    }
     try {
-      const res = await fetch("/api/files/rename", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ oldPath: fullPath(dialog.entry.name), newPath: fullPath(newName) }) });
+      const res = await fetch("/api/files/rename", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldPath: fullPath(dialog.entry.name), newPath: fullPath(newName) }),
+      });
       const data = await res.json();
-      if (data.error) patch({ error: data.error }); else await loadDirectory(cwd);
-    } catch (err: any) { patch({ error: err.message }); }
+      if (data.error) patch({ error: data.error });
+      else await loadDirectory(cwd);
+    } catch (err: any) {
+      patch({ error: err.message });
+    }
     setDialog(null);
   };
 
@@ -280,7 +324,9 @@ function FileSessionView({ session }: { session: FileSession }) {
       uploadXhrs.current.delete(index);
     }
     cancelledIndices.current.add(index);
-    setUploadQueue((q) => q.map((f, i) => i === index && f.status !== "done" ? { ...f, status: "cancelled", progress: 0 } : f));
+    setUploadQueue((q) =>
+      q.map((f, i) => (i === index && f.status !== "done" ? { ...f, status: "cancelled", progress: 0 } : f)),
+    );
   };
 
   // Auto-clear upload queue when all jobs reach a terminal status
@@ -314,10 +360,18 @@ function FileSessionView({ session }: { session: FileSession }) {
         try {
           const data = JSON.parse(xhr.responseText);
           resolve(!data.error);
-        } catch { resolve(false); }
+        } catch {
+          resolve(false);
+        }
       };
-      xhr.onerror = () => { uploadXhrs.current.delete(index); resolve(false); };
-      xhr.onabort = () => { uploadXhrs.current.delete(index); resolve(false); };
+      xhr.onerror = () => {
+        uploadXhrs.current.delete(index);
+        resolve(false);
+      };
+      xhr.onabort = () => {
+        uploadXhrs.current.delete(index);
+        resolve(false);
+      };
 
       xhr.open("POST", "/api/files/upload-chunk");
       xhr.send(formData);
@@ -326,7 +380,7 @@ function FileSessionView({ session }: { session: FileSession }) {
 
   const uploadFile = async (file: File, index: number): Promise<void> => {
     if (cancelledIndices.current.has(index)) return;
-    setUploadQueue((q) => q.map((f, i) => i === index ? { ...f, status: "uploading" } : f));
+    setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "uploading" } : f)));
 
     // Small files: direct upload
     if (file.size <= CHUNK_SIZE) {
@@ -341,7 +395,7 @@ function FileSessionView({ session }: { session: FileSession }) {
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
             const pct = Math.round((e.loaded / e.total) * 100);
-            setUploadQueue((q) => q.map((f, i) => i === index ? { ...f, progress: pct } : f));
+            setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, progress: pct } : f)));
           }
         };
         xhr.onload = () => {
@@ -349,21 +403,24 @@ function FileSessionView({ session }: { session: FileSession }) {
           try {
             const data = JSON.parse(xhr.responseText);
             if (data.error) {
-              setUploadQueue((q) => q.map((f, i) => i === index ? { ...f, status: "error", error: data.error } : f));
+              setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "error", error: data.error } : f)));
             } else {
-              setUploadQueue((q) => q.map((f, i) => i === index ? { ...f, status: "done", progress: 100 } : f));
+              setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "done", progress: 100 } : f)));
             }
           } catch {
-            setUploadQueue((q) => q.map((f, i) => i === index ? { ...f, status: "done", progress: 100 } : f));
+            setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "done", progress: 100 } : f)));
           }
           resolve();
         };
         xhr.onerror = () => {
           uploadXhrs.current.delete(index);
-          setUploadQueue((q) => q.map((f, i) => i === index ? { ...f, status: "error", error: "Network error" } : f));
+          setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "error", error: "Network error" } : f)));
           resolve();
         };
-        xhr.onabort = () => { uploadXhrs.current.delete(index); resolve(); };
+        xhr.onabort = () => {
+          uploadXhrs.current.delete(index);
+          resolve();
+        };
 
         xhr.open("POST", "/api/files/upload");
         xhr.send(formData);
@@ -376,7 +433,7 @@ function FileSessionView({ session }: { session: FileSession }) {
 
     for (let c = 0; c < totalChunks; c++) {
       if (cancelledIndices.current.has(index)) {
-        setUploadQueue((q) => q.map((f, i) => i === index ? { ...f, status: "cancelled", progress: 0 } : f));
+        setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "cancelled", progress: 0 } : f)));
         return;
       }
       const start = c * CHUNK_SIZE;
@@ -385,11 +442,13 @@ function FileSessionView({ session }: { session: FileSession }) {
 
       const ok = await uploadChunk(blob, uploadId, c, index);
       if (!ok) {
-        setUploadQueue((q) => q.map((f, i) => i === index ? { ...f, status: "error", error: `Chunk ${c + 1}/${totalChunks} failed` } : f));
+        setUploadQueue((q) =>
+          q.map((f, i) => (i === index ? { ...f, status: "error", error: `Chunk ${c + 1}/${totalChunks} failed` } : f)),
+        );
         return;
       }
       const pct = Math.round(((c + 1) / totalChunks) * 100);
-      setUploadQueue((q) => q.map((f, i) => i === index ? { ...f, progress: pct } : f));
+      setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, progress: pct } : f)));
     }
 
     // Finalize: assemble chunks on server
@@ -401,12 +460,12 @@ function FileSessionView({ session }: { session: FileSession }) {
       });
       const data = await res.json();
       if (data.error) {
-        setUploadQueue((q) => q.map((f, i) => i === index ? { ...f, status: "error", error: data.error } : f));
+        setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "error", error: data.error } : f)));
       } else {
-        setUploadQueue((q) => q.map((f, i) => i === index ? { ...f, status: "done", progress: 100 } : f));
+        setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "done", progress: 100 } : f)));
       }
     } catch (err: any) {
-      setUploadQueue((q) => q.map((f, i) => i === index ? { ...f, status: "error", error: err.message } : f));
+      setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "error", error: err.message } : f)));
     }
   };
 
@@ -419,9 +478,10 @@ function FileSessionView({ session }: { session: FileSession }) {
     const conflicts = fileArray.filter((f) => existingNames.has(f.name));
     if (conflicts.length > 0) {
       const names = conflicts.map((f) => f.name).join(", ");
-      const msg = conflicts.length === 1
-        ? `"${names}" already exists. Overwrite?`
-        : `${conflicts.length} files already exist (${names}). Overwrite?`;
+      const msg =
+        conflicts.length === 1
+          ? `"${names}" already exists. Overwrite?`
+          : `${conflicts.length} files already exist (${names}). Overwrite?`;
       if (!window.confirm(msg)) {
         if (uploadInputRef.current) uploadInputRef.current.value = "";
         return;
@@ -463,7 +523,11 @@ function FileSessionView({ session }: { session: FileSession }) {
       return (
         <div className="flex flex-col items-center justify-center h-full bg-[#0d0d1a] text-gray-400 gap-3">
           <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+            />
           </svg>
           <span className="text-sm text-red-400">{fileError}</span>
           <span className="text-xs text-gray-600 overflow-hidden text-ellipsis max-w-xs">{selectedFile}</span>
@@ -476,43 +540,77 @@ function FileSessionView({ session }: { session: FileSession }) {
         </div>
       );
     }
-    return (
-      <FileViewer
-        path={selectedFile}
-        content={fileContent}
-        onSave={handleSave}
-        onClose={handleCloseFile}
-      />
-    );
+    return <FileViewer path={selectedFile} content={fileContent} onSave={handleSave} onClose={handleCloseFile} />;
   }
 
   return (
     <>
-      <Breadcrumbs path={cwd} onNavigate={uploading ? () => {} : handleNavigate} onGoUp={uploading ? () => {} : handleGoUp} canGoUp={cwd !== "/" && !uploading} disabled={uploading} />
+      <Breadcrumbs
+        path={cwd}
+        onNavigate={uploading ? () => {} : handleNavigate}
+        onGoUp={uploading ? () => {} : handleGoUp}
+        canGoUp={cwd !== "/" && !uploading}
+        disabled={uploading}
+      />
 
       {/* Toolbar */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#16162a] border-b border-gray-700 shrink-0">
         <div className="flex items-center gap-0.5">
-          <button onClick={() => loadDirectory(cwd)} disabled={uploading} className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors" title="Refresh">
+          <button
+            onClick={() => loadDirectory(cwd)}
+            disabled={uploading}
+            className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
+            title="Refresh"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
           </button>
-          <button onClick={handleNewFile} disabled={uploading} className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors" title="New file">
+          <button
+            onClick={handleNewFile}
+            disabled={uploading}
+            className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
+            title="New file"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"
+              />
               <path strokeLinecap="round" strokeLinejoin="round" d="M14 2v6h6M12 18v-6M9 15h6" />
             </svg>
           </button>
-          <button onClick={handleNewFolder} disabled={uploading} className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors" title="New folder">
+          <button
+            onClick={handleNewFolder}
+            disabled={uploading}
+            className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
+            title="New folder"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+              />
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 11v6M9 14h6" />
             </svg>
           </button>
-          <button onClick={() => uploadInputRef.current?.click()} className="p-1.5 text-gray-400 hover:text-white transition-colors" title="Upload files">
+          <button
+            onClick={() => uploadInputRef.current?.click()}
+            className="p-1.5 text-gray-400 hover:text-white transition-colors"
+            title="Upload files"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5 5 5M12 15V3" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5 5 5M12 15V3"
+              />
             </svg>
           </button>
           <input
@@ -523,8 +621,16 @@ function FileSessionView({ session }: { session: FileSession }) {
             onChange={(e) => handleUpload(e.target.files)}
           />
         </div>
-        <label className={`flex items-center gap-2 text-sm text-gray-400 ${uploading ? "pointer-events-none opacity-50" : "cursor-pointer"}`}>
-          <input type="checkbox" checked={showHidden} onChange={(e) => toggleHidden(e.target.checked)} disabled={uploading} className="accent-blue-500" />
+        <label
+          className={`flex items-center gap-2 text-sm text-gray-400 ${uploading ? "pointer-events-none opacity-50" : "cursor-pointer"}`}
+        >
+          <input
+            type="checkbox"
+            checked={showHidden}
+            onChange={(e) => toggleHidden(e.target.checked)}
+            disabled={uploading}
+            className="accent-blue-500"
+          />
           Hidden
         </label>
       </div>
@@ -538,40 +644,110 @@ function FileSessionView({ session }: { session: FileSession }) {
           <span className="text-sm">Loading...</span>
         </div>
       ) : (
-        <FileList entries={entries} onOpen={handleOpen} onDelete={handleDelete} onInfo={handleInfo} onRename={handleRename} onDownload={handleDownload} onCopyPath={handleCopyPath} uploadQueue={uploadQueue} cancelUpload={cancelUpload} disabled={uploading} />
+        <FileList
+          entries={entries}
+          onOpen={handleOpen}
+          onDelete={handleDelete}
+          onInfo={handleInfo}
+          onRename={handleRename}
+          onDownload={handleDownload}
+          onCopyPath={handleCopyPath}
+          uploadQueue={uploadQueue}
+          cancelUpload={cancelUpload}
+          disabled={uploading}
+        />
       )}
 
       {/* Dialogs */}
       {dialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDialog(null)}>
-          <div className="bg-[#1e1e3a] border border-gray-600 rounded-lg shadow-xl p-4 mx-4 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setDialog(null)}
+        >
+          <div
+            className="bg-[#1e1e3a] border border-gray-600 rounded-lg shadow-xl p-4 mx-4 w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
             {dialog.type === "newFolder" && (
               <>
                 <h3 className="text-sm font-medium text-white mb-3">New Folder</h3>
-                <input autoFocus value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && confirmNewFolder()} placeholder="Folder name" className="w-full bg-[#0d0d1a] text-white border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3" />
+                <input
+                  autoFocus
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && confirmNewFolder()}
+                  placeholder="Folder name"
+                  className="w-full bg-[#0d0d1a] text-white border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
+                />
                 <div className="flex justify-end gap-2">
-                  <button onClick={() => setDialog(null)} className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">Cancel</button>
-                  <button onClick={confirmNewFolder} disabled={!inputValue.trim()} className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors">Create</button>
+                  <button
+                    onClick={() => setDialog(null)}
+                    className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmNewFolder}
+                    disabled={!inputValue.trim()}
+                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
+                  >
+                    Create
+                  </button>
                 </div>
               </>
             )}
             {dialog.type === "newFile" && (
               <>
                 <h3 className="text-sm font-medium text-white mb-3">New File</h3>
-                <input autoFocus value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && confirmNewFile()} placeholder="File name" className="w-full bg-[#0d0d1a] text-white border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3" />
+                <input
+                  autoFocus
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && confirmNewFile()}
+                  placeholder="File name"
+                  className="w-full bg-[#0d0d1a] text-white border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
+                />
                 <div className="flex justify-end gap-2">
-                  <button onClick={() => setDialog(null)} className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">Cancel</button>
-                  <button onClick={confirmNewFile} disabled={!inputValue.trim()} className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors">Create</button>
+                  <button
+                    onClick={() => setDialog(null)}
+                    className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmNewFile}
+                    disabled={!inputValue.trim()}
+                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
+                  >
+                    Create
+                  </button>
                 </div>
               </>
             )}
             {dialog.type === "rename" && (
               <>
                 <h3 className="text-sm font-medium text-white mb-3">Rename</h3>
-                <input autoFocus value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && confirmRename()} className="w-full bg-[#0d0d1a] text-white border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3" />
+                <input
+                  autoFocus
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && confirmRename()}
+                  className="w-full bg-[#0d0d1a] text-white border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
+                />
                 <div className="flex justify-end gap-2">
-                  <button onClick={() => setDialog(null)} className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">Cancel</button>
-                  <button onClick={confirmRename} disabled={!inputValue.trim() || inputValue.trim() === dialog.entry.name} className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors">Rename</button>
+                  <button
+                    onClick={() => setDialog(null)}
+                    className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmRename}
+                    disabled={!inputValue.trim() || inputValue.trim() === dialog.entry.name}
+                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
+                  >
+                    Rename
+                  </button>
                 </div>
               </>
             )}
@@ -581,11 +757,25 @@ function FileSessionView({ session }: { session: FileSession }) {
                 <p className="text-sm text-gray-300 mb-1">
                   Are you sure you want to delete <span className="text-white font-medium">{dialog.entry.name}</span>?
                 </p>
-                {dialog.entry.isDirectory && <p className="text-xs text-yellow-400 mb-3">This will recursively delete the folder and all its contents.</p>}
+                {dialog.entry.isDirectory && (
+                  <p className="text-xs text-yellow-400 mb-3">
+                    This will recursively delete the folder and all its contents.
+                  </p>
+                )}
                 {!dialog.entry.isDirectory && <div className="mb-3" />}
                 <div className="flex justify-end gap-2">
-                  <button onClick={() => setDialog(null)} className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">Cancel</button>
-                  <button onClick={confirmDelete} className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition-colors">Delete</button>
+                  <button
+                    onClick={() => setDialog(null)}
+                    className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDelete}
+                    className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                  >
+                    Delete
+                  </button>
                 </div>
               </>
             )}
@@ -610,7 +800,12 @@ function FileSessionView({ session }: { session: FileSession }) {
                   </tbody>
                 </table>
                 <div className="flex justify-end mt-3">
-                  <button onClick={() => setDialog(null)} className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors">Close</button>
+                  <button
+                    onClick={() => setDialog(null)}
+                    className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                  >
+                    Close
+                  </button>
                 </div>
               </>
             )}

@@ -69,11 +69,7 @@ export const useFileStore = create<FileState>((set, get) => ({
     set({
       sessions: newSessions,
       activeSessionId:
-        activeSessionId === id
-          ? remaining.length > 0
-            ? remaining[remaining.length - 1]
-            : null
-          : activeSessionId,
+        activeSessionId === id ? (remaining.length > 0 ? remaining[remaining.length - 1] : null) : activeSessionId,
     });
   },
 

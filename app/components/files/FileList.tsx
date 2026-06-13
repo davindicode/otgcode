@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FileEntry } from "~/stores/fileStore";
 
 interface UploadFile {
@@ -32,16 +32,31 @@ function formatSize(bytes: number): string {
 interface ContextMenuState {
   entry: FileEntry;
   rightAlign: boolean; // 3-dot button: right-edge align; point menus: left-align
-  anchorX: number;     // content-x: button right edge (rightAlign) or click point
-  topDown: number;     // content-y for the menu top when opening downward
-  bottomUp: number;    // content-y of the anchor top, used when flipping upward
-  vpTop: number;       // anchor top within the visible container (flip decision)
-  vpBottom: number;    // anchor bottom within the visible container (flip decision)
+  anchorX: number; // content-x: button right edge (rightAlign) or click point
+  topDown: number; // content-y for the menu top when opening downward
+  bottomUp: number; // content-y of the anchor top, used when flipping upward
+  vpTop: number; // anchor top within the visible container (flip decision)
+  vpBottom: number; // anchor bottom within the visible container (flip decision)
 }
 
-export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, onDownload, onCopyPath, uploadQueue, cancelUpload, disabled }: FileListProps) {
+export default function FileList({
+  entries,
+  onOpen,
+  onDelete,
+  onInfo,
+  onRename,
+  onDownload,
+  onCopyPath,
+  uploadQueue,
+  cancelUpload,
+  disabled,
+}: FileListProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
-  const [menuStyle, setMenuStyle] = useState<{ left: number; top: number; visible: boolean }>({ left: 0, top: 0, visible: false });
+  const [menuStyle, setMenuStyle] = useState<{ left: number; top: number; visible: boolean }>({
+    left: 0,
+    top: 0,
+    visible: false,
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -153,98 +168,112 @@ export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, 
   };
 
   if (entries.length === 0 && (!uploadQueue || uploadQueue.length === 0)) {
-    return (
-      <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-        Empty directory
-      </div>
-    );
+    return <div className="flex items-center justify-center h-full text-gray-500 text-sm">Empty directory</div>;
   }
 
   return (
     <div ref={scrollRef} className="overflow-y-auto flex-1 relative">
       <div className={disabled ? "pointer-events-none opacity-50" : ""}>
-      {entries.map((entry) => (
-        <div
-          key={entry.name}
-          className="w-full flex items-center border-b border-gray-800"
-        >
-          {/* Clickable file/folder area */}
-          <button
-            onClick={() => onOpen(entry)}
-            onContextMenu={(e) => handleContextMenu(e, entry)}
-            onTouchStart={(e) => handleTouchStart(e, entry)}
-            onTouchEnd={handleTouchEnd}
-            onTouchMove={handleTouchEnd}
-            className="flex-1 flex items-center gap-3 px-3 py-2 hover:bg-[#1a1a2e] active:bg-[#1a1a2e] transition-colors text-left min-w-0"
-          >
-            {/* Icon */}
-            <span className="text-lg shrink-0">
-              {entry.isDirectory ? (
-                <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              )}
-            </span>
-            {/* Name */}
-            <span className="flex-1 text-sm text-gray-200 truncate">{entry.name}</span>
-            {/* Size */}
-            {!entry.isDirectory && (
-              <span className="text-xs text-gray-500 shrink-0">{formatSize(entry.size)}</span>
-            )}
-          </button>
-          {/* Three-dot menu button — separate from file click */}
-          <button
-            className="shrink-0 p-2 text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 active:bg-gray-700 transition-colors"
-            onClick={(e) => openMenuFromButton(e, entry)}
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
-            </svg>
-          </button>
-        </div>
-      ))}
+        {entries.map((entry) => (
+          <div key={entry.name} className="w-full flex items-center border-b border-gray-800">
+            {/* Clickable file/folder area */}
+            <button
+              onClick={() => onOpen(entry)}
+              onContextMenu={(e) => handleContextMenu(e, entry)}
+              onTouchStart={(e) => handleTouchStart(e, entry)}
+              onTouchEnd={handleTouchEnd}
+              onTouchMove={handleTouchEnd}
+              className="flex-1 flex items-center gap-3 px-3 py-2 hover:bg-[#1a1a2e] active:bg-[#1a1a2e] transition-colors text-left min-w-0"
+            >
+              {/* Icon */}
+              <span className="text-lg shrink-0">
+                {entry.isDirectory ? (
+                  <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                )}
+              </span>
+              {/* Name */}
+              <span className="flex-1 text-sm text-gray-200 truncate">{entry.name}</span>
+              {/* Size */}
+              {!entry.isDirectory && <span className="text-xs text-gray-500 shrink-0">{formatSize(entry.size)}</span>}
+            </button>
+            {/* Three-dot menu button — separate from file click */}
+            <button
+              className="shrink-0 p-2 text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 active:bg-gray-700 transition-colors"
+              onClick={(e) => openMenuFromButton(e, entry)}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
+              </svg>
+            </button>
+          </div>
+        ))}
       </div>
 
       {/* Upload queue inline rows */}
-      {uploadQueue && uploadQueue.length > 0 && uploadQueue.map((file, i) => (
-        <div key={`upload-${i}`} className="w-full flex items-center gap-3 px-3 py-2 border-b border-gray-800">
-          <span className="shrink-0">
-            {file.status === "uploading" || file.status === "pending" ? (
-              <svg className="w-5 h-5 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            ) : file.status === "done" ? (
-              <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+      {uploadQueue &&
+        uploadQueue.length > 0 &&
+        uploadQueue.map((file, i) => (
+          <div key={`upload-${i}`} className="w-full flex items-center gap-3 px-3 py-2 border-b border-gray-800">
+            <span className="shrink-0">
+              {file.status === "uploading" || file.status === "pending" ? (
+                <svg className="w-5 h-5 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : file.status === "done" ? (
+                <svg
+                  className="w-5 h-5 text-green-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg
+                  className="w-5 h-5 text-red-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
+            </span>
+            <span className="flex-1 text-sm text-gray-400 truncate">{file.name}</span>
+            <span className="text-xs text-gray-500 shrink-0">
+              {file.status === "uploading"
+                ? `${file.progress}%`
+                : file.status === "error"
+                  ? file.error || "error"
+                  : file.status}
+            </span>
+            {(file.status === "pending" || file.status === "uploading") && cancelUpload && (
+              <button
+                onClick={() => cancelUpload(i)}
+                className="shrink-0 p-0.5 text-gray-500 hover:text-red-400 transition-colors"
+                title="Cancel upload"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             )}
-          </span>
-          <span className="flex-1 text-sm text-gray-400 truncate">{file.name}</span>
-          <span className="text-xs text-gray-500 shrink-0">
-            {file.status === "uploading" ? `${file.progress}%` : file.status === "error" ? (file.error || "error") : file.status}
-          </span>
-          {(file.status === "pending" || file.status === "uploading") && cancelUpload && (
-            <button
-              onClick={() => cancelUpload(i)}
-              className="shrink-0 p-0.5 text-gray-500 hover:text-red-400 transition-colors"
-              title="Cancel upload"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
-        </div>
-      ))}
+          </div>
+        ))}
 
       {/* Context menu */}
       {menu && (
@@ -257,9 +286,7 @@ export default function FileList({ entries, onOpen, onDelete, onInfo, onRename, 
             visibility: menuStyle.visible ? "visible" : "hidden",
           }}
         >
-          <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700 truncate">
-            {menu.entry.name}
-          </div>
+          <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700 truncate">{menu.entry.name}</div>
           <button
             onClick={() => menuAction(onOpen)}
             className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"

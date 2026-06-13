@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import CopyPathButton from "./CopyPathButton";
 
 interface ImageViewerProps {
@@ -41,14 +41,28 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 bg-[#16162a] border-b border-gray-700 shrink-0">
-        <span className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none" title={path}>{path}</span>
+        <span
+          className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
+          title={path}
+        >
+          {path}
+        </span>
         <CopyPathButton path={path} />
         <div className="flex items-center gap-2 shrink-0">
           {/* Zoom controls */}
           <div className="flex items-center gap-1 border border-gray-700 rounded overflow-hidden">
-            <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">-</button>
-            <button onClick={zoomFit} className="px-2 py-0.5 text-[10px] text-gray-400 hover:text-white hover:bg-gray-700 tabular-nums">{Math.round(zoom * 100)}%</button>
-            <button onClick={zoomIn} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">+</button>
+            <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">
+              -
+            </button>
+            <button
+              onClick={zoomFit}
+              className="px-2 py-0.5 text-[10px] text-gray-400 hover:text-white hover:bg-gray-700 tabular-nums"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button onClick={zoomIn} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">
+              +
+            </button>
           </div>
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
@@ -56,14 +70,22 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
             className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
             title="Download"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"
+              />
+            </svg>
           </a>
           <button
             onClick={onClose}
             className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
             title="Close"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
       </div>
@@ -76,8 +98,12 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
         <div
           className="flex items-center justify-center p-4"
           style={{
-            minWidth: naturalSize ? Math.max(naturalSize.w * zoom + 32, containerRef.current?.clientWidth ?? 0) : "100%",
-            minHeight: naturalSize ? Math.max(naturalSize.h * zoom + 32, containerRef.current?.clientHeight ?? 0) : "100%",
+            minWidth: naturalSize
+              ? Math.max(naturalSize.w * zoom + 32, containerRef.current?.clientWidth ?? 0)
+              : "100%",
+            minHeight: naturalSize
+              ? Math.max(naturalSize.h * zoom + 32, containerRef.current?.clientHeight ?? 0)
+              : "100%",
           }}
         >
           <img
@@ -86,10 +112,14 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
             className="max-w-none"
             draggable={false}
             onLoad={handleImageLoad}
-            style={naturalSize ? {
-              width: naturalSize.w * zoom,
-              height: naturalSize.h * zoom,
-            } : undefined}
+            style={
+              naturalSize
+                ? {
+                    width: naturalSize.w * zoom,
+                    height: naturalSize.h * zoom,
+                  }
+                : undefined
+            }
           />
         </div>
       </div>

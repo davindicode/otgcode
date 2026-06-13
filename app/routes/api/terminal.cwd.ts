@@ -1,7 +1,7 @@
 import { execFileSync, execSync } from "child_process";
-import { readlinkSync, readFileSync } from "fs";
-import type { Route } from "./+types/terminal.cwd";
+import { readFileSync, readlinkSync } from "fs";
 import { getPtyPid } from "../../../server/pty-manager";
+import type { Route } from "./+types/terminal.cwd";
 
 function getDirectChildren(pid: number): number[] {
   try {
@@ -55,11 +55,10 @@ export async function loader({ request }: Route.LoaderArgs) {
         const tty = readTty(childPid);
         if (!tty || !tty.startsWith("/dev/")) continue;
         try {
-          const cwd = execFileSync(
-            "tmux",
-            ["display-message", "-p", "-c", tty, "#{pane_current_path}"],
-            { encoding: "utf-8", timeout: 2000 }
-          ).trim();
+          const cwd = execFileSync("tmux", ["display-message", "-p", "-c", tty, "#{pane_current_path}"], {
+            encoding: "utf-8",
+            timeout: 2000,
+          }).trim();
           if (cwd) return Response.json({ cwd });
         } catch {
           // Fall through to PTY-based detection

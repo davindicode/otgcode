@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useTerminalStore } from "~/stores/terminalStore";
-import TerminalTabs from "./TerminalTabs";
 import TerminalPanel from "./TerminalPanel";
+import TerminalTabs from "./TerminalTabs";
 
 export default function TerminalPage() {
   const sessions = useTerminalStore((s) => s.sessions);

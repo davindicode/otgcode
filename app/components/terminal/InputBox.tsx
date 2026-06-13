@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTerminalStore } from "~/stores/terminalStore";
 
@@ -99,7 +99,7 @@ const TMUX_KEYS: QuickKey[] = [
   { label: "3", key: "\x023", title: "Window 3" },
   { label: "4", key: "\x024", title: "Window 4" },
   { label: "5", key: "\x025", title: "Window 5" },
-  { label: "\" hsplit", key: "\x02\"", title: "Split horizontal" },
+  { label: '" hsplit', key: '\x02"', title: "Split horizontal" },
   { label: "% vsplit", key: "\x02%", title: "Split vertical" },
   { label: "o pane", key: "\x02o", title: "Next pane" },
   { label: "x kill", key: "\x02x", title: "Kill pane" },
@@ -143,7 +143,11 @@ const CLI_VENDORS: CliVendor[] = [
     launch: [
       { label: "claude", title: "Interactive mode", command: "claude\n" },
       { label: "yolo", title: "Skip all permission checks", command: "claude --dangerously-skip-permissions\n" },
-      { label: "plan", title: "Read-only plan mode", command: "claude --allowedTools Read,Glob,Grep,WebSearch,WebFetch\n" },
+      {
+        label: "plan",
+        title: "Read-only plan mode",
+        command: "claude --allowedTools Read,Glob,Grep,WebSearch,WebFetch\n",
+      },
     ],
     slashCmds: [
       { label: "/clear", title: "Clear conversation context", command: "/clear\n" },
@@ -166,7 +170,11 @@ const CLI_VENDORS: CliVendor[] = [
     ],
     launch: [
       { label: "suggest", title: "Proposes changes for approval", command: "codex --approval-mode suggest\n" },
-      { label: "auto-edit", title: "Applies file changes, asks for commands", command: "codex --approval-mode auto-edit\n" },
+      {
+        label: "auto-edit",
+        title: "Applies file changes, asks for commands",
+        command: "codex --approval-mode auto-edit\n",
+      },
       { label: "full-auto", title: "Runs without confirmation", command: "codex --approval-mode full-auto\n" },
     ],
     slashCmds: [
@@ -187,9 +195,7 @@ const CLI_VENDORS: CliVendor[] = [
       { label: "Ctrl+S", key: "\x13", title: "Send message" },
       { label: "Ctrl+A", key: "\x01", title: "Switch session" },
     ],
-    launch: [
-      { label: "opencode", title: "Interactive mode", command: "opencode\n" },
-    ],
+    launch: [{ label: "opencode", title: "Interactive mode", command: "opencode\n" }],
     slashCmds: [
       { label: "/help", title: "Show available commands", command: "/help\n" },
       { label: "/exit", title: "Exit OpenCode", command: "/exit\n" },
@@ -236,9 +242,7 @@ function getStickyKey(ch: string, mode: StickyMode): string {
   switch (mode) {
     case "ctrl":
       // Ctrl+Letter = control code, Ctrl+Digit = send via CSI u
-      return isLetter
-        ? String.fromCharCode(ch.charCodeAt(0) - 64)
-        : `\x1b[${ch.charCodeAt(0)};5u`;
+      return isLetter ? String.fromCharCode(ch.charCodeAt(0) - 64) : `\x1b[${ch.charCodeAt(0)};5u`;
     case "ctrl+shift":
       return `\x1b[${ch.charCodeAt(0)};6u`;
     case "alt":
@@ -259,7 +263,14 @@ export default function InputBox() {
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [tmuxSessions, setTmuxSessions] = useState<TmuxSession[]>([]);
   const [tmuxLoading, setTmuxLoading] = useState(false);
-  const [toolVersions, setToolVersions] = useState<{ tmux: string | null; nano: string | null; vim: string | null; claude: string | null; codex: string | null; opencode: string | null }>({ tmux: null, nano: null, vim: null, claude: null, codex: null, opencode: null });
+  const [toolVersions, setToolVersions] = useState<{
+    tmux: string | null;
+    nano: string | null;
+    vim: string | null;
+    claude: string | null;
+    codex: string | null;
+    opencode: string | null;
+  }>({ tmux: null, nano: null, vim: null, claude: null, codex: null, opencode: null });
   const toolVersionsFetched = useRef(false);
   const [tmuxNewName, setTmuxNewName] = useState("");
   const [editorFileName, setEditorFileName] = useState("");
@@ -314,15 +325,18 @@ export default function InputBox() {
     ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
   };
 
-  const handleQuickKey = useCallback((key: string) => {
-    if (!activeSessionId) return;
-    if (key.length === 2 && key.charCodeAt(0) < 0x20 && key.charCodeAt(1) >= 0x20) {
-      sendInput(activeSessionId, key[0]);
-      setTimeout(() => sendInput(activeSessionId, key[1]), 50);
-    } else {
-      sendInput(activeSessionId, key);
-    }
-  }, [activeSessionId, sendInput]);
+  const handleQuickKey = useCallback(
+    (key: string) => {
+      if (!activeSessionId) return;
+      if (key.length === 2 && key.charCodeAt(0) < 0x20 && key.charCodeAt(1) >= 0x20) {
+        sendInput(activeSessionId, key[0]);
+        setTimeout(() => sendInput(activeSessionId, key[1]), 50);
+      } else {
+        sendInput(activeSessionId, key);
+      }
+    },
+    [activeSessionId, sendInput],
+  );
 
   // Long-press repeat with scroll detection
   const repeatRef = useRef<{
@@ -333,16 +347,19 @@ export default function InputBox() {
     startY: number;
   } | null>(null);
 
-  const startRepeat = useCallback((key: string, x: number, y: number) => {
-    const timeout = setTimeout(() => {
-      if (!repeatRef.current) return;
-      repeatRef.current.fired = true;
-      handleQuickKey(key);
-      const interval = setInterval(() => handleQuickKey(key), 80);
-      if (repeatRef.current) repeatRef.current.interval = interval;
-    }, 120);
-    repeatRef.current = { timeout, interval: null as any, fired: false, startX: x, startY: y };
-  }, [handleQuickKey]);
+  const startRepeat = useCallback(
+    (key: string, x: number, y: number) => {
+      const timeout = setTimeout(() => {
+        if (!repeatRef.current) return;
+        repeatRef.current.fired = true;
+        handleQuickKey(key);
+        const interval = setInterval(() => handleQuickKey(key), 80);
+        if (repeatRef.current) repeatRef.current.interval = interval;
+      }, 120);
+      repeatRef.current = { timeout, interval: null as any, fired: false, startX: x, startY: y };
+    },
+    [handleQuickKey],
+  );
 
   const cancelRepeat = useCallback(() => {
     if (repeatRef.current) {
@@ -352,20 +369,29 @@ export default function InputBox() {
     }
   }, []);
 
-  const finishRepeat = useCallback((key: string) => {
-    if (repeatRef.current && !repeatRef.current.fired) handleQuickKey(key);
-    cancelRepeat();
-  }, [handleQuickKey, cancelRepeat]);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!repeatRef.current) return;
-    if (Math.abs(e.clientX - repeatRef.current.startX) > 10 || Math.abs(e.clientY - repeatRef.current.startY) > 10) {
+  const finishRepeat = useCallback(
+    (key: string) => {
+      if (repeatRef.current && !repeatRef.current.fired) handleQuickKey(key);
       cancelRepeat();
-    }
-  }, [cancelRepeat]);
+    },
+    [handleQuickKey, cancelRepeat],
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!repeatRef.current) return;
+      if (Math.abs(e.clientX - repeatRef.current.startX) > 10 || Math.abs(e.clientY - repeatRef.current.startY) > 10) {
+        cancelRepeat();
+      }
+    },
+    [cancelRepeat],
+  );
 
   const repeatProps = (key: string) => ({
-    onPointerDown: (e: React.PointerEvent) => { e.preventDefault(); startRepeat(key, e.clientX, e.clientY); },
+    onPointerDown: (e: React.PointerEvent) => {
+      e.preventDefault();
+      startRepeat(key, e.clientX, e.clientY);
+    },
     onPointerMove: handlePointerMove,
     onPointerUp: () => finishRepeat(key),
     onPointerLeave: cancelRepeat,
@@ -416,7 +442,9 @@ export default function InputBox() {
       const res = await fetch("/api/tmux/sessions");
       const data = await res.json();
       setTmuxSessions(data.sessions || []);
-    } catch { setTmuxSessions([]); }
+    } catch {
+      setTmuxSessions([]);
+    }
     setTmuxLoading(false);
   };
 
@@ -471,11 +499,13 @@ export default function InputBox() {
           setCdDirs(
             (data.entries || [])
               .filter((e: { isDirectory: boolean }) => e.isDirectory)
-              .map((e: { name: string }) => e.name)
+              .map((e: { name: string }) => e.name),
           );
         }
       }
-    } catch { setCdDirs([]); }
+    } catch {
+      setCdDirs([]);
+    }
     setCdLoading(false);
   };
 
@@ -529,7 +559,8 @@ export default function InputBox() {
   };
 
   // --- Styles ---
-  const tabBase = "px-2.5 py-0.5 text-[11px] rounded border whitespace-nowrap transition-colors shrink-0 select-none touch-manipulation";
+  const tabBase =
+    "px-2.5 py-0.5 text-[11px] rounded border whitespace-nowrap transition-colors shrink-0 select-none touch-manipulation";
   const tabDisabledAction = `${tabBase} bg-[#151520] text-gray-600 border-gray-700/50 cursor-not-allowed`;
   const tabDisabledApp = `${tabBase} bg-[#151520] text-gray-600 border-gray-700/50 cursor-not-allowed`;
   // Action tabs (cmds, cd, code, sticky) — blue
@@ -540,9 +571,12 @@ export default function InputBox() {
   const appTabOn = `${tabBase} bg-[#1a3e2a] text-green-200 border-green-500`;
 
   // Popup action buttons: neutral gray
-  const keyBtn = "px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-gray-400 hover:text-white hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-gray-700 whitespace-nowrap transition-colors select-none touch-manipulation";
-  const exitBtn = "px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-red-400 hover:text-red-300 hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-red-800 whitespace-nowrap transition-colors select-none touch-manipulation";
-  const saveExitBtn = "px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-green-400 hover:text-green-300 hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-green-800 whitespace-nowrap transition-colors select-none touch-manipulation";
+  const keyBtn =
+    "px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-gray-400 hover:text-white hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-gray-700 whitespace-nowrap transition-colors select-none touch-manipulation";
+  const exitBtn =
+    "px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-red-400 hover:text-red-300 hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-red-800 whitespace-nowrap transition-colors select-none touch-manipulation";
+  const saveExitBtn =
+    "px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-green-400 hover:text-green-300 hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-green-800 whitespace-nowrap transition-colors select-none touch-manipulation";
 
   // --- Determine which tabs to show ---
   // Editor mode (nano/vim): only editor tab + sticky (+ tmux if in tmux)
@@ -556,23 +590,35 @@ export default function InputBox() {
       onClick={() => !disabled && toggleGroup(id)}
       disabled={disabled}
       title={title}
-      className={disabled
-        ? (kind === "app" ? tabDisabledApp : tabDisabledAction)
-        : activeGroup === id
-          ? (kind === "app" ? appTabOn : actionTabOn)
-          : (kind === "app" ? appTabOff : actionTabOff)}
+      className={
+        disabled
+          ? kind === "app"
+            ? tabDisabledApp
+            : tabDisabledAction
+          : activeGroup === id
+            ? kind === "app"
+              ? appTabOn
+              : actionTabOn
+            : kind === "app"
+              ? appTabOff
+              : actionTabOff
+      }
     >
       {label}
     </button>
   );
 
   // Resolve which key group to show in the popup
-  const activeStandardGroup = activeGroup && ![STICKY_TAB, TMUX_TAB, NANO_TAB, VIM_TAB, CODE_TAB, GIT_TAB, CD_TAB].includes(activeGroup)
-    ? TERMINAL_GROUPS.find((g) => g.label === activeGroup)
-    : null;
+  const activeStandardGroup =
+    activeGroup && ![STICKY_TAB, TMUX_TAB, NANO_TAB, VIM_TAB, CODE_TAB, GIT_TAB, CD_TAB].includes(activeGroup)
+      ? TERMINAL_GROUPS.find((g) => g.label === activeGroup)
+      : null;
 
   return (
-    <div className="bg-[#16162a] border-t border-gray-700 shrink-0 overflow-hidden terminal-focus-area rounded-sm" style={{ minWidth: 0 }}>
+    <div
+      className="bg-[#16162a] border-t border-gray-700 shrink-0 overflow-hidden terminal-focus-area rounded-sm"
+      style={{ minWidth: 0 }}
+    >
       {/* Tab bar */}
       <div className="border-b border-gray-700/50 overflow-x-auto scrollbar-none" style={{ minWidth: 0 }}>
         <div className="flex items-center gap-1 px-2 py-1 w-max">
@@ -583,9 +629,29 @@ export default function InputBox() {
           {!isEditorMode && tabBtn(CODE_TAB, "code", "Coding CLI launchers & keys", !activeSessionId)}
           {!isEditorMode && tabBtn(GIT_TAB, "git", "Git actions", !activeSessionId)}
           {/* App tabs (green) — nano/vim hidden in tmux mode, shown with active indicator in editor mode */}
-          {!inTmux && tabBtn(NANO_TAB, inEditor === "nano" ? "nano \u2318" : "nano", inEditor === "nano" ? "nano commands" : "Open file in nano", !activeSessionId && inEditor !== "nano", "app")}
-          {!inTmux && tabBtn(VIM_TAB, inEditor === "vim" ? "vim \u2318" : "vim", inEditor === "vim" ? "vim commands" : "Open file in vim", !activeSessionId && inEditor !== "vim", "app")}
-          {tabBtn(TMUX_TAB, inTmux ? "tmux \u2318" : "tmux", inTmux ? "tmux commands" : "tmux sessions", !activeSessionId && !inTmux, "app")}
+          {!inTmux &&
+            tabBtn(
+              NANO_TAB,
+              inEditor === "nano" ? "nano \u2318" : "nano",
+              inEditor === "nano" ? "nano commands" : "Open file in nano",
+              !activeSessionId && inEditor !== "nano",
+              "app",
+            )}
+          {!inTmux &&
+            tabBtn(
+              VIM_TAB,
+              inEditor === "vim" ? "vim \u2318" : "vim",
+              inEditor === "vim" ? "vim commands" : "Open file in vim",
+              !activeSessionId && inEditor !== "vim",
+              "app",
+            )}
+          {tabBtn(
+            TMUX_TAB,
+            inTmux ? "tmux \u2318" : "tmux",
+            inTmux ? "tmux commands" : "tmux sessions",
+            !activeSessionId && !inTmux,
+            "app",
+          )}
         </div>
       </div>
 
@@ -594,7 +660,13 @@ export default function InputBox() {
         <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5">
           <div className="flex flex-wrap gap-1">
             {activeStandardGroup.keys.map((qk) => (
-              <button key={qk.label} {...repeatProps(qk.key)} disabled={!activeSessionId} title={qk.title} className={keyBtn}>
+              <button
+                key={qk.label}
+                {...repeatProps(qk.key)}
+                disabled={!activeSessionId}
+                title={qk.title}
+                className={keyBtn}
+              >
                 {qk.label}
               </button>
             ))}
@@ -607,7 +679,12 @@ export default function InputBox() {
         <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5">
           <div className="flex items-center gap-1.5 mb-1">
             <span className="text-[11px] text-gray-500">cd</span>
-            <span className="text-[10px] text-gray-600 overflow-hidden text-ellipsis whitespace-nowrap flex-1" title={cdCwd}>{cdCwd}</span>
+            <span
+              className="text-[10px] text-gray-600 overflow-hidden text-ellipsis whitespace-nowrap flex-1"
+              title={cdCwd}
+            >
+              {cdCwd}
+            </span>
           </div>
           {cdLoading ? (
             <span className="text-[11px] text-gray-500">Loading...</span>
@@ -695,7 +772,13 @@ export default function InputBox() {
         <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5">
           <div className="flex flex-wrap gap-1">
             {NANO_KEYS.map((qk) => (
-              <button key={qk.label} {...repeatProps(qk.key)} disabled={!activeSessionId} title={qk.title} className={keyBtn}>
+              <button
+                key={qk.label}
+                {...repeatProps(qk.key)}
+                disabled={!activeSessionId}
+                title={qk.title}
+                className={keyBtn}
+              >
                 {qk.label}
               </button>
             ))}
@@ -708,25 +791,27 @@ export default function InputBox() {
       {activeGroup === NANO_TAB && inEditor !== "nano" && (
         <div className="border-b border-gray-700/50 bg-[#12122a] px-3 py-2">
           {!toolVersions.nano ? (
-            <span className="text-[11px] text-yellow-400">nano is not installed. Install it via your package manager.</span>
+            <span className="text-[11px] text-yellow-400">
+              nano is not installed. Install it via your package manager.
+            </span>
           ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-gray-500">nano{toolVersions.nano ? ` v${toolVersions.nano}` : ""}</span>
-            <input
-              value={editorFileName}
-              onChange={(e) => setEditorFileName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("nano")}
-              placeholder="filename or path..."
-              className="flex-1 bg-[#1a1a2e] text-white border border-gray-700 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            <button
-              onClick={() => handleOpenEditor("nano")}
-              disabled={!editorFileName.trim() || !activeSessionId}
-              className="px-2 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
-            >
-              Open
-            </button>
-          </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-500">nano{toolVersions.nano ? ` v${toolVersions.nano}` : ""}</span>
+              <input
+                value={editorFileName}
+                onChange={(e) => setEditorFileName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("nano")}
+                placeholder="filename or path..."
+                className="flex-1 bg-[#1a1a2e] text-white border border-gray-700 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <button
+                onClick={() => handleOpenEditor("nano")}
+                disabled={!editorFileName.trim() || !activeSessionId}
+                className="px-2 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
+              >
+                Open
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -736,11 +821,22 @@ export default function InputBox() {
         <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5">
           <div className="flex flex-wrap gap-1">
             {VIM_KEYS.map((qk) => (
-              <button key={qk.label} {...repeatProps(qk.key)} disabled={!activeSessionId} title={qk.title} className={keyBtn}>
+              <button
+                key={qk.label}
+                {...repeatProps(qk.key)}
+                disabled={!activeSessionId}
+                title={qk.title}
+                className={keyBtn}
+              >
                 {qk.label}
               </button>
             ))}
-            <button onClick={handleSaveExitVim} disabled={!activeSessionId} title="Save and exit (:wq)" className={saveExitBtn}>
+            <button
+              onClick={handleSaveExitVim}
+              disabled={!activeSessionId}
+              title="Save and exit (:wq)"
+              className={saveExitBtn}
+            >
               save+exit
             </button>
             <button onClick={handleExitVim} disabled={!activeSessionId} title="Force quit (:q!)" className={exitBtn}>
@@ -752,25 +848,27 @@ export default function InputBox() {
       {activeGroup === VIM_TAB && inEditor !== "vim" && (
         <div className="border-b border-gray-700/50 bg-[#12122a] px-3 py-2">
           {!toolVersions.vim ? (
-            <span className="text-[11px] text-yellow-400">vim is not installed. Install it via your package manager.</span>
+            <span className="text-[11px] text-yellow-400">
+              vim is not installed. Install it via your package manager.
+            </span>
           ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-gray-500">vim v{toolVersions.vim}</span>
-            <input
-              value={editorFileName}
-              onChange={(e) => setEditorFileName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("vim")}
-              placeholder="filename or path..."
-              className="flex-1 bg-[#1a1a2e] text-white border border-gray-700 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            <button
-              onClick={() => handleOpenEditor("vim")}
-              disabled={!editorFileName.trim() || !activeSessionId}
-              className="px-2 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
-            >
-              Open
-            </button>
-          </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-500">vim v{toolVersions.vim}</span>
+              <input
+                value={editorFileName}
+                onChange={(e) => setEditorFileName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("vim")}
+                placeholder="filename or path..."
+                className="flex-1 bg-[#1a1a2e] text-white border border-gray-700 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <button
+                onClick={() => handleOpenEditor("vim")}
+                disabled={!editorFileName.trim() || !activeSessionId}
+                className="px-2 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
+              >
+                Open
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -780,7 +878,13 @@ export default function InputBox() {
         <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5">
           <div className="flex flex-wrap gap-1">
             {TMUX_KEYS.map((qk) => (
-              <button key={qk.label} {...repeatProps(qk.key)} disabled={!activeSessionId} title={qk.title} className={keyBtn}>
+              <button
+                key={qk.label}
+                {...repeatProps(qk.key)}
+                disabled={!activeSessionId}
+                title={qk.title}
+                className={keyBtn}
+              >
                 {qk.label}
               </button>
             ))}
@@ -793,142 +897,177 @@ export default function InputBox() {
       {activeGroup === TMUX_TAB && !inTmux && (
         <div className="border-b border-gray-700/50 bg-[#12122a] px-3 py-2">
           {!toolVersions.tmux ? (
-            <span className="text-[11px] text-yellow-400">tmux is not installed. Install it via your package manager.</span>
-          ) : (<>
-          <span className="text-[10px] text-gray-600 float-right">v{toolVersions.tmux}</span>
-          {tmuxLoading ? (
-            <span className="text-[11px] text-gray-500">Loading...</span>
-          ) : tmuxSessions.length === 0 ? (
-            <span className="text-[11px] text-gray-500">No tmux sessions running</span>
+            <span className="text-[11px] text-yellow-400">
+              tmux is not installed. Install it via your package manager.
+            </span>
           ) : (
-            <div className="flex flex-col gap-1 mb-2">
-              {tmuxSessions.map((s) => (
-                <div key={s.name} className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleTmuxAttach(s.name)}
-                    className="flex-1 text-left px-2 py-1 text-[11px] bg-[#1a1a2e] text-gray-300 hover:text-white hover:bg-[#2a2a4a] rounded border border-gray-700 transition-colors"
-                  >
-                    <span className="font-medium">{s.name}</span>
-                    <span className="text-gray-500 ml-2">{s.windows}w</span>
-                    {s.attached && <span className="text-green-500 ml-1">(attached)</span>}
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (!activeSessionId) return;
-                      sendInput(activeSessionId, `tmux kill-session -t ${s.name}\n`);
-                      setTimeout(fetchTmuxSessions, 500);
-                    }}
-                    className="p-1 text-gray-500 hover:text-red-400 transition-colors"
-                    title={`Kill session ${s.name}`}
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
+            <>
+              <span className="text-[10px] text-gray-600 float-right">v{toolVersions.tmux}</span>
+              {tmuxLoading ? (
+                <span className="text-[11px] text-gray-500">Loading...</span>
+              ) : tmuxSessions.length === 0 ? (
+                <span className="text-[11px] text-gray-500">No tmux sessions running</span>
+              ) : (
+                <div className="flex flex-col gap-1 mb-2">
+                  {tmuxSessions.map((s) => (
+                    <div key={s.name} className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleTmuxAttach(s.name)}
+                        className="flex-1 text-left px-2 py-1 text-[11px] bg-[#1a1a2e] text-gray-300 hover:text-white hover:bg-[#2a2a4a] rounded border border-gray-700 transition-colors"
+                      >
+                        <span className="font-medium">{s.name}</span>
+                        <span className="text-gray-500 ml-2">{s.windows}w</span>
+                        {s.attached && <span className="text-green-500 ml-1">(attached)</span>}
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!activeSessionId) return;
+                          sendInput(activeSessionId, `tmux kill-session -t ${s.name}\n`);
+                          setTimeout(fetchTmuxSessions, 500);
+                        }}
+                        className="p-1 text-gray-500 hover:text-red-400 transition-colors"
+                        title={`Kill session ${s.name}`}
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  value={tmuxNewName}
+                  onChange={(e) => setTmuxNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleTmuxNew()}
+                  placeholder="New session name..."
+                  className="flex-1 bg-[#1a1a2e] text-white border border-gray-700 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <button
+                  onClick={handleTmuxNew}
+                  disabled={!tmuxNewName.trim() || !activeSessionId}
+                  className="px-2 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
+                >
+                  Create
+                </button>
+              </div>
+            </>
           )}
-          <div className="flex items-center gap-2 mt-1">
-            <input
-              value={tmuxNewName}
-              onChange={(e) => setTmuxNewName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleTmuxNew()}
-              placeholder="New session name..."
-              className="flex-1 bg-[#1a1a2e] text-white border border-gray-700 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            <button
-              onClick={handleTmuxNew}
-              disabled={!tmuxNewName.trim() || !activeSessionId}
-              className="px-2 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
-            >
-              Create
-            </button>
-          </div>
-          </>)}
         </div>
       )}
 
       {/* Code tab: common keys + selected vendor panel */}
-      {activeGroup === CODE_TAB && (() => {
-        const vendor = CLI_VENDORS[codeVendorIdx] || CLI_VENDORS[0];
-        return (
-        <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5 max-h-64 overflow-y-auto">
-          {/* Common keys (no header) */}
-          <div className="flex flex-wrap gap-1 mb-1.5">
-            {CODE_COMMON_KEYS.map((qk) => (
-              <button key={qk.label} {...repeatProps(qk.key)} disabled={!activeSessionId} title={qk.title} className={keyBtn}>
-                {qk.label}
-              </button>
-            ))}
-          </div>
-          {/* Selected vendor: toggle selector left, buttons right */}
-          <div className="flex items-start gap-1.5 border-t border-gray-700/50 pt-1.5">
-            <button
-              ref={codeVendorBtnRef}
-              onClick={() => setCodeVendorOpen((v) => !v)}
-              className="text-[10px] text-gray-400 hover:text-white font-medium flex items-center gap-0.5 pt-0.5 select-none shrink-0"
-            >
-              <svg className="w-2.5 h-2.5 transition-transform" style={{ transform: codeVendorOpen ? "rotate(90deg)" : "rotate(0deg)" }} fill="currentColor" viewBox="0 0 20 20">
-                <path d="M6 4l8 6-8 6V4z" />
-              </svg>
-              {vendor.name}
-            </button>
-            {codeVendorOpen && createPortal(
-              <div
-                ref={codeVendorMenuRef}
-                className="fixed bg-[#1a1a2e] border border-gray-600 rounded shadow-lg min-w-[80px] py-0.5"
-                style={{ zIndex: 9999, ...((() => {
-                  const r = codeVendorBtnRef.current?.getBoundingClientRect();
-                  return r ? { left: r.left, bottom: window.innerHeight - r.top + 4 } : {};
-                })()) }}
-              >
-                {CLI_VENDORS.map((v, i) => (
+      {activeGroup === CODE_TAB &&
+        (() => {
+          const vendor = CLI_VENDORS[codeVendorIdx] || CLI_VENDORS[0];
+          return (
+            <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5 max-h-64 overflow-y-auto">
+              {/* Common keys (no header) */}
+              <div className="flex flex-wrap gap-1 mb-1.5">
+                {CODE_COMMON_KEYS.map((qk) => (
                   <button
-                    key={v.name}
-                    onClick={() => { setCodeVendorIdx(i); setCodeVendorOpen(false); }}
-                    className={`block w-full text-left px-3 py-1 text-[11px] hover:bg-[#2a2a4a] transition-colors ${i === codeVendorIdx ? "text-blue-400" : "text-gray-300"}`}
+                    key={qk.label}
+                    {...repeatProps(qk.key)}
+                    disabled={!activeSessionId}
+                    title={qk.title}
+                    className={keyBtn}
                   >
-                    {v.name}
+                    {qk.label}
                   </button>
                 ))}
-              </div>,
-              document.body
-            )}
-            <div className="flex flex-wrap gap-1 min-w-0">
-              {/* Launch buttons (purple) */}
-              {vendor.launch.map((cmd) => (
+              </div>
+              {/* Selected vendor: toggle selector left, buttons right */}
+              <div className="flex items-start gap-1.5 border-t border-gray-700/50 pt-1.5">
                 <button
-                  key={`${vendor.name}-${cmd.label}`}
-                  onClick={() => { if (activeSessionId) sendInput(activeSessionId, cmd.command); }}
-                  disabled={!activeSessionId}
-                  title={cmd.title}
-                  className="px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-purple-400 hover:text-purple-200 hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-purple-800/60 whitespace-nowrap transition-colors select-none"
+                  ref={codeVendorBtnRef}
+                  onClick={() => setCodeVendorOpen((v) => !v)}
+                  className="text-[10px] text-gray-400 hover:text-white font-medium flex items-center gap-0.5 pt-0.5 select-none shrink-0"
                 >
-                  {cmd.label}
+                  <svg
+                    className="w-2.5 h-2.5 transition-transform"
+                    style={{ transform: codeVendorOpen ? "rotate(90deg)" : "rotate(0deg)" }}
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M6 4l8 6-8 6V4z" />
+                  </svg>
+                  {vendor.name}
                 </button>
-              ))}
-              {/* Vendor-specific keys */}
-              {vendor.keys.map((qk) => (
-                <button key={`${vendor.name}-${qk.label}`} {...repeatProps(qk.key)} disabled={!activeSessionId} title={qk.title} className={keyBtn}>
-                  {qk.label}
-                </button>
-              ))}
-              {/* Slash commands (cyan) */}
-              {vendor.slashCmds.map((cmd) => (
-                <button
-                  key={`${vendor.name}-${cmd.label}`}
-                  onClick={() => { if (activeSessionId) sendInput(activeSessionId, cmd.command); }}
-                  disabled={!activeSessionId}
-                  title={cmd.title}
-                  className="px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-cyan-400 hover:text-cyan-200 hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-cyan-800/60 whitespace-nowrap transition-colors select-none"
-                >
-                  {cmd.label}
-                </button>
-              ))}
+                {codeVendorOpen &&
+                  createPortal(
+                    <div
+                      ref={codeVendorMenuRef}
+                      className="fixed bg-[#1a1a2e] border border-gray-600 rounded shadow-lg min-w-[80px] py-0.5"
+                      style={{
+                        zIndex: 9999,
+                        ...(() => {
+                          const r = codeVendorBtnRef.current?.getBoundingClientRect();
+                          return r ? { left: r.left, bottom: window.innerHeight - r.top + 4 } : {};
+                        })(),
+                      }}
+                    >
+                      {CLI_VENDORS.map((v, i) => (
+                        <button
+                          key={v.name}
+                          onClick={() => {
+                            setCodeVendorIdx(i);
+                            setCodeVendorOpen(false);
+                          }}
+                          className={`block w-full text-left px-3 py-1 text-[11px] hover:bg-[#2a2a4a] transition-colors ${i === codeVendorIdx ? "text-blue-400" : "text-gray-300"}`}
+                        >
+                          {v.name}
+                        </button>
+                      ))}
+                    </div>,
+                    document.body,
+                  )}
+                <div className="flex flex-wrap gap-1 min-w-0">
+                  {/* Launch buttons (purple) */}
+                  {vendor.launch.map((cmd) => (
+                    <button
+                      key={`${vendor.name}-${cmd.label}`}
+                      onClick={() => {
+                        if (activeSessionId) sendInput(activeSessionId, cmd.command);
+                      }}
+                      disabled={!activeSessionId}
+                      title={cmd.title}
+                      className="px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-purple-400 hover:text-purple-200 hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-purple-800/60 whitespace-nowrap transition-colors select-none"
+                    >
+                      {cmd.label}
+                    </button>
+                  ))}
+                  {/* Vendor-specific keys */}
+                  {vendor.keys.map((qk) => (
+                    <button
+                      key={`${vendor.name}-${qk.label}`}
+                      {...repeatProps(qk.key)}
+                      disabled={!activeSessionId}
+                      title={qk.title}
+                      className={keyBtn}
+                    >
+                      {qk.label}
+                    </button>
+                  ))}
+                  {/* Slash commands (cyan) */}
+                  {vendor.slashCmds.map((cmd) => (
+                    <button
+                      key={`${vendor.name}-${cmd.label}`}
+                      onClick={() => {
+                        if (activeSessionId) sendInput(activeSessionId, cmd.command);
+                      }}
+                      disabled={!activeSessionId}
+                      title={cmd.title}
+                      className="px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-cyan-400 hover:text-cyan-200 hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-cyan-800/60 whitespace-nowrap transition-colors select-none"
+                    >
+                      {cmd.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        );
-      })()}
+          );
+        })()}
 
       {/* Git tab: quick actions + commit + config */}
       {activeGroup === GIT_TAB && (
@@ -938,7 +1077,9 @@ export default function InputBox() {
             {GIT_QUICK_CMDS.map((cmd) => (
               <button
                 key={cmd.label}
-                onClick={() => { if (activeSessionId) sendInput(activeSessionId, cmd.command); }}
+                onClick={() => {
+                  if (activeSessionId) sendInput(activeSessionId, cmd.command);
+                }}
                 disabled={!activeSessionId}
                 title={cmd.title}
                 className={keyBtn}
@@ -995,8 +1136,10 @@ export default function InputBox() {
             <button
               onClick={() => {
                 if (!activeSessionId) return;
-                if (gitConfigName.trim()) sendInput(activeSessionId, `git config --global user.name '${gitConfigName.trim()}'\n`);
-                if (gitConfigEmail.trim()) sendInput(activeSessionId, `git config --global user.email '${gitConfigEmail.trim()}'\n`);
+                if (gitConfigName.trim())
+                  sendInput(activeSessionId, `git config --global user.name '${gitConfigName.trim()}'\n`);
+                if (gitConfigEmail.trim())
+                  sendInput(activeSessionId, `git config --global user.email '${gitConfigEmail.trim()}'\n`);
               }}
               disabled={!activeSessionId || (!gitConfigName.trim() && !gitConfigEmail.trim())}
               className="px-2 py-0.5 text-[11px] bg-blue-700 hover:bg-blue-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors shrink-0"
@@ -1030,17 +1173,35 @@ export default function InputBox() {
       {/* Always-visible nav keys */}
       <div className="flex items-center gap-1 px-2 pb-1.5 overflow-x-auto scrollbar-none">
         {NAV_KEYS.map((qk) => (
-          <button key={qk.label} {...repeatProps(qk.key)} disabled={!activeSessionId} title={qk.title} className={`${keyBtn} text-[10px] px-1.5`}>
+          <button
+            key={qk.label}
+            {...repeatProps(qk.key)}
+            disabled={!activeSessionId}
+            title={qk.title}
+            className={`${keyBtn} text-[10px] px-1.5`}
+          >
             {qk.label}
           </button>
         ))}
         {NAV_TAIL.map((qk) => (
-          <button key={qk.label} {...repeatProps(qk.key)} disabled={!activeSessionId} title={qk.title} className={`${keyBtn} text-[10px] px-1.5`}>
+          <button
+            key={qk.label}
+            {...repeatProps(qk.key)}
+            disabled={!activeSessionId}
+            title={qk.title}
+            className={`${keyBtn} text-[10px] px-1.5`}
+          >
             {qk.label}
           </button>
         ))}
         {NAV_ARROWS.map((qk) => (
-          <button key={qk.label} {...repeatProps(qk.key)} disabled={!activeSessionId} title={qk.title} className={`${keyBtn} text-[10px] px-1.5`}>
+          <button
+            key={qk.label}
+            {...repeatProps(qk.key)}
+            disabled={!activeSessionId}
+            title={qk.title}
+            className={`${keyBtn} text-[10px] px-1.5`}
+          >
             {qk.label}
           </button>
         ))}

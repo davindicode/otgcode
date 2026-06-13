@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 export interface BrowserTab {
   id: string;
-  port: string;       // "" = pending input
+  port: string; // "" = pending input
   refreshKey: number;
   error: string | null;
 }
@@ -38,9 +38,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
     let newActive = activeTabId;
     if (activeTabId === id) {
       const idx = tabs.findIndex((t) => t.id === id);
-      newActive = newTabs.length > 0
-        ? newTabs[Math.min(idx, newTabs.length - 1)].id
-        : null;
+      newActive = newTabs.length > 0 ? newTabs[Math.min(idx, newTabs.length - 1)].id : null;
     }
     set({ tabs: newTabs, activeTabId: newActive });
   },
@@ -49,19 +47,19 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
 
   setTabPort: (id, port) => {
     set((s) => ({
-      tabs: s.tabs.map((t) => t.id === id ? { ...t, port, error: null, refreshKey: 0 } : t),
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, port, error: null, refreshKey: 0 } : t)),
     }));
   },
 
   setTabError: (id, error) => {
     set((s) => ({
-      tabs: s.tabs.map((t) => t.id === id ? { ...t, error } : t),
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, error } : t)),
     }));
   },
 
   refreshTab: (id) => {
     set((s) => ({
-      tabs: s.tabs.map((t) => t.id === id ? { ...t, refreshKey: t.refreshKey + 1 } : t),
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, refreshKey: t.refreshKey + 1 } : t)),
     }));
   },
 }));

@@ -1,6 +1,6 @@
 import { readFile, stat } from "fs/promises";
-import { basename } from "path";
 import { lookup } from "mime-types";
+import { basename } from "path";
 import type { Route } from "./+types/files.download";
 
 export async function loader({ request }: Route.LoaderArgs) {

@@ -1,6 +1,6 @@
-import { useTerminalStore } from "~/stores/terminalStore";
-import { MIN_FONT_SIZE, MAX_FONT_SIZE } from "~/lib/constants";
 import RenamableTab from "~/components/RenamableTab";
+import { MAX_FONT_SIZE, MIN_FONT_SIZE } from "~/lib/constants";
+import { useTerminalStore } from "~/stores/terminalStore";
 
 export default function TerminalTabs() {
   const sessions = useTerminalStore((s) => s.sessions);

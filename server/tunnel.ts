@@ -1,7 +1,7 @@
-import { spawn, type ChildProcess } from "child_process";
+import { type ChildProcess, spawn } from "child_process";
 import { existsSync, writeFileSync } from "fs";
-import { join } from "path";
 import { tmpdir } from "os";
+import { join } from "path";
 
 // Main OTG Code tunnel
 let mainTunnelProcess: ChildProcess | null = null;
@@ -44,7 +44,16 @@ function spawnTunnelOnce(port: number): Promise<string | null> {
 
     let proc: ChildProcess;
     try {
-      const args = ["tunnel", "--config", stubConfigPath(), "--no-autoupdate", "--protocol", "http2", "--url", `http://localhost:${port}`];
+      const args = [
+        "tunnel",
+        "--config",
+        stubConfigPath(),
+        "--no-autoupdate",
+        "--protocol",
+        "http2",
+        "--url",
+        `http://localhost:${port}`,
+      ];
       proc = spawn(cfBin, args, {
         stdio: ["ignore", "pipe", "pipe"],
       });

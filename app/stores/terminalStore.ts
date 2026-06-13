@@ -1,8 +1,8 @@
-import { create } from "zustand";
-import type { Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
-import { getSocket } from "~/lib/socket";
+import type { Terminal } from "@xterm/xterm";
+import { create } from "zustand";
 import { DEFAULT_FONT_SIZE } from "~/lib/constants";
+import { getSocket } from "~/lib/socket";
 
 interface TerminalSession {
   id: string;
@@ -79,7 +79,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       set({ socketConnected: false });
       // Mark all sessions as disconnected
       const { sessions } = get();
-      const updated: Record<string, typeof sessions[string]> = {};
+      const updated: Record<string, (typeof sessions)[string]> = {};
       for (const [id, session] of Object.entries(sessions)) {
         updated[id] = { ...session, status: "disconnected" };
       }
@@ -101,9 +101,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           [data.sessionId]: {
             ...session,
             status: "connected",
-            outputBuffer: session.terminal
-              ? session.outputBuffer
-              : [...session.outputBuffer, connectedMsg],
+            outputBuffer: session.terminal ? session.outputBuffer : [...session.outputBuffer, connectedMsg],
           },
         },
       });
@@ -145,9 +143,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
             ...session,
             status: "error",
             error: data.error,
-            outputBuffer: session.terminal
-              ? session.outputBuffer
-              : [...session.outputBuffer, errorMsg],
+            outputBuffer: session.terminal ? session.outputBuffer : [...session.outputBuffer, errorMsg],
           },
         },
       });
