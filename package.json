@@ -18,7 +18,9 @@
     "dev": "tsx server/dev.ts",
     "start": "tsx server/index.ts",
     "start:tunnel": "tsx server/index.ts --tunnel",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "lint": "biome ci .",
+    "format": "biome check --write ."
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -44,6 +46,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.0",
     "@react-router/dev": "7.12.0",
     "@tailwindcss/vite": "^4.1.13",
     "@types/busboy": "^1.5.4",

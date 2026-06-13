@@ -24,6 +24,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Lint & format check
+        run: pnpm run lint
+
       - name: TypeScript check
         run: pnpm run typecheck
 
