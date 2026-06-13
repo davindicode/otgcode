@@ -1,27 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import RenamableTab from "~/components/RenamableTab";
+import { copyText } from "~/lib/clipboard";
 import { type FileEntry, type FileSession, useFileStore } from "~/stores/fileStore";
 import Breadcrumbs from "./Breadcrumbs";
 import FileList from "./FileList";
 import FileViewer from "./FileViewer";
-
-// Clipboard fallback for insecure contexts / older mobile browsers where
-// navigator.clipboard is unavailable. Must run within a user gesture.
-function fallbackCopy(text: string): void {
-  const ta = document.createElement("textarea");
-  ta.value = text;
-  ta.style.position = "fixed";
-  ta.style.opacity = "0";
-  document.body.appendChild(ta);
-  ta.focus();
-  ta.select();
-  try {
-    document.execCommand("copy");
-  } catch {
-    /* nothing more we can do */
-  }
-  ta.remove();
-}
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + " B";
@@ -146,12 +129,7 @@ function FileSessionView({ session }: { session: FileSession }) {
   const fullPath = (name: string) => (cwd === "/" ? `/${name}` : `${cwd}/${name}`);
 
   const handleCopyPath = (entry: FileEntry) => {
-    const path = fullPath(entry.name);
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(path).catch(() => fallbackCopy(path));
-    } else {
-      fallbackCopy(path);
-    }
+    copyText(fullPath(entry.name));
   };
 
   const handleDownload = (entry: FileEntry) => {

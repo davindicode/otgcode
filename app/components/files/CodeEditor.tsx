@@ -1,5 +1,6 @@
 import { marked } from "marked";
 import { lazy, Suspense, useMemo, useState } from "react";
+import { copyText } from "~/lib/clipboard";
 import CopyPathButton from "./CopyPathButton";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
@@ -190,10 +191,17 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
   const canPreview = PREVIEWABLE.has(ext);
   const [value, setValue] = useState(content);
   const [dirty, setDirty] = useState(false);
-  const [mode, setMode] = useState<"edit" | "preview">(canPreview ? "preview" : "edit");
+  const [mode, setMode] = useState<"edit" | "plain" | "preview">(canPreview ? "preview" : "edit");
   const [editorFontSize, setEditorFontSize] = useState(6);
   const isHtml = ext === "html" || ext === "htm";
   const [htmlZoom, setHtmlZoom] = useState(100);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyAll = () => {
+    copyText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   const handleChange = (v: string | undefined) => {
     if (v !== undefined) {
@@ -218,17 +226,48 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
           {path}
         </span>
         <CopyPathButton path={path} />
+        <button
+          onClick={handleCopyAll}
+          className="p-1 text-gray-400 hover:text-white transition-colors shrink-0"
+          title={copied ? "Copied!" : "Copy file contents"}
+        >
+          {copied ? (
+            <svg
+              className="w-3.5 h-3.5 text-green-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+            </svg>
+          )}
+        </button>
         <div className="flex items-center gap-1.5 shrink-0">
-          {canPreview && (
-            <div className="flex items-center bg-[#0d0d1a] rounded overflow-hidden border border-gray-700">
-              <button
-                onClick={() => setMode("edit")}
-                className={`px-2 py-0.5 text-xs transition-colors ${
-                  mode === "edit" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
-                }`}
-              >
-                Edit
-              </button>
+          <div className="flex items-center bg-[#0d0d1a] rounded overflow-hidden border border-gray-700">
+            <button
+              onClick={() => setMode("edit")}
+              className={`px-2 py-0.5 text-xs transition-colors ${
+                mode === "edit" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => setMode("plain")}
+              title="Plain text — easier selection & copy on mobile"
+              className={`px-2 py-0.5 text-xs transition-colors ${
+                mode === "plain" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Plain
+            </button>
+            {canPreview && (
               <button
                 onClick={() => setMode("preview")}
                 className={`px-2 py-0.5 text-xs transition-colors ${
@@ -237,8 +276,8 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
               >
                 Preview
               </button>
-            </div>
-          )}
+            )}
+          </div>
           {/* Font size / Zoom controls */}
           {isHtml && mode === "preview" ? (
             <div className="flex items-center gap-1 border border-gray-700 rounded overflow-hidden">
@@ -330,6 +369,18 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
           ) : (
             <MarkdownPreview content={value} fontSize={editorFontSize} />
           )
+        ) : mode === "plain" ? (
+          // Native textarea: mobile gets real selection handles + OS "Select All",
+          // which Monaco's custom-rendered editor does not support on touch.
+          <textarea
+            readOnly
+            value={value}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            className="w-full h-full resize-none bg-[#0d0d1a] text-gray-200 font-mono p-3 outline-none border-0 selection:bg-blue-600/40"
+            style={{ fontSize: `${editorFontSize}px`, lineHeight: 1.6 }}
+          />
         ) : (
           <Suspense
             fallback={
