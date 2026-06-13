@@ -43,15 +43,14 @@ decide. Match the conventions of the surrounding code.
 ## Commit messages — Conventional Commits
 
 This project uses [Conventional Commits](https://www.conventionalcommits.org).
-This is **required**: releases (version bump, `CHANGELOG.md`, GitHub Release)
-are generated automatically from commit messages by
-[release-please](https://github.com/googleapis/release-please).
+It keeps history readable and makes the `CHANGELOG.md` easy to assemble per
+release.
 
 Common types:
 
-- `feat:` — a new feature (bumps the version)
-- `fix:` — a bug fix (bumps the version)
-- `chore:`, `docs:`, `style:`, `refactor:`, `test:`, `ci:` — no release on their own
+- `feat:` — a new feature
+- `fix:` — a bug fix
+- `chore:`, `docs:`, `style:`, `refactor:`, `test:`, `ci:` — supporting changes
 
 Example: `fix: flip file menu upward near the bottom of the pane`
 
@@ -64,11 +63,19 @@ the changelog — there is no separate security-advisory file.
 2. Make your change; keep commits focused and Conventionally named.
 3. Ensure `pnpm lint`, `pnpm typecheck`, and `pnpm run build` pass.
 4. Open a PR against `main` with a short description of what and why.
-5. Once merged, release-please opens/updates a "release PR" that bumps the
-   version and updates the changelog. Merging that publishes the release.
 
-You don't need to edit `CHANGELOG.md` or the version by hand — the commit
-messages drive it.
+## Releasing (maintainers)
+
+Releases are cut manually:
+
+1. Update the version in `package.json` and add a section to `CHANGELOG.md`
+   (group changes under Added / Changed / Fixed / Security).
+2. Merge to `main`.
+3. Tag and push: `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`.
+4. Create a GitHub Release for the tag, using the changelog section as the notes.
+
+The in-app version (shown in the header) is read from `package.json` at build
+time, so bumping `package.json` is enough to update it.
 
 ## Project layout
 
