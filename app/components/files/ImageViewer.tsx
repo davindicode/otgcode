@@ -11,6 +11,12 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // GIFs animate via the <img> itself; bumping a cache-busting param reloads the
+  // image, which restarts the animation (a play-once gif can't otherwise replay).
+  const isGif = path.split(".").pop()?.toLowerCase() === "gif";
+  const [replayKey, setReplayKey] = useState(0);
+  const src = `/api/files/download?path=${encodeURIComponent(path)}&inline=1${replayKey ? `&_r=${replayKey}` : ""}`;
+
   const zoomIn = () => setZoom((z) => Math.min(5, z + 0.25));
   const zoomOut = () => setZoom((z) => Math.max(0.1, z - 0.25));
   const zoomFit = () => setZoom(1);
@@ -75,6 +81,18 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
         </span>
         <CopyPathButton path={path} />
         <div className="flex items-center gap-2 shrink-0">
+          {isGif && (
+            <button
+              onClick={() => setReplayKey((k) => k + 1)}
+              className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+              title="Replay GIF"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M1 4v6h6" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+              </svg>
+            </button>
+          )}
           {/* Zoom controls */}
           <div className="flex items-center gap-1 border border-gray-700 rounded overflow-hidden">
             <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">
@@ -134,7 +152,7 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
           }}
         >
           <img
-            src={`/api/files/download?path=${encodeURIComponent(path)}&inline=1`}
+            src={src}
             alt={path}
             className="max-w-none"
             draggable={false}

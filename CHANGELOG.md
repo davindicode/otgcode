@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Image viewer: **Replay** button for GIFs (restart a play-once animation).
+- Video/audio viewer: **loop toggle**, plus `playsInline` and `preload=metadata`.
+- File open: **Cancel** button while a large file is loading, so a misclick can
+  be backed out instead of waiting.
+
+### Changed
+- Opening image/PDF/video/audio files no longer reads the whole file as text
+  first — they stream straight from the file API, so large media/PDFs open
+  immediately instead of hanging.
+- PDF viewer renders pages lazily (only as they scroll into view) instead of
+  mounting every page up front, so large PDFs no longer choke.
+
+### Fixed
+- Centering/truncation of the file path on the opening/error screens.
+
 ## [0.1.1] - 2026-06-13
 
 ### Added

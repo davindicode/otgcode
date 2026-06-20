@@ -4,7 +4,7 @@ import { copyText } from "~/lib/clipboard";
 import { type FileEntry, type FileSession, useFileStore } from "~/stores/fileStore";
 import Breadcrumbs from "./Breadcrumbs";
 import FileList from "./FileList";
-import FileViewer from "./FileViewer";
+import FileViewer, { isDirectViewerFile } from "./FileViewer";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + " B";
@@ -124,6 +124,7 @@ function FileSessionView({ session }: { session: FileSession }) {
   const [uploadQueue, setUploadQueue] = useState<UploadFile[]>([]);
   const uploadXhrs = useRef<Map<number, XMLHttpRequest>>(new Map());
   const cancelledIndices = useRef<Set<number>>(new Set());
+  const openAbortRef = useRef<AbortController | null>(null);
   const uploading = uploadQueue.some((f) => f.status === "pending" || f.status === "uploading");
 
   const fullPath = (name: string) => (cwd === "/" ? `/${name}` : `${cwd}/${name}`);
@@ -147,27 +148,53 @@ function FileSessionView({ session }: { session: FileSession }) {
       await loadDirectory(fullPath(entry.name));
       patch({ selectedFile: null, fileContent: null });
       setFileError(null);
-    } else {
-      const filePath = fullPath(entry.name);
+      return;
+    }
+
+    const filePath = fullPath(entry.name);
+    setFileError(null);
+
+    // Image/PDF/video/audio viewers stream from the download URL, so there's no
+    // point reading the whole file as text first — open them straight away
+    // (this is what made large PDFs/media "stuck on opening").
+    if (isDirectViewerFile(filePath)) {
       patch({ selectedFile: filePath, fileContent: null });
-      setFileLoading(true);
-      setFileError(null);
-      try {
-        const res = await fetch(`/api/files/read?path=${encodeURIComponent(filePath)}`);
-        const data = await res.json();
-        if (data.error) {
-          const sizeInfo = data.size ? ` (${formatSize(data.size)})` : "";
-          setFileError(`${data.error}${sizeInfo}`);
-          patch({ fileContent: null });
-        } else {
-          patch({ fileContent: data.content !== undefined ? data.content : null });
-        }
-      } catch (err: any) {
+      setFileLoading(false);
+      return;
+    }
+
+    patch({ selectedFile: filePath, fileContent: null });
+    setFileLoading(true);
+    const controller = new AbortController();
+    openAbortRef.current = controller;
+    try {
+      const res = await fetch(`/api/files/read?path=${encodeURIComponent(filePath)}`, { signal: controller.signal });
+      const data = await res.json();
+      if (data.error) {
+        const sizeInfo = data.size ? ` (${formatSize(data.size)})` : "";
+        setFileError(`${data.error}${sizeInfo}`);
+        patch({ fileContent: null });
+      } else {
+        patch({ fileContent: data.content !== undefined ? data.content : null });
+      }
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        patch({ selectedFile: null, fileContent: null }); // cancelled — back to the list
+      } else {
         setFileError(err.message || "Failed to load file");
         patch({ fileContent: null });
       }
+    } finally {
+      if (openAbortRef.current === controller) openAbortRef.current = null;
       setFileLoading(false);
     }
+  };
+
+  const handleCancelOpen = () => {
+    openAbortRef.current?.abort();
+    openAbortRef.current = null;
+    setFileLoading(false);
+    patch({ selectedFile: null, fileContent: null });
   };
 
   const handleNavigate = (path: string) => {
@@ -487,19 +514,25 @@ function FileSessionView({ session }: { session: FileSession }) {
   if (selectedFile) {
     if (fileLoading) {
       return (
-        <div className="flex flex-col items-center justify-center h-full bg-[#0d0d1a] text-gray-500 gap-3">
+        <div className="flex flex-col items-center justify-center h-full bg-[#0d0d1a] text-gray-500 gap-3 px-6">
           <svg className="w-8 h-8 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
           <span className="text-sm">Opening file...</span>
-          <span className="text-xs text-gray-600 overflow-hidden text-ellipsis max-w-xs">{selectedFile}</span>
+          <span className="text-xs text-gray-600 truncate text-center max-w-full">{selectedFile}</span>
+          <button
+            onClick={handleCancelOpen}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors"
+          >
+            Cancel
+          </button>
         </div>
       );
     }
     if (fileError) {
       return (
-        <div className="flex flex-col items-center justify-center h-full bg-[#0d0d1a] text-gray-400 gap-3">
+        <div className="flex flex-col items-center justify-center h-full bg-[#0d0d1a] text-gray-400 gap-3 px-6">
           <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path
               strokeLinecap="round"
@@ -507,8 +540,8 @@ function FileSessionView({ session }: { session: FileSession }) {
               d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
             />
           </svg>
-          <span className="text-sm text-red-400">{fileError}</span>
-          <span className="text-xs text-gray-600 overflow-hidden text-ellipsis max-w-xs">{selectedFile}</span>
+          <span className="text-sm text-red-400 text-center">{fileError}</span>
+          <span className="text-xs text-gray-600 truncate text-center max-w-full">{selectedFile}</span>
           <button
             onClick={handleCloseFile}
             className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors"

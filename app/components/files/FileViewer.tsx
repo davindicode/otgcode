@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import CopyPathButton from "./CopyPathButton";
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -16,6 +16,14 @@ function getExt(path: string): string {
   return path.split(".").pop()?.toLowerCase() || "";
 }
 
+// True for files rendered by a viewer that streams from the download URL
+// (image/pdf/video/audio) and therefore needs no text-content fetch. Lets the
+// explorer open them instantly instead of reading the whole file as UTF-8.
+export function isDirectViewerFile(path: string): boolean {
+  const ext = getExt(path);
+  return IMAGE_EXTS.has(ext) || ext === "pdf" || VIDEO_EXTS.has(ext) || AUDIO_EXTS.has(ext);
+}
+
 interface FileViewerProps {
   path: string;
   content: string | null;
@@ -25,6 +33,7 @@ interface FileViewerProps {
 
 function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "audio"; onClose: () => void }) {
   const src = `/api/files/download?path=${encodeURIComponent(path)}&inline=1`;
+  const [loop, setLoop] = useState(false);
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 bg-[#16162a] border-b border-gray-700 shrink-0">
@@ -36,6 +45,19 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
         </span>
         <CopyPathButton path={path} />
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setLoop((l) => !l)}
+            className={`p-1 rounded transition-colors ${
+              loop ? "bg-blue-600 text-white" : "bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white"
+            }`}
+            title={loop ? "Loop: on" : "Loop: off"}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 1l4 4-4 4" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 13v2a4 4 0 01-4 4H3" />
+            </svg>
+          </button>
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
             className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
@@ -63,11 +85,61 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
       </div>
       <div className="flex-1 flex items-center justify-center bg-[#0d0d1a] p-4 overflow-auto">
         {type === "video" ? (
-          <video src={src} controls className="max-w-full max-h-full rounded" />
+          <video
+            src={src}
+            controls
+            playsInline
+            loop={loop}
+            preload="metadata"
+            className="max-w-full max-h-full rounded"
+          />
         ) : (
-          <audio src={src} controls className="w-full max-w-md" />
+          <audio src={src} controls loop={loop} preload="metadata" className="w-full max-w-md" />
         )}
       </div>
+    </div>
+  );
+}
+
+// Render a PDF page only once it scrolls near the viewport. Rendering every
+// page up front (canvas + text + annotation layers) is what made large PDFs
+// choke; this keeps continuous scroll but mounts pages on demand.
+function LazyPdfPage({
+  pageNumber,
+  scale,
+  root,
+}: {
+  pageNumber: number;
+  scale: number;
+  root: React.RefObject<HTMLDivElement | null>;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [render, setRender] = useState(pageNumber === 1); // first page eagerly
+
+  useEffect(() => {
+    if (render) return;
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setRender(true);
+          io.disconnect();
+        }
+      },
+      { root: root.current, rootMargin: "800px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [render, root]);
+
+  return (
+    <div ref={ref} className="w-full flex justify-center">
+      {render ? (
+        <Page pageNumber={pageNumber} scale={scale} className="shadow-lg" renderTextLayer renderAnnotationLayer />
+      ) : (
+        <div className="w-full max-w-[800px] rounded bg-[#16162a]/40" style={{ height: Math.round(1000 * scale) }} />
+      )}
     </div>
   );
 }
@@ -147,14 +219,7 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
         >
           <div className="flex flex-col items-center gap-2 p-4">
             {Array.from({ length: numPages }, (_, i) => (
-              <Page
-                key={i + 1}
-                pageNumber={i + 1}
-                scale={scale}
-                className="shadow-lg"
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-              />
+              <LazyPdfPage key={i + 1} pageNumber={i + 1} scale={scale} root={containerRef} />
             ))}
           </div>
         </Document>
