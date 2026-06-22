@@ -125,6 +125,8 @@ function FileSessionView({ session }: { session: FileSession }) {
   const uploadXhrs = useRef<Map<number, XMLHttpRequest>>(new Map());
   const cancelledIndices = useRef<Set<number>>(new Set());
   const openAbortRef = useRef<AbortController | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
   const uploading = uploadQueue.some((f) => f.status === "pending" || f.status === "uploading");
 
   const fullPath = (name: string) => (cwd === "/" ? `/${name}` : `${cwd}/${name}`);
@@ -511,6 +513,35 @@ function FileSessionView({ session }: { session: FileSession }) {
     if (uploadInputRef.current) uploadInputRef.current.value = "";
   };
 
+  // Drag & drop upload. A dragenter/dragleave depth counter avoids flicker as
+  // the pointer crosses child elements. Only reacts to dragged files.
+  const hasFiles = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!hasFiles(e) || uploading) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setDragging(true);
+  };
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!hasFiles(e) || uploading) return;
+    e.preventDefault();
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!hasFiles(e)) return;
+    dragDepth.current -= 1;
+    if (dragDepth.current <= 0) {
+      dragDepth.current = 0;
+      setDragging(false);
+    }
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDragging(false);
+    if (!uploading) handleUpload(e.dataTransfer.files);
+  };
+
   if (selectedFile) {
     if (fileLoading) {
       return (
@@ -555,7 +586,13 @@ function FileSessionView({ session }: { session: FileSession }) {
   }
 
   return (
-    <>
+    <div
+      className="relative flex-1 flex flex-col min-h-0"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <Breadcrumbs
         path={cwd}
         onNavigate={uploading ? () => {} : handleNavigate}
@@ -823,7 +860,24 @@ function FileSessionView({ session }: { session: FileSession }) {
           </div>
         </div>
       )}
-    </>
+
+      {/* Drag & drop upload overlay */}
+      {dragging && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-blue-950/70 border-2 border-dashed border-blue-400 rounded-lg pointer-events-none">
+          <div className="flex flex-col items-center gap-2 text-blue-200">
+            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 7.5 7.5 12M12 7.5V21"
+              />
+            </svg>
+            <span className="text-sm font-medium">Drop files to upload</span>
+            <span className="text-xs text-blue-300/80 truncate max-w-full">to {cwd}</span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Video/audio viewer: **loop toggle**, plus `playsInline` and `preload=metadata`.
 - File open: **Cancel** button while a large file is loading, so a misclick can
   be backed out instead of waiting.
+- File explorer: **drag-and-drop upload** — drop files onto the explorer panel
+  to upload them to the current directory (with a drop overlay).
 
 ### Changed
 - Opening image/PDF/video/audio files no longer reads the whole file as text
