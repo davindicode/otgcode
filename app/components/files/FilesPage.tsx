@@ -82,8 +82,10 @@ function FileSessionView({ session }: { session: FileSession }) {
 
   const patch = useCallback((p: Partial<FileSession>) => updateSession(id, p), [id, updateSession]);
 
+  // Returns an error message if the directory could not be loaded, else null.
+  // On failure cwd is left unchanged, so the explorer stays on the current path.
   const loadDirectory = useCallback(
-    async (dir: string, showHidden?: boolean) => {
+    async (dir: string, showHidden?: boolean): Promise<string | null> => {
       const hidden = showHidden ?? session.showHidden;
       patch({ loading: true });
       try {
@@ -91,11 +93,14 @@ function FileSessionView({ session }: { session: FileSession }) {
         const data = await res.json();
         if (data.error) {
           patch({ error: data.error, loading: false });
-        } else {
-          patch({ cwd: data.dir, entries: data.entries, error: null, loading: false });
+          return data.error as string;
         }
+        patch({ cwd: data.dir, entries: data.entries, error: null, loading: false });
+        return null;
       } catch (err: any) {
-        patch({ error: err.message, loading: false });
+        const message = err?.message || "Failed to load directory";
+        patch({ error: message, loading: false });
+        return message;
       }
     },
     [id, session.showHidden],
@@ -127,6 +132,20 @@ function FileSessionView({ session }: { session: FileSession }) {
   const openAbortRef = useRef<AbortController | null>(null);
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 4000);
+  }, []);
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    [],
+  );
   const uploading = uploadQueue.some((f) => f.status === "pending" || f.status === "uploading");
 
   const fullPath = (name: string) => (cwd === "/" ? `/${name}` : `${cwd}/${name}`);
@@ -147,7 +166,11 @@ function FileSessionView({ session }: { session: FileSession }) {
 
   const handleOpen = async (entry: FileEntry) => {
     if (entry.isDirectory) {
-      await loadDirectory(fullPath(entry.name));
+      const err = await loadDirectory(fullPath(entry.name));
+      if (err) {
+        showToast(`Can't open "${entry.name}": ${err}`);
+        return;
+      }
       patch({ selectedFile: null, fileContent: null });
       setFileError(null);
       return;
@@ -199,8 +222,12 @@ function FileSessionView({ session }: { session: FileSession }) {
     patch({ selectedFile: null, fileContent: null });
   };
 
-  const handleNavigate = (path: string) => {
-    loadDirectory(path);
+  const handleNavigate = async (path: string) => {
+    const err = await loadDirectory(path);
+    if (err) {
+      showToast(`Can't open "${path}": ${err}`);
+      return; // navigation cancelled — stays on the current path
+    }
     patch({ selectedFile: null, fileContent: null });
   };
 
@@ -875,6 +902,25 @@ function FileSessionView({ session }: { session: FileSession }) {
             <span className="text-sm font-medium">Drop files to upload</span>
             <span className="text-xs text-blue-300/80 truncate max-w-full">to {cwd}</span>
           </div>
+        </div>
+      )}
+
+      {/* Error toast — slides in from the top of the explorer panel */}
+      {toast && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[45] max-w-[90%] flex items-center gap-2 px-3 py-2 rounded-lg bg-red-900/90 border border-red-600 shadow-xl text-red-100 text-xs">
+          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+            />
+          </svg>
+          <span className="truncate">{toast}</span>
+          <button onClick={() => setToast(null)} className="shrink-0 text-red-300 hover:text-white" title="Dismiss">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
     </div>

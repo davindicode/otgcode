@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be backed out instead of waiting.
 - File explorer: **drag-and-drop upload** — drop files onto the explorer panel
   to upload them to the current directory (with a drop overlay).
+- File explorer: error **toast** when a path can't be opened, instead of failing
+  silently; navigation is cancelled and stays on the current path.
+- Breadcrumbs: a **Go** button to submit the edited path (on-screen alternative
+  to Enter, handy on mobile).
 
 ### Changed
 - Opening image/PDF/video/audio files no longer reads the whole file as text
@@ -24,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Centering/truncation of the file path on the opening/error screens.
+- Path edit mode: the up/breadcrumb navigation is now disabled while editing the
+  path, so the tree can no longer desync from the frozen text field.
 
 ## [0.1.1] - 2026-06-13
 
