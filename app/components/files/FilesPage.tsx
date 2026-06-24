@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import RenamableTab from "~/components/RenamableTab";
 import { copyText } from "~/lib/clipboard";
 import { type FileEntry, type FileSession, useFileStore } from "~/stores/fileStore";
+import { useToastStore } from "~/stores/toastStore";
 import Breadcrumbs from "./Breadcrumbs";
 import FileList from "./FileList";
 import FileViewer, { isDirectViewerFile } from "./FileViewer";
@@ -132,20 +133,7 @@ function FileSessionView({ session }: { session: FileSession }) {
   const openAbortRef = useRef<AbortController | null>(null);
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 4000);
-  }, []);
-  useEffect(
-    () => () => {
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-    },
-    [],
-  );
+  const showToast = useToastStore((s) => s.show);
   const uploading = uploadQueue.some((f) => f.status === "pending" || f.status === "uploading");
 
   const fullPath = (name: string) => (cwd === "/" ? `/${name}` : `${cwd}/${name}`);
@@ -902,25 +890,6 @@ function FileSessionView({ session }: { session: FileSession }) {
             <span className="text-sm font-medium">Drop files to upload</span>
             <span className="text-xs text-blue-300/80 truncate max-w-full">to {cwd}</span>
           </div>
-        </div>
-      )}
-
-      {/* Error toast — slides in from the top of the explorer panel */}
-      {toast && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[45] max-w-[90%] flex items-center gap-2 px-3 py-2 rounded-lg bg-red-900/90 border border-red-600 shadow-xl text-red-100 text-xs">
-          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-            />
-          </svg>
-          <span className="truncate">{toast}</span>
-          <button onClick={() => setToast(null)} className="shrink-0 text-red-300 hover:text-white" title="Dismiss">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
         </div>
       )}
     </div>

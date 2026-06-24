@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTerminalStore } from "~/stores/terminalStore";
+import { showToast } from "~/stores/toastStore";
 
 interface QuickKey {
   label: string;
@@ -444,6 +445,7 @@ export default function InputBox() {
       setTmuxSessions(data.sessions || []);
     } catch {
       setTmuxSessions([]);
+      showToast("Failed to load tmux sessions");
     }
     setTmuxLoading(false);
   };
@@ -492,19 +494,20 @@ export default function InputBox() {
       const query = targetDir ? `?dir=${encodeURIComponent(targetDir)}&showHidden=false` : "?showHidden=false";
       const res = await fetch(`/api/files/list${query}`);
       const data = await res.json();
-      if (!data.error) {
+      if (data.error) {
+        showToast(`Can't list directory: ${data.error}`);
+      } else if (useTerminalStore.getState().activeSessionId === sessionId) {
         // Only apply the result if the user hasn't switched to a different tab while we were fetching
-        if (useTerminalStore.getState().activeSessionId === sessionId) {
-          setCdCwd(sessionId, data.dir);
-          setCdDirs(
-            (data.entries || [])
-              .filter((e: { isDirectory: boolean }) => e.isDirectory)
-              .map((e: { name: string }) => e.name),
-          );
-        }
+        setCdCwd(sessionId, data.dir);
+        setCdDirs(
+          (data.entries || [])
+            .filter((e: { isDirectory: boolean }) => e.isDirectory)
+            .map((e: { name: string }) => e.name),
+        );
       }
     } catch {
       setCdDirs([]);
+      showToast("Failed to list directories");
     }
     setCdLoading(false);
   };

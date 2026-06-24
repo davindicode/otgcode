@@ -5,6 +5,7 @@ import FilesPage from "./files/FilesPage";
 import Header from "./Header";
 import MobileTabBar from "./MobileTabBar";
 import ResizablePanels from "./ResizablePanels";
+import Toaster from "./Toaster";
 import InputBox from "./terminal/InputBox";
 import TerminalPage from "./terminal/TerminalPage";
 
@@ -32,6 +33,7 @@ export default function AppShell() {
 
   return (
     <div className="app-shell bg-[#0d0d1a] text-white">
+      <Toaster />
       <Header />
 
       {isDesktop ? (

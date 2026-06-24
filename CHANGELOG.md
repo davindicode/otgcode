@@ -14,8 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be backed out instead of waiting.
 - File explorer: **drag-and-drop upload** — drop files onto the explorer panel
   to upload them to the current directory (with a drop overlay).
-- File explorer: error **toast** when a path can't be opened, instead of failing
-  silently; navigation is cancelled and stays on the current path.
+- App-wide **toast notifications** — small popups centered at the top, above all
+  widgets; click to dismiss (slides out) or auto-dismiss after 3s. Used to
+  surface previously-silent errors: failed directory navigation, tmux session
+  load failures, and `cd` directory-picker failures.
 - Breadcrumbs: a **Go** button to submit the edited path (on-screen alternative
   to Enter, handy on mobile).
 
