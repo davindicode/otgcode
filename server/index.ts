@@ -1,10 +1,12 @@
 import "dotenv/config";
+import { ZipArchive } from "archiver";
 import Busboy from "busboy";
 import express from "express";
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, unlinkSync } from "fs";
+import { stat } from "fs/promises";
 import { createServer } from "http";
 import { tmpdir } from "os";
-import { join } from "path";
+import { basename, join } from "path";
 import { Server as SocketIOServer } from "socket.io";
 import { mountProxy } from "./proxy.js";
 import { registerSocketHandlers } from "./socket-handlers.js";
@@ -181,6 +183,40 @@ async function main() {
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  // Zip download: stream one or more files/folders as a single .zip.
+  // Folders are added recursively. Used for individual folder downloads and
+  // for group downloads in the file explorer's multi-select mode.
+  app.get("/api/files/download-zip", async (req, res) => {
+    const raw = req.query.path;
+    const paths = (Array.isArray(raw) ? raw : raw ? [raw] : []).filter((p): p is string => typeof p === "string");
+    if (paths.length === 0) {
+      res.status(400).json({ error: "Missing path" });
+      return;
+    }
+    const name = typeof req.query.name === "string" && req.query.name ? req.query.name : "archive.zip";
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${name.replace(/"/g, "")}"`);
+
+    const archive = new ZipArchive({ level: 9 });
+    archive.on("error", (err: Error) => {
+      if (!res.headersSent) res.status(500).json({ error: err.message });
+      else res.destroy(err);
+    });
+    archive.pipe(res);
+
+    for (const p of paths) {
+      try {
+        const st = await stat(p);
+        if (st.isDirectory()) archive.directory(p, basename(p));
+        else archive.file(p, { name: basename(p) });
+      } catch {
+        // skip missing/unreadable entries
+      }
+    }
+    archive.finalize();
   });
 
   // Reverse proxy (before RR handler so it gets priority)

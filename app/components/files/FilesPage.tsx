@@ -146,18 +146,28 @@ function FileSessionView({ session }: { session: FileSession }) {
     copyText(fullPath(entry.name));
   };
 
-  const triggerDownload = (entry: FileEntry) => {
+  const clickDownloadLink = (href: string, downloadName: string) => {
     const a = document.createElement("a");
-    a.href = `/api/files/download?path=${encodeURIComponent(fullPath(entry.name))}`;
-    a.download = entry.name;
+    a.href = href;
+    a.download = downloadName;
     document.body.appendChild(a);
     a.click();
     a.remove();
   };
 
+  const triggerDownload = (entry: FileEntry) => {
+    clickDownloadLink(`/api/files/download?path=${encodeURIComponent(fullPath(entry.name))}`, entry.name);
+  };
+
+  // Download one or more paths as a single .zip (folders included recursively).
+  const triggerZipDownload = (paths: string[], zipName: string) => {
+    const qs = paths.map((p) => `path=${encodeURIComponent(p)}`).join("&");
+    clickDownloadLink(`/api/files/download-zip?${qs}&name=${encodeURIComponent(zipName)}`, zipName);
+  };
+
   const handleDownload = (entry: FileEntry) => {
-    if (entry.isDirectory) return;
-    triggerDownload(entry);
+    if (entry.isDirectory) triggerZipDownload([fullPath(entry.name)], `${entry.name}.zip`);
+    else triggerDownload(entry);
   };
 
   // --- Multi-select ---
@@ -188,13 +198,19 @@ function FileSessionView({ session }: { session: FileSession }) {
   const selectedEntries = () => entries.filter((e) => selected.has(e.name));
 
   const handleGroupDownload = () => {
-    const files = selectedEntries().filter((e) => !e.isDirectory);
-    if (files.length === 0) {
-      showToast("No files selected to download (folders can't be downloaded)", "info");
-      return;
-    }
-    for (const f of files) triggerDownload(f);
+    const items = selectedEntries();
+    if (items.length === 0) return;
     setGroupMenu(false);
+    // Single file → direct download; otherwise (multiple items or any folder)
+    // bundle everything into one recursive .zip.
+    if (items.length === 1 && !items[0].isDirectory) {
+      triggerDownload(items[0]);
+    } else {
+      triggerZipDownload(
+        items.map((e) => fullPath(e.name)),
+        `${cwd === "/" ? "download" : cwd.split("/").pop()}-selection.zip`,
+      );
+    }
   };
 
   const handleGroupDelete = () => {

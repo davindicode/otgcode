@@ -23,8 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - File explorer **multi-select mode** — a "Select" item in an entry's menu enters
   select mode, where each row's 3-dot becomes a checkbox and the Hidden toggle is
   replaced by a selection count, Select all/None, a group actions menu, and
-  Cancel. Group actions: **Download** (files; folders skipped) and **Delete**
-  with a recursive-folder warning when folders are included.
+  Cancel. Group actions: **Download** and **Delete** with a recursive-folder
+  warning when folders are included.
+- **Folder downloads** — download a folder as a recursive `.zip` from its menu,
+  and group downloads bundle the whole selection (files + folders) into one zip
+  (streamed server-side via a new `/api/files/download-zip` endpoint).
 
 ### Changed
 - Opening image/PDF/video/audio files no longer reads the whole file as text

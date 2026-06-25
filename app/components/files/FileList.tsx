@@ -345,14 +345,12 @@ export default function FileList({
           >
             Copy path
           </button>
-          {!menu.entry.isDirectory && (
-            <button
-              onClick={() => menuAction(onDownload)}
-              className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
-            >
-              Download
-            </button>
-          )}
+          <button
+            onClick={() => menuAction(onDownload)}
+            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+          >
+            {menu.entry.isDirectory ? "Download (zip)" : "Download"}
+          </button>
           <button
             onClick={() => menuAction(onInfo)}
             className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
