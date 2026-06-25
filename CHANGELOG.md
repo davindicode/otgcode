@@ -33,6 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Path edit mode: the up/breadcrumb navigation is now disabled while editing the
   path, so the tree can no longer desync from the frozen text field.
 
+### Security
+- Resolve all production dependency vulnerabilities (`pnpm audit --prod` clean):
+  - Bump `react-router` family 7.12.0 → 7.18.0 (DoS, XSS, CSRF, turbo-stream RCE).
+  - Bump `http-proxy-middleware` → 3.0.7 (multipart field injection / router bypass).
+  - Add version-scoped pnpm overrides for patched transitive deps: `dompurify`,
+    `ws`, `qs`, `path-to-regexp`, `picomatch`, `follow-redirects`, `postcss`,
+    `@babel/core`, `undici`; update `vite` to 7.3.6.
+- Remaining advisories are dev/build-tooling only and not in the production
+  runtime (`lodash` via `@react-router/dev` has no published fix; the low-severity
+  `esbuild` dev-server advisory is not reachable through `tsx`'s usage).
+
 ## [0.1.1] - 2026-06-13
 
 ### Added
