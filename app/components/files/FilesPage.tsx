@@ -18,6 +18,7 @@ type Dialog =
   | { type: "newFolder" }
   | { type: "newFile" }
   | { type: "delete"; entry: FileEntry }
+  | { type: "deleteMany"; entries: FileEntry[] }
   | { type: "info"; entry: FileEntry }
   | { type: "rename"; entry: FileEntry }
   | null;
@@ -133,6 +134,9 @@ function FileSessionView({ session }: { session: FileSession }) {
   const openAbortRef = useRef<AbortController | null>(null);
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [groupMenu, setGroupMenu] = useState(false);
   const showToast = useToastStore((s) => s.show);
   const uploading = uploadQueue.some((f) => f.status === "pending" || f.status === "uploading");
 
@@ -142,14 +146,62 @@ function FileSessionView({ session }: { session: FileSession }) {
     copyText(fullPath(entry.name));
   };
 
-  const handleDownload = (entry: FileEntry) => {
-    if (entry.isDirectory) return;
+  const triggerDownload = (entry: FileEntry) => {
     const a = document.createElement("a");
     a.href = `/api/files/download?path=${encodeURIComponent(fullPath(entry.name))}`;
     a.download = entry.name;
     document.body.appendChild(a);
     a.click();
     a.remove();
+  };
+
+  const handleDownload = (entry: FileEntry) => {
+    if (entry.isDirectory) return;
+    triggerDownload(entry);
+  };
+
+  // --- Multi-select ---
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+    setGroupMenu(false);
+  };
+
+  const enterSelectMode = (entry: FileEntry) => {
+    setSelectMode(true);
+    setSelected(new Set([entry.name])); // preselect the item the menu was opened on
+  };
+
+  const toggleSelect = (entry: FileEntry) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(entry.name)) next.delete(entry.name);
+      else next.add(entry.name);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => (prev.size === entries.length ? new Set() : new Set(entries.map((e) => e.name))));
+  };
+
+  const selectedEntries = () => entries.filter((e) => selected.has(e.name));
+
+  const handleGroupDownload = () => {
+    const files = selectedEntries().filter((e) => !e.isDirectory);
+    if (files.length === 0) {
+      showToast("No files selected to download (folders can't be downloaded)", "info");
+      return;
+    }
+    for (const f of files) triggerDownload(f);
+    setGroupMenu(false);
+  };
+
+  const handleGroupDelete = () => {
+    const items = selectedEntries();
+    if (items.length === 0) return;
+    setGroupMenu(false);
+    setDialog({ type: "deleteMany", entries: items });
   };
 
   const handleOpen = async (entry: FileEntry) => {
@@ -216,6 +268,7 @@ function FileSessionView({ session }: { session: FileSession }) {
       showToast(`Can't open "${path}": ${err}`);
       return; // navigation cancelled — stays on the current path
     }
+    if (selectMode) exitSelectMode(); // selection is directory-specific
     patch({ selectedFile: null, fileContent: null });
   };
 
@@ -309,6 +362,29 @@ function FileSessionView({ session }: { session: FileSession }) {
       patch({ error: err.message });
     }
     setDialog(null);
+  };
+
+  const confirmDeleteMany = async () => {
+    if (dialog?.type !== "deleteMany") return;
+    const items = dialog.entries;
+    setDialog(null);
+    let failed = 0;
+    for (const entry of items) {
+      try {
+        const res = await fetch("/api/files/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: fullPath(entry.name) }),
+        });
+        const data = await res.json();
+        if (data.error) failed++;
+      } catch {
+        failed++;
+      }
+    }
+    if (failed > 0) showToast(`Failed to delete ${failed} of ${items.length} item${items.length === 1 ? "" : "s"}`);
+    exitSelectMode();
+    await loadDirectory(cwd);
   };
 
   const handleRename = (entry: FileEntry) => {
@@ -684,18 +760,72 @@ function FileSessionView({ session }: { session: FileSession }) {
             onChange={(e) => handleUpload(e.target.files)}
           />
         </div>
-        <label
-          className={`flex items-center gap-2 text-sm text-gray-400 ${uploading ? "pointer-events-none opacity-50" : "cursor-pointer"}`}
-        >
-          <input
-            type="checkbox"
-            checked={showHidden}
-            onChange={(e) => toggleHidden(e.target.checked)}
-            disabled={uploading}
-            className="accent-blue-500"
-          />
-          Hidden
-        </label>
+        {selectMode ? (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-xs text-gray-400 tabular-nums">{selected.size} selected</span>
+            <button
+              onClick={toggleSelectAll}
+              className="px-2 py-0.5 text-xs text-gray-300 hover:text-white border border-gray-700 rounded transition-colors"
+            >
+              {selected.size === entries.length && entries.length > 0 ? "None" : "All"}
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setGroupMenu((v) => !v)}
+                disabled={selected.size === 0}
+                className="p-1 text-gray-400 hover:text-white disabled:text-gray-700 disabled:pointer-events-none transition-colors"
+                title="Actions on selected"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
+                </svg>
+              </button>
+              {groupMenu && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-40 cursor-default"
+                    onClick={() => setGroupMenu(false)}
+                    aria-label="Close menu"
+                  />
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-[#1e1e3a] border border-gray-600 rounded-lg shadow-xl py-1 min-w-[160px]">
+                    <button
+                      onClick={handleGroupDownload}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+                    >
+                      Download
+                    </button>
+                    <button
+                      onClick={handleGroupDelete}
+                      className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-[#2a2a4a] transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <button
+              onClick={exitSelectMode}
+              className="px-2 py-0.5 text-xs text-gray-300 hover:text-white border border-gray-700 rounded transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <label
+            className={`flex items-center gap-2 text-sm text-gray-400 ${uploading ? "pointer-events-none opacity-50" : "cursor-pointer"}`}
+          >
+            <input
+              type="checkbox"
+              checked={showHidden}
+              onChange={(e) => toggleHidden(e.target.checked)}
+              disabled={uploading}
+              className="accent-blue-500"
+            />
+            Hidden
+          </label>
+        )}
       </div>
 
       {loading ? (
@@ -715,6 +845,10 @@ function FileSessionView({ session }: { session: FileSession }) {
           onRename={handleRename}
           onDownload={handleDownload}
           onCopyPath={handleCopyPath}
+          onEnterSelect={enterSelectMode}
+          selectMode={selectMode}
+          selectedNames={selected}
+          onToggleSelect={toggleSelect}
           uploadQueue={uploadQueue}
           cancelUpload={cancelUpload}
           disabled={uploading}
@@ -842,6 +976,41 @@ function FileSessionView({ session }: { session: FileSession }) {
                 </div>
               </>
             )}
+            {dialog.type === "deleteMany" &&
+              (() => {
+                const folderCount = dialog.entries.filter((e) => e.isDirectory).length;
+                const n = dialog.entries.length;
+                return (
+                  <>
+                    <h3 className="text-sm font-medium text-white mb-2">Delete {n} items</h3>
+                    <p className="text-sm text-gray-300 mb-1">
+                      Are you sure you want to delete <span className="text-white font-medium">{n}</span> selected item
+                      {n === 1 ? "" : "s"}?
+                    </p>
+                    {folderCount > 0 && (
+                      <p className="text-xs text-yellow-400 mb-3">
+                        ⚠️ {folderCount} folder{folderCount === 1 ? "" : "s"} will be deleted recursively, including all
+                        contents.
+                      </p>
+                    )}
+                    {folderCount === 0 && <div className="mb-3" />}
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setDialog(null)}
+                        className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={confirmDeleteMany}
+                        className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                      >
+                        Delete {n}
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
             {dialog.type === "info" && (
               <>
                 <h3 className="text-sm font-medium text-white mb-3">File Info</h3>

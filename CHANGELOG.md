@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   load failures, and `cd` directory-picker failures.
 - Breadcrumbs: a **Go** button to submit the edited path (on-screen alternative
   to Enter, handy on mobile).
+- File explorer **multi-select mode** — a "Select" item in an entry's menu enters
+  select mode, where each row's 3-dot becomes a checkbox and the Hidden toggle is
+  replaced by a selection count, Select all/None, a group actions menu, and
+  Cancel. Group actions: **Download** (files; folders skipped) and **Delete**
+  with a recursive-folder warning when folders are included.
 
 ### Changed
 - Opening image/PDF/video/audio files no longer reads the whole file as text

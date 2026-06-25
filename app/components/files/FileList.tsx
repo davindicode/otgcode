@@ -17,6 +17,10 @@ interface FileListProps {
   onRename: (entry: FileEntry) => void;
   onDownload: (entry: FileEntry) => void;
   onCopyPath: (entry: FileEntry) => void;
+  onEnterSelect: (entry: FileEntry) => void;
+  selectMode?: boolean;
+  selectedNames?: Set<string>;
+  onToggleSelect?: (entry: FileEntry) => void;
   uploadQueue?: UploadFile[];
   cancelUpload?: (index: number) => void;
   disabled?: boolean;
@@ -47,6 +51,10 @@ export default function FileList({
   onRename,
   onDownload,
   onCopyPath,
+  onEnterSelect,
+  selectMode = false,
+  selectedNames,
+  onToggleSelect,
   uploadQueue,
   cancelUpload,
   disabled,
@@ -174,50 +182,76 @@ export default function FileList({
   return (
     <div ref={scrollRef} className="overflow-y-auto flex-1 relative">
       <div className={disabled ? "pointer-events-none opacity-50" : ""}>
-        {entries.map((entry) => (
-          <div key={entry.name} className="w-full flex items-center border-b border-gray-800">
-            {/* Clickable file/folder area */}
-            <button
-              onClick={() => onOpen(entry)}
-              onContextMenu={(e) => handleContextMenu(e, entry)}
-              onTouchStart={(e) => handleTouchStart(e, entry)}
-              onTouchEnd={handleTouchEnd}
-              onTouchMove={handleTouchEnd}
-              className="flex-1 flex items-center gap-3 px-3 py-2 hover:bg-[#1a1a2e] active:bg-[#1a1a2e] transition-colors text-left min-w-0"
+        {entries.map((entry) => {
+          const isSelected = selectMode && !!selectedNames?.has(entry.name);
+          return (
+            <div
+              key={entry.name}
+              className={`w-full flex items-center border-b border-gray-800 ${isSelected ? "bg-blue-600/15" : ""}`}
             >
-              {/* Icon */}
-              <span className="text-lg shrink-0">
-                {entry.isDirectory ? (
-                  <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+              {/* Clickable file/folder area */}
+              <button
+                onClick={() => (selectMode ? onToggleSelect?.(entry) : onOpen(entry))}
+                onContextMenu={(e) => handleContextMenu(e, entry)}
+                onTouchStart={(e) => handleTouchStart(e, entry)}
+                onTouchEnd={handleTouchEnd}
+                onTouchMove={handleTouchEnd}
+                className="flex-1 flex items-center gap-3 px-3 py-2 hover:bg-[#1a1a2e] active:bg-[#1a1a2e] transition-colors text-left min-w-0"
+              >
+                {/* Icon */}
+                <span className="text-lg shrink-0">
+                  {entry.isDirectory ? (
+                    <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                  )}
+                </span>
+                {/* Name */}
+                <span className="flex-1 text-sm text-gray-200 truncate">{entry.name}</span>
+                {/* Size */}
+                {!entry.isDirectory && <span className="text-xs text-gray-500 shrink-0">{formatSize(entry.size)}</span>}
+              </button>
+              {/* Right control: checkbox in select mode, otherwise the 3-dot menu */}
+              {selectMode ? (
+                <button
+                  onClick={() => onToggleSelect?.(entry)}
+                  className="shrink-0 p-2 text-gray-400 hover:text-white transition-colors"
+                  title={isSelected ? "Deselect" : "Select"}
+                >
+                  {isSelected ? (
+                    <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path
+                        fillRule="evenodd"
+                        d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 011.42-1.42l2.79 2.79 6.79-6.79a1 1 0 011.42 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  ) : (
+                    <span className="block w-4 h-4 rounded border border-gray-500" />
+                  )}
+                </button>
+              ) : (
+                <button
+                  className="shrink-0 p-2 text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 active:bg-gray-700 transition-colors"
+                  onClick={(e) => openMenuFromButton(e, entry)}
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
                   </svg>
-                ) : (
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                )}
-              </span>
-              {/* Name */}
-              <span className="flex-1 text-sm text-gray-200 truncate">{entry.name}</span>
-              {/* Size */}
-              {!entry.isDirectory && <span className="text-xs text-gray-500 shrink-0">{formatSize(entry.size)}</span>}
-            </button>
-            {/* Three-dot menu button — separate from file click */}
-            <button
-              className="shrink-0 p-2 text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 active:bg-gray-700 transition-colors"
-              onClick={(e) => openMenuFromButton(e, entry)}
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
-              </svg>
-            </button>
-          </div>
-        ))}
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Upload queue inline rows */}
@@ -292,6 +326,12 @@ export default function FileList({
             className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
           >
             Open
+          </button>
+          <button
+            onClick={() => menuAction(onEnterSelect)}
+            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+          >
+            Select
           </button>
           <button
             onClick={() => menuAction(onRename)}
