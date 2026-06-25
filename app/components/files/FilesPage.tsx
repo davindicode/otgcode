@@ -137,8 +137,26 @@ function FileSessionView({ session }: { session: FileSession }) {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [groupMenu, setGroupMenu] = useState(false);
+  // True while a mutating op (delete/rename/create) is running its post-action
+  // reload. Folded into `busy` so the explorer stays frozen until the new tree
+  // is loaded — navigation can't slip in and then get reset to cwd.
+  const [opBusy, setOpBusy] = useState(false);
   const showToast = useToastStore((s) => s.show);
-  const uploading = uploadQueue.some((f) => f.status === "pending" || f.status === "uploading");
+  // Explorer is "busy" (frozen) whenever an upload is in flight, while its
+  // done-display + post-upload refresh is pending (uploadQueue not yet cleared),
+  // or while another op is reloading. This closes the window where the user
+  // could navigate after an upload finished but before the tree refreshed.
+  const busy = uploadQueue.length > 0 || opBusy;
+
+  // Run a mutating op with the explorer frozen until it (and its reload) finish.
+  const withBusy = async (fn: () => Promise<void>) => {
+    setOpBusy(true);
+    try {
+      await fn();
+    } finally {
+      setOpBusy(false);
+    }
+  };
 
   const fullPath = (name: string) => (cwd === "/" ? `/${name}` : `${cwd}/${name}`);
 
@@ -384,23 +402,28 @@ function FileSessionView({ session }: { session: FileSession }) {
     if (dialog?.type !== "deleteMany") return;
     const items = dialog.entries;
     setDialog(null);
-    let failed = 0;
-    for (const entry of items) {
-      try {
-        const res = await fetch("/api/files/delete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: fullPath(entry.name) }),
-        });
-        const data = await res.json();
-        if (data.error) failed++;
-      } catch {
-        failed++;
+    // This dialog closes before the work runs, so freeze the explorer for the
+    // whole delete loop + reload (otherwise navigation could slip in and then
+    // get reset to cwd by the refresh).
+    await withBusy(async () => {
+      let failed = 0;
+      for (const entry of items) {
+        try {
+          const res = await fetch("/api/files/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: fullPath(entry.name) }),
+          });
+          const data = await res.json();
+          if (data.error) failed++;
+        } catch {
+          failed++;
+        }
       }
-    }
-    if (failed > 0) showToast(`Failed to delete ${failed} of ${items.length} item${items.length === 1 ? "" : "s"}`);
-    exitSelectMode();
-    await loadDirectory(cwd);
+      if (failed > 0) showToast(`Failed to delete ${failed} of ${items.length} item${items.length === 1 ? "" : "s"}`);
+      exitSelectMode();
+      await loadDirectory(cwd);
+    });
   };
 
   const handleRename = (entry: FileEntry) => {
@@ -443,18 +466,31 @@ function FileSessionView({ session }: { session: FileSession }) {
     );
   };
 
-  // Auto-clear upload queue when all jobs reach a terminal status
+  // When all jobs reach a terminal status, briefly show the result, then refresh
+  // the tree and clear the queue. The explorer stays frozen (busy) the whole
+  // time: queue is non-empty during the delay, and opBusy covers the reload —
+  // so navigation can't slip in and then get reset by the background refresh.
   useEffect(() => {
     if (uploadQueue.length === 0) return;
     const allDone = uploadQueue.every((f) => f.status === "done" || f.status === "error" || f.status === "cancelled");
     if (!allDone) return;
-    const timer = setTimeout(() => {
-      setUploadQueue([]);
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setOpBusy(true);
+      await loadDirectory(cwd); // load the new tree first, while still frozen
+      if (cancelled) {
+        setOpBusy(false);
+        return;
+      }
       uploadXhrs.current.clear();
       cancelledIndices.current.clear();
-      loadDirectory(cwd);
+      setUploadQueue([]); // clear the queue only once the new tree is ready
+      setOpBusy(false);
     }, 1500);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [uploadQueue]);
 
   const CHUNK_SIZE = 80 * 1024 * 1024; // 80MB — under Cloudflare's 100MB limit
@@ -624,13 +660,13 @@ function FileSessionView({ session }: { session: FileSession }) {
   // the pointer crosses child elements. Only reacts to dragged files.
   const hasFiles = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
   const handleDragEnter = (e: React.DragEvent) => {
-    if (!hasFiles(e) || uploading) return;
+    if (!hasFiles(e) || busy) return;
     e.preventDefault();
     dragDepth.current += 1;
     setDragging(true);
   };
   const handleDragOver = (e: React.DragEvent) => {
-    if (!hasFiles(e) || uploading) return;
+    if (!hasFiles(e) || busy) return;
     e.preventDefault();
   };
   const handleDragLeave = (e: React.DragEvent) => {
@@ -646,7 +682,7 @@ function FileSessionView({ session }: { session: FileSession }) {
     e.preventDefault();
     dragDepth.current = 0;
     setDragging(false);
-    if (!uploading) handleUpload(e.dataTransfer.files);
+    if (!busy) handleUpload(e.dataTransfer.files);
   };
 
   if (selectedFile) {
@@ -702,10 +738,10 @@ function FileSessionView({ session }: { session: FileSession }) {
     >
       <Breadcrumbs
         path={cwd}
-        onNavigate={uploading ? () => {} : handleNavigate}
-        onGoUp={uploading ? () => {} : handleGoUp}
-        canGoUp={cwd !== "/" && !uploading}
-        disabled={uploading}
+        onNavigate={busy ? () => {} : handleNavigate}
+        onGoUp={busy ? () => {} : handleGoUp}
+        canGoUp={cwd !== "/" && !busy}
+        disabled={busy}
       />
 
       {/* Toolbar */}
@@ -713,7 +749,7 @@ function FileSessionView({ session }: { session: FileSession }) {
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => loadDirectory(cwd)}
-            disabled={uploading}
+            disabled={busy}
             className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
             title="Refresh"
           >
@@ -727,7 +763,7 @@ function FileSessionView({ session }: { session: FileSession }) {
           </button>
           <button
             onClick={handleNewFile}
-            disabled={uploading}
+            disabled={busy}
             className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
             title="New file"
           >
@@ -742,7 +778,7 @@ function FileSessionView({ session }: { session: FileSession }) {
           </button>
           <button
             onClick={handleNewFolder}
-            disabled={uploading}
+            disabled={busy}
             className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
             title="New folder"
           >
@@ -830,13 +866,13 @@ function FileSessionView({ session }: { session: FileSession }) {
           </div>
         ) : (
           <label
-            className={`flex items-center gap-2 text-sm text-gray-400 ${uploading ? "pointer-events-none opacity-50" : "cursor-pointer"}`}
+            className={`flex items-center gap-2 text-sm text-gray-400 ${busy ? "pointer-events-none opacity-50" : "cursor-pointer"}`}
           >
             <input
               type="checkbox"
               checked={showHidden}
               onChange={(e) => toggleHidden(e.target.checked)}
-              disabled={uploading}
+              disabled={busy}
               className="accent-blue-500"
             />
             Hidden
@@ -867,7 +903,7 @@ function FileSessionView({ session }: { session: FileSession }) {
           onToggleSelect={toggleSelect}
           uploadQueue={uploadQueue}
           cancelUpload={cancelUpload}
-          disabled={uploading}
+          disabled={busy}
         />
       )}
 

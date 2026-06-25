@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mounting every page up front, so large PDFs no longer choke.
 
 ### Fixed
+- Upload race: the explorer no longer briefly unfreezes between an upload
+  finishing and the tree refreshing, so navigating during that window can't get
+  reset back to the upload directory. It stays frozen until the refreshed tree
+  is ready, and the same freeze now covers the multi-select group delete.
 - Centering/truncation of the file path on the opening/error screens.
 - Path edit mode: the up/breadcrumb navigation is now disabled while editing the
   path, so the tree can no longer desync from the frozen text field.
