@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Folder downloads** — download a folder as a recursive `.zip` from its menu,
   and group downloads bundle the whole selection (files + folders) into one zip
   (streamed server-side via a new `/api/files/download-zip` endpoint).
+- **Folder uploads** — upload whole folders via a new "Upload folder" button
+  (`webkitdirectory`) or by dragging a folder onto the explorer; nested
+  structure is recreated server-side (with path-traversal protection).
 
 ### Changed
 - Opening image/PDF/video/audio files no longer reads the whole file as text

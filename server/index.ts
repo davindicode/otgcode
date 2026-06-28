@@ -6,7 +6,7 @@ import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync
 import { stat } from "fs/promises";
 import { createServer } from "http";
 import { tmpdir } from "os";
-import { basename, join } from "path";
+import { basename, dirname, join, resolve } from "path";
 import { Server as SocketIOServer } from "socket.io";
 import { mountProxy } from "./proxy.js";
 import { registerSocketHandlers } from "./socket-handlers.js";
@@ -14,6 +14,22 @@ import { startTunnel } from "./tunnel.js";
 
 const PORT = parseInt(process.env.OTG_PORT || "7777", 10);
 const useTunnel = process.argv.includes("--tunnel");
+
+// Resolve a (possibly nested) upload destination under `dir`, stripping any
+// traversal so an uploaded relativePath can never escape the target directory.
+// Returns null if the path is empty or would resolve outside `dir`.
+function safeUploadDest(dir: string, relativePath: string): string | null {
+  const cleaned = relativePath
+    .split(/[/\\]/)
+    .filter((seg) => seg && seg !== "." && seg !== "..")
+    .join("/");
+  if (!cleaned) return null;
+  const dest = join(dir, cleaned);
+  const base = resolve(dir);
+  const resolved = resolve(dest);
+  if (resolved !== base && !resolved.startsWith(`${base}/`)) return null;
+  return dest;
+}
 
 async function main() {
   const app = express();
@@ -35,6 +51,7 @@ async function main() {
     req.setTimeout(0);
     let dir = "";
     let fileName = "";
+    let relativePath = "";
     let dest = "";
     let writeStream: ReturnType<typeof createWriteStream> | null = null;
     let error: string | null = null;
@@ -43,6 +60,7 @@ async function main() {
 
     busboy.on("field", (name: string, val: string) => {
       if (name === "dir") dir = val;
+      if (name === "relativePath") relativePath = val;
     });
 
     busboy.on("file", (_name: string, stream: NodeJS.ReadableStream, info: { filename: string }) => {
@@ -52,7 +70,15 @@ async function main() {
         stream.resume(); // drain
         return;
       }
-      dest = join(dir, fileName);
+      // relativePath (folder uploads) may include subdirectories; create them.
+      const safe = safeUploadDest(dir, relativePath || fileName);
+      if (!safe) {
+        error = "Invalid upload path";
+        stream.resume();
+        return;
+      }
+      dest = safe;
+      mkdirSync(dirname(dest), { recursive: true });
       writeStream = createWriteStream(dest);
       stream.pipe(writeStream);
 
@@ -130,10 +156,11 @@ async function main() {
 
   // Chunked upload: finalize — assemble chunks into destination file
   app.post("/api/files/upload-finalize", express.json(), (req, res) => {
-    const { uploadId, dir, fileName, totalChunks } = req.body as {
+    const { uploadId, dir, fileName, relativePath, totalChunks } = req.body as {
       uploadId: string;
       dir: string;
       fileName: string;
+      relativePath?: string;
       totalChunks: number;
     };
 
@@ -143,9 +170,14 @@ async function main() {
     }
 
     const uploadDir = join(chunksDir, uploadId);
-    const dest = join(dir, fileName);
+    const dest = safeUploadDest(dir, relativePath || fileName);
+    if (!dest) {
+      res.status(400).json({ error: "Invalid upload path" });
+      return;
+    }
 
     try {
+      mkdirSync(dirname(dest), { recursive: true });
       const ws = createWriteStream(dest);
       let i = 0;
 

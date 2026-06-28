@@ -119,6 +119,7 @@ function FileSessionView({ session }: { session: FileSession }) {
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   // Upload state: queue of files with per-file progress
   interface UploadFile {
@@ -528,7 +529,7 @@ function FileSessionView({ session }: { session: FileSession }) {
     });
   };
 
-  const uploadFile = async (file: File, index: number): Promise<void> => {
+  const uploadFile = async (file: File, index: number, relativePath: string): Promise<void> => {
     if (cancelledIndices.current.has(index)) return;
     setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "uploading" } : f)));
 
@@ -537,6 +538,7 @@ function FileSessionView({ session }: { session: FileSession }) {
       return new Promise((resolve) => {
         const formData = new FormData();
         formData.append("dir", cwd);
+        formData.append("relativePath", relativePath);
         formData.append("file", file);
 
         const xhr = new XMLHttpRequest();
@@ -606,7 +608,7 @@ function FileSessionView({ session }: { session: FileSession }) {
       const res = await fetch("/api/files/upload-finalize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uploadId, dir: cwd, fileName: file.name, totalChunks }),
+        body: JSON.stringify({ uploadId, dir: cwd, fileName: file.name, relativePath, totalChunks }),
       });
       const data = await res.json();
       if (data.error) {
@@ -619,41 +621,70 @@ function FileSessionView({ session }: { session: FileSession }) {
     }
   };
 
-  const handleUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const fileArray = Array.from(files);
+  // Core upload pipeline. Each item carries a relativePath so folder uploads
+  // recreate their structure (relativePath is "name" for plain files, or
+  // "folder/sub/file" for folder uploads / dropped directories).
+  const startUploads = async (items: { file: File; relativePath: string }[]) => {
+    if (items.length === 0) return;
 
-    // Check for overwrites
+    // Conflict check on the top-level name each item lands under (a folder's
+    // first path segment, or the file name).
+    const topLevel = [...new Set(items.map((it) => it.relativePath.split("/")[0]))];
     const existingNames = new Set(entries.map((e) => e.name));
-    const conflicts = fileArray.filter((f) => existingNames.has(f.name));
+    const conflicts = topLevel.filter((n) => existingNames.has(n));
     if (conflicts.length > 0) {
-      const names = conflicts.map((f) => f.name).join(", ");
+      const names = conflicts.join(", ");
       const msg =
         conflicts.length === 1
-          ? `"${names}" already exists. Overwrite?`
-          : `${conflicts.length} files already exist (${names}). Overwrite?`;
-      if (!window.confirm(msg)) {
-        if (uploadInputRef.current) uploadInputRef.current.value = "";
-        return;
-      }
+          ? `"${names}" already exists. Overwrite/merge?`
+          : `${conflicts.length} items already exist (${names}). Overwrite/merge?`;
+      if (!window.confirm(msg)) return;
     }
 
     const startIndex = uploadQueue.length;
-    const newFiles: UploadFile[] = fileArray.map((f) => ({
-      name: f.name,
-      size: f.size,
+    const newFiles: UploadFile[] = items.map((it) => ({
+      name: it.relativePath,
+      size: it.file.size,
       status: "pending" as const,
       progress: 0,
     }));
     setUploadQueue((prev) => [...prev, ...newFiles]);
 
-    for (let i = 0; i < fileArray.length; i++) {
+    for (let i = 0; i < items.length; i++) {
       const idx = startIndex + i;
       if (!cancelledIndices.current.has(idx)) {
-        await uploadFile(fileArray[i], idx);
+        await uploadFile(items[i].file, idx, items[i].relativePath);
       }
     }
+  };
+
+  const handleUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const items = Array.from(files).map((f) => ({ file: f, relativePath: f.webkitRelativePath || f.name }));
+    await startUploads(items);
     if (uploadInputRef.current) uploadInputRef.current.value = "";
+    if (folderInputRef.current) folderInputRef.current.value = "";
+  };
+
+  // Recursively walk dropped filesystem entries into {file, relativePath} pairs
+  // so dropped folders upload with their structure intact.
+  const collectDroppedEntries = async (entries: FileSystemEntry[]): Promise<{ file: File; relativePath: string }[]> => {
+    const out: { file: File; relativePath: string }[] = [];
+    const walk = async (entry: FileSystemEntry, prefix: string): Promise<void> => {
+      if (entry.isFile) {
+        const file = await new Promise<File>((res, rej) => (entry as FileSystemFileEntry).file(res, rej));
+        out.push({ file, relativePath: prefix + entry.name });
+      } else if (entry.isDirectory) {
+        const reader = (entry as FileSystemDirectoryEntry).createReader();
+        // readEntries returns at most ~100 per call; loop until it's drained.
+        const readBatch = () => new Promise<FileSystemEntry[]>((res, rej) => reader.readEntries(res, rej));
+        for (let batch = await readBatch(); batch.length > 0; batch = await readBatch()) {
+          for (const child of batch) await walk(child, `${prefix + entry.name}/`);
+        }
+      }
+    };
+    for (const entry of entries) await walk(entry, "");
+    return out;
   };
 
   // Drag & drop upload. A dragenter/dragleave depth counter avoids flicker as
@@ -682,7 +713,20 @@ function FileSessionView({ session }: { session: FileSession }) {
     e.preventDefault();
     dragDepth.current = 0;
     setDragging(false);
-    if (!busy) handleUpload(e.dataTransfer.files);
+    if (busy) return;
+
+    // Capture filesystem entries synchronously — dataTransfer is cleared once
+    // the handler returns, so getAsEntry() must run before any await.
+    const entries: FileSystemEntry[] = [];
+    for (const item of Array.from(e.dataTransfer.items)) {
+      const entry = item.webkitGetAsEntry?.();
+      if (entry) entries.push(entry);
+    }
+    if (entries.length > 0) {
+      collectDroppedEntries(entries).then((items) => startUploads(items));
+    } else {
+      handleUpload(e.dataTransfer.files); // fallback when entries aren't exposed
+    }
   };
 
   if (selectedFile) {
@@ -793,7 +837,8 @@ function FileSessionView({ session }: { session: FileSession }) {
           </button>
           <button
             onClick={() => uploadInputRef.current?.click()}
-            className="p-1.5 text-gray-400 hover:text-white transition-colors"
+            disabled={busy}
+            className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
             title="Upload files"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -804,8 +849,37 @@ function FileSessionView({ session }: { session: FileSession }) {
               />
             </svg>
           </button>
+          <button
+            onClick={() => folderInputRef.current?.click()}
+            disabled={busy}
+            className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
+            title="Upload folder"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 11v5m-2.5-2.5L12 11l2.5 2.5" />
+            </svg>
+          </button>
           <input
             ref={uploadInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => handleUpload(e.target.files)}
+          />
+          <input
+            ref={(el) => {
+              folderInputRef.current = el;
+              // webkitdirectory isn't a typed React prop; set it imperatively.
+              if (el) {
+                el.setAttribute("webkitdirectory", "");
+                el.setAttribute("directory", "");
+              }
+            }}
             type="file"
             multiple
             className="hidden"

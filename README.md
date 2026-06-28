@@ -170,6 +170,15 @@ React Router v7, Express, Socket.IO, node-pty, xterm.js, Monaco Editor, Zustand,
 - **C compiler** for node-pty on Linux (`apt install build-essential`)
 - **cloudflared** (auto-installed by `start.sh` if not found) for remote access via Cloudflare tunnel
 
+## Known Limitations
+
+- **tmux state sync is button-driven.** The terminal toolbar tracks whether
+  you're in tmux only when you attach/detach via the in-app buttons. If you run
+  `tmux attach` / `tmux new` / `detach` (or `exit`) manually in the terminal, the
+  UI won't reflect it. Robust sync is possible via server-side process inspection
+  (see the tracked issue) but is deferred. The same applies to nano/vim mode
+  detection.
+
 ## License
 
 [MIT](LICENSE)
