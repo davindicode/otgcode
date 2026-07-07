@@ -281,6 +281,21 @@ async function main() {
   const { createRequestHandler } = await import("@react-router/express");
   app.all("/{*splat}", createRequestHandler({ build }));
 
+  // Error handler. Unmatched routes make React Router throw "No route matches
+  // URL" — on a public tunnel that's constant bot/scanner noise (probes for
+  // /test.cgi, /whois.cgi, etc.), not real errors. Respond 404 quietly instead
+  // of letting Express log a full stack trace for each. Real errors still log.
+  app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const status = err?.status ?? err?.statusCode;
+    if (status === 404 || /No route matches URL/.test(err?.message ?? "")) {
+      if (!res.headersSent) res.status(404).end();
+      return;
+    }
+    console.error(err);
+    if (!res.headersSent) res.status(500).end();
+    else next(err);
+  });
+
   httpServer.listen(PORT, () => {
     console.log(`\n  OTG Code running on http://localhost:${PORT}\n`);
   });

@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mounting every page up front, so large PDFs no longer choke.
 
 ### Fixed
+- Server console no longer floods with "No route matches URL" stack traces for
+  unmatched URLs (bot/scanner probes on the public tunnel). A custom
+  `handleError` swallows expected 404s and an Express handler returns a clean
+  404; real errors still log.
 - Upload race: the explorer no longer briefly unfreezes between an upload
   finishing and the tree refreshing, so navigating during that window can't get
   reset back to the upload directory. It stays frozen until the refreshed tree
