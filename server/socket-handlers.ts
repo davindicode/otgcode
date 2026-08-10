@@ -15,7 +15,7 @@ export function registerSocketHandlers(io: Server): void {
 
       ownedSessions.add(sessionId);
 
-      createPty(sessionId, {
+      createPty(sessionId, socket.id, {
         cwd,
         onData: (output) => {
           socket.emit("terminal_output", { sessionId, data: output });
@@ -31,19 +31,19 @@ export function registerSocketHandlers(io: Server): void {
 
     socket.on("terminal_input", (data: { sessionId: string; data: string }) => {
       if (data.sessionId && data.data) {
-        writePty(data.sessionId, data.data);
+        writePty(data.sessionId, socket.id, data.data);
       }
     });
 
     socket.on("terminal_resize", (data: { sessionId: string; cols: number; rows: number }) => {
       if (data.sessionId) {
-        resizePty(data.sessionId, data.cols, data.rows);
+        resizePty(data.sessionId, socket.id, data.cols, data.rows);
       }
     });
 
     socket.on("close_terminal", (data: { sessionId: string }) => {
       if (data.sessionId) {
-        killPty(data.sessionId);
+        killPty(data.sessionId, socket.id);
         ownedSessions.delete(data.sessionId);
       }
     });
@@ -51,7 +51,10 @@ export function registerSocketHandlers(io: Server): void {
     socket.on("disconnect", () => {
       console.log(`Client disconnected: ${socket.id}`);
       for (const sessionId of ownedSessions) {
-        killPty(sessionId);
+        // A reconnect may already have replaced this ID with a PTY owned by a
+        // new socket. Owner checking prevents stale disconnect cleanup from
+        // killing that replacement.
+        killPty(sessionId, socket.id);
       }
       ownedSessions.clear();
     });

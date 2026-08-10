@@ -40,6 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mounting every page up front, so large PDFs no longer choke.
 
 ### Fixed
+- Terminal reconnects now clear stale tmux mouse/focus input modes before a
+  replacement shell starts, preventing mouse movement from appearing as raw
+  escape-sequence text after a connection loss.
+- PTY replacement and disconnect cleanup are socket-owner and generation safe;
+  stale socket callbacks can no longer delete, write to, resize, or kill a
+  newly reconnected terminal with the same client session ID.
+- Multi-byte toolbar controls (including tmux detach and Vim exit) are sent as
+  one input operation so delayed trailing keys cannot cross a reconnect.
 - Server console no longer floods with "No route matches URL" stack traces for
   unmatched URLs (bot/scanner probes on the public tunnel). A custom
   `handleError` swallows expected 404s and an Express handler returns a clean

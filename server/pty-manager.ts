@@ -17,6 +17,7 @@ function getDefaultShell(): string {
 
 interface PtySession {
   id: string;
+  ownerId: string;
   process: pty.IPty;
   onData: (data: string) => void;
   onExit: (exitCode: number) => void;
@@ -26,6 +27,7 @@ const sessions = new Map<string, PtySession>();
 
 export function createPty(
   sessionId: string,
+  ownerId: string,
   options: {
     shell?: string;
     cwd?: string;
@@ -61,16 +63,21 @@ export function createPty(
 
   const session: PtySession = {
     id: sessionId,
+    ownerId,
     process: proc,
     onData: options.onData,
     onExit: options.onExit,
   };
 
   proc.onData((data) => {
+    if (sessions.get(sessionId) !== session) return;
     session.onData(data);
   });
 
   proc.onExit(({ exitCode }) => {
+    // A replacement PTY may already exist under the same client session ID.
+    // Ignore this stale process's exit instead of deleting/closing its successor.
+    if (sessions.get(sessionId) !== session) return;
     session.onExit(exitCode);
     sessions.delete(sessionId);
   });
@@ -78,16 +85,16 @@ export function createPty(
   sessions.set(sessionId, session);
 }
 
-export function writePty(sessionId: string, data: string): void {
+export function writePty(sessionId: string, ownerId: string, data: string): void {
   const session = sessions.get(sessionId);
-  if (session) {
+  if (session?.ownerId === ownerId) {
     session.process.write(data);
   }
 }
 
-export function resizePty(sessionId: string, cols: number, rows: number): void {
+export function resizePty(sessionId: string, ownerId: string, cols: number, rows: number): void {
   const session = sessions.get(sessionId);
-  if (session) {
+  if (session?.ownerId === ownerId) {
     try {
       session.process.resize(cols, rows);
     } catch {
@@ -96,9 +103,9 @@ export function resizePty(sessionId: string, cols: number, rows: number): void {
   }
 }
 
-export function killPty(sessionId: string): void {
+export function killPty(sessionId: string, ownerId?: string): void {
   const session = sessions.get(sessionId);
-  if (session) {
+  if (session && (ownerId === undefined || session.ownerId === ownerId)) {
     try {
       session.process.kill();
     } catch {

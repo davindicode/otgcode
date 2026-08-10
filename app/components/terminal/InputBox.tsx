@@ -330,8 +330,7 @@ export default function InputBox() {
     (key: string) => {
       if (!activeSessionId) return;
       if (key.length === 2 && key.charCodeAt(0) < 0x20 && key.charCodeAt(1) >= 0x20) {
-        sendInput(activeSessionId, key[0]);
-        setTimeout(() => sendInput(activeSessionId, key[1]), 50);
+        sendInput(activeSessionId, key);
       } else {
         sendInput(activeSessionId, key);
       }
@@ -468,12 +467,9 @@ export default function InputBox() {
 
   const handleTmuxDetach = () => {
     if (!activeSessionId) return;
-    sendInput(activeSessionId, "\x02");
-    setTimeout(() => {
-      sendInput(activeSessionId, "d");
-      setInTmux(activeSessionId, false);
-      setActiveGroup(null);
-    }, 50);
+    sendInput(activeSessionId, "\x02d");
+    setInTmux(activeSessionId, false);
+    setActiveGroup(null);
   };
 
   // cd directory picker — always scoped to the currently-active terminal session
@@ -543,22 +539,16 @@ export default function InputBox() {
 
   const handleExitVim = () => {
     if (!activeSessionId) return;
-    sendInput(activeSessionId, "\x1b");
-    setTimeout(() => {
-      sendInput(activeSessionId, ":q!\n");
-      setInEditor(activeSessionId, null);
-      setActiveGroup(null);
-    }, 50);
+    sendInput(activeSessionId, "\x1b:q!\n");
+    setInEditor(activeSessionId, null);
+    setActiveGroup(null);
   };
 
   const handleSaveExitVim = () => {
     if (!activeSessionId) return;
-    sendInput(activeSessionId, "\x1b");
-    setTimeout(() => {
-      sendInput(activeSessionId, ":wq\n");
-      setInEditor(activeSessionId, null);
-      setActiveGroup(null);
-    }, 50);
+    sendInput(activeSessionId, "\x1b:wq\n");
+    setInEditor(activeSessionId, null);
+    setActiveGroup(null);
   };
 
   // --- Styles ---

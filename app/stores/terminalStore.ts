@@ -60,16 +60,16 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       // On reconnect, re-create all existing sessions (server killed PTYs on disconnect)
       const { sessions } = get();
       for (const session of Object.values(sessions)) {
-        if (session.status === "disconnected" || session.status === "error") {
-          socket.emit("create_terminal", {
-            sessionId: session.id,
-            cwd: get().defaultCwd || undefined,
-          });
+        if (session.status !== "connected") {
           set({
             sessions: {
               ...get().sessions,
               [session.id]: { ...get().sessions[session.id], status: "connecting", inTmux: false, inEditor: null },
             },
+          });
+          socket.emit("create_terminal", {
+            sessionId: session.id,
+            cwd: get().defaultCwd || undefined,
           });
         }
       }
@@ -81,6 +81,10 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const { sessions } = get();
       const updated: Record<string, (typeof sessions)[string]> = {};
       for (const [id, session] of Object.entries(sessions)) {
+        // Tmux and full-screen editors can leave xterm input modes enabled.
+        // Disable mouse/focus/paste reporting without clearing scrollback; the
+        // replacement PTY is a plain shell and must not inherit those modes.
+        session.terminal?.write("\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1004l\x1b[?1006l\x1b[?2004l");
         updated[id] = { ...session, status: "disconnected" };
       }
       set({ sessions: updated });
@@ -177,7 +181,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         [sessionId]: {
           id: sessionId,
           name: name || `Terminal ${Object.keys(sessions).length + 1}`,
-          status: "connecting",
+          status: socket.connected ? "connecting" : "disconnected",
           terminal: null,
           fitAddon: null,
           error: null,
@@ -190,7 +194,11 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       activeSessionId: sessionId,
     });
 
-    socket.emit("create_terminal", { sessionId, cwd: cwd || get().defaultCwd || undefined });
+    // Socket.IO buffers emits while offline. Avoid buffering this create because
+    // the connect handler owns recreation and would otherwise create it twice.
+    if (socket.connected) {
+      socket.emit("create_terminal", { sessionId, cwd: cwd || get().defaultCwd || undefined });
+    }
   },
 
   registerTerminal: (sessionId, terminal, fitAddon) => {
@@ -213,7 +221,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   sendInput: (sessionId, data) => {
     const socket = getSocket();
-    if (socket.connected) {
+    const session = get().sessions[sessionId];
+    if (socket.connected && session?.status === "connected") {
       socket.emit("terminal_input", { sessionId, data });
     }
   },
