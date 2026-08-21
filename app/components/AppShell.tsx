@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useTerminalStore } from "~/stores/terminalStore";
 import { useUiStore } from "~/stores/uiStore";
 import BrowserPage from "./browser/BrowserPage";
+import ConnectionGate from "./ConnectionGate";
 import FilesPage from "./files/FilesPage";
 import Header from "./Header";
 import MobileTabBar from "./MobileTabBar";
@@ -30,50 +32,68 @@ function useIsDesktop() {
 export default function AppShell() {
   const activeTab = useUiStore((s) => s.activeTab);
   const isDesktop = useIsDesktop();
+  const socketConnected = useTerminalStore((s) => s.socketConnected);
+  const initSocket = useTerminalStore((s) => s.initSocket);
+
+  useEffect(() => {
+    initSocket();
+  }, [initSocket]);
 
   return (
     <div className="app-shell bg-[#0d0d1a] text-white">
       <Toaster />
-      <Header />
+      <div
+        className={`flex min-h-0 flex-1 flex-col transition-[filter,opacity] duration-200 ${
+          socketConnected ? "" : "pointer-events-none opacity-45 grayscale"
+        }`}
+        inert={!socketConnected}
+        aria-hidden={!socketConnected}
+      >
+        <Header />
 
-      {isDesktop ? (
-        /* Desktop: 3-column resizable panels */
-        <div className="flex flex-1 overflow-hidden min-h-0">
-          <ResizablePanels
-            left={<FilesPage />}
-            center={
-              <div className="flex flex-col h-full min-h-0 min-w-0 w-full">
+        {isDesktop ? (
+          /* Desktop: 3-column resizable panels */
+          <div className="flex flex-1 overflow-hidden min-h-0">
+            <ResizablePanels
+              left={<FilesPage />}
+              center={
+                <div className="flex flex-col h-full min-h-0 min-w-0 w-full">
+                  <TerminalPage />
+                  <InputBox />
+                </div>
+              }
+              right={<BrowserPage />}
+            />
+          </div>
+        ) : (
+          /* Mobile: single panel with tab switching */
+          <>
+            <div className="flex flex-col flex-1 overflow-hidden min-h-0">
+              <div
+                className="flex-1 flex flex-col min-h-0"
+                style={{ display: activeTab === "terminal" ? "flex" : "none" }}
+              >
                 <TerminalPage />
                 <InputBox />
               </div>
-            }
-            right={<BrowserPage />}
-          />
-        </div>
-      ) : (
-        /* Mobile: single panel with tab switching */
-        <>
-          <div className="flex flex-col flex-1 overflow-hidden min-h-0">
-            <div
-              className="flex-1 flex flex-col min-h-0"
-              style={{ display: activeTab === "terminal" ? "flex" : "none" }}
-            >
-              <TerminalPage />
-              <InputBox />
+              <div
+                className="flex-1 flex flex-col min-h-0"
+                style={{ display: activeTab === "files" ? "flex" : "none" }}
+              >
+                <FilesPage />
+              </div>
+              <div
+                className="flex-1 flex flex-col min-h-0"
+                style={{ display: activeTab === "browser" ? "flex" : "none" }}
+              >
+                <BrowserPage />
+              </div>
             </div>
-            <div className="flex-1 flex flex-col min-h-0" style={{ display: activeTab === "files" ? "flex" : "none" }}>
-              <FilesPage />
-            </div>
-            <div
-              className="flex-1 flex flex-col min-h-0"
-              style={{ display: activeTab === "browser" ? "flex" : "none" }}
-            >
-              <BrowserPage />
-            </div>
-          </div>
-          <MobileTabBar />
-        </>
-      )}
+            <MobileTabBar />
+          </>
+        )}
+      </div>
+      {!socketConnected && <ConnectionGate />}
     </div>
   );
 }

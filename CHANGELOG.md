@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- App-wide offline/reconnecting gate: the interface dims and becomes fully
+  non-interactive while the server socket is disconnected, with a spinner and
+  animated connecting message until the VPS connection is ready.
 - Image viewer: **Replay** button for GIFs (restart a play-once animation).
 - Video/audio viewer: **loop toggle**, plus `playsInline` and `preload=metadata`.
 - File open: **Cancel** button while a large file is loading, so a misclick can
@@ -20,11 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   load failures, and `cd` directory-picker failures.
 - Breadcrumbs: a **Go** button to submit the edited path (on-screen alternative
   to Enter, handy on mobile).
-- File explorer **multi-select mode** — a "Select" item in an entry's menu enters
-  select mode, where each row's 3-dot becomes a checkbox and the Hidden toggle is
-  replaced by a selection count, Select all/None, a group actions menu, and
-  Cancel. Group actions: **Download** and **Delete** with a recursive-folder
-  warning when folders are included.
+- File explorer **multi-select mode** — a toolbar Select button enters selection
+  mode and changes to Cancel, while each row's 3-dot becomes a checkbox. The
+  toolbar also shows the selection count, Select all/None, and a group actions
+  menu. Group actions: **Download** and **Delete** with a recursive-folder warning
+  when folders are included.
 - **Folder downloads** — download a folder as a recursive `.zip` from its menu,
   and group downloads bundle the whole selection (files + folders) into one zip
   (streamed server-side via a new `/api/files/download-zip` endpoint).

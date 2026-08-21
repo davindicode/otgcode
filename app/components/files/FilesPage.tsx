@@ -196,9 +196,10 @@ function FileSessionView({ session }: { session: FileSession }) {
     setGroupMenu(false);
   };
 
-  const enterSelectMode = (entry: FileEntry) => {
+  const enterSelectMode = () => {
     setSelectMode(true);
-    setSelected(new Set([entry.name])); // preselect the item the menu was opened on
+    setSelected(new Set());
+    setGroupMenu(false);
   };
 
   const toggleSelect = (entry: FileEntry) => {
@@ -792,20 +793,6 @@ function FileSessionView({ session }: { session: FileSession }) {
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#16162a] border-b border-gray-700 shrink-0">
         <div className="flex items-center gap-0.5">
           <button
-            onClick={() => loadDirectory(cwd)}
-            disabled={busy}
-            className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
-            title="Refresh"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-          </button>
-          <button
             onClick={handleNewFile}
             disabled={busy}
             className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
@@ -886,72 +873,98 @@ function FileSessionView({ session }: { session: FileSession }) {
             onChange={(e) => handleUpload(e.target.files)}
           />
         </div>
-        {selectMode ? (
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-xs text-gray-400 tabular-nums">{selected.size} selected</span>
-            <button
-              onClick={toggleSelectAll}
-              className="px-2 py-0.5 text-xs text-gray-300 hover:text-white border border-gray-700 rounded transition-colors"
-            >
-              {selected.size === entries.length && entries.length > 0 ? "None" : "All"}
-            </button>
-            <div className="relative">
+        <div className="flex items-center gap-1 text-sm">
+          {selectMode && (
+            <>
+              <span className="text-xs text-gray-400 tabular-nums">{selected.size} selected</span>
               <button
-                onClick={() => setGroupMenu((v) => !v)}
-                disabled={selected.size === 0}
-                className="p-1 text-gray-400 hover:text-white disabled:text-gray-700 disabled:pointer-events-none transition-colors"
-                title="Actions on selected"
+                onClick={toggleSelectAll}
+                className="px-2 py-0.5 text-xs text-gray-300 hover:text-white border border-gray-700 rounded transition-colors"
               >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
-                </svg>
+                {selected.size === entries.length && entries.length > 0 ? "None" : "All"}
               </button>
-              {groupMenu && (
-                <>
-                  <button
-                    type="button"
-                    className="fixed inset-0 z-40 cursor-default"
-                    onClick={() => setGroupMenu(false)}
-                    aria-label="Close menu"
-                  />
-                  <div className="absolute right-0 top-full mt-1 z-50 bg-[#1e1e3a] border border-gray-600 rounded-lg shadow-xl py-1 min-w-[160px]">
+              <div className="relative">
+                <button
+                  onClick={() => setGroupMenu((v) => !v)}
+                  disabled={selected.size === 0}
+                  className="p-1 text-gray-400 hover:text-white disabled:text-gray-700 disabled:pointer-events-none transition-colors"
+                  title="Actions on selected"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
+                  </svg>
+                </button>
+                {groupMenu && (
+                  <>
                     <button
-                      onClick={handleGroupDownload}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
-                    >
-                      Download
-                    </button>
-                    <button
-                      onClick={handleGroupDelete}
-                      className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-[#2a2a4a] transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-            <button
-              onClick={exitSelectMode}
-              className="px-2 py-0.5 text-xs text-gray-300 hover:text-white border border-gray-700 rounded transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <label
-            className={`flex items-center gap-2 text-sm text-gray-400 ${busy ? "pointer-events-none opacity-50" : "cursor-pointer"}`}
+                      type="button"
+                      className="fixed inset-0 z-40 cursor-default"
+                      onClick={() => setGroupMenu(false)}
+                      aria-label="Close menu"
+                    />
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-[#1e1e3a] border border-gray-600 rounded-lg shadow-xl py-1 min-w-[160px]">
+                      <button
+                        onClick={handleGroupDownload}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+                      >
+                        Download
+                      </button>
+                      <button
+                        onClick={handleGroupDelete}
+                        className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-[#2a2a4a] transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+          <button
+            onClick={() => {
+              if (selectMode) exitSelectMode();
+              loadDirectory(cwd);
+            }}
+            disabled={busy}
+            className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
+            title="Refresh"
+            aria-label="Refresh files"
           >
-            <input
-              type="checkbox"
-              checked={showHidden}
-              onChange={(e) => toggleHidden(e.target.checked)}
-              disabled={busy}
-              className="accent-blue-500"
-            />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (selectMode) exitSelectMode();
+              toggleHidden(!showHidden);
+            }}
+            disabled={busy}
+            aria-pressed={showHidden}
+            className={`px-2 py-0.5 text-xs border rounded transition-colors disabled:pointer-events-none disabled:opacity-50 ${
+              showHidden
+                ? "border-blue-500/70 bg-blue-500/20 text-blue-200"
+                : "border-gray-700 text-gray-400 hover:border-gray-600 hover:text-white"
+            }`}
+            title={`${showHidden ? "Hide" : "Show"} hidden files`}
+          >
             Hidden
-          </label>
-        )}
+          </button>
+          <button
+            type="button"
+            onClick={selectMode ? exitSelectMode : enterSelectMode}
+            disabled={busy}
+            className="px-2 py-0.5 text-xs text-gray-300 hover:text-white border border-gray-700 hover:border-gray-600 rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
+          >
+            {selectMode ? "Cancel" : "Select"}
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -971,7 +984,6 @@ function FileSessionView({ session }: { session: FileSession }) {
           onRename={handleRename}
           onDownload={handleDownload}
           onCopyPath={handleCopyPath}
-          onEnterSelect={enterSelectMode}
           selectMode={selectMode}
           selectedNames={selected}
           onToggleSelect={toggleSelect}

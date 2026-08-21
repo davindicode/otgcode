@@ -17,7 +17,6 @@ interface FileListProps {
   onRename: (entry: FileEntry) => void;
   onDownload: (entry: FileEntry) => void;
   onCopyPath: (entry: FileEntry) => void;
-  onEnterSelect: (entry: FileEntry) => void;
   selectMode?: boolean;
   selectedNames?: Set<string>;
   onToggleSelect?: (entry: FileEntry) => void;
@@ -51,7 +50,6 @@ export default function FileList({
   onRename,
   onDownload,
   onCopyPath,
-  onEnterSelect,
   selectMode = false,
   selectedNames,
   onToggleSelect,
@@ -326,12 +324,6 @@ export default function FileList({
             className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
           >
             Open
-          </button>
-          <button
-            onClick={() => menuAction(onEnterSelect)}
-            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
-          >
-            Select
           </button>
           <button
             onClick={() => menuAction(onRename)}
