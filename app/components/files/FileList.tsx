@@ -42,6 +42,13 @@ interface ContextMenuState {
   vpBottom: number; // anchor bottom within the visible container (flip decision)
 }
 
+const MENU_TRIGGER_ATTR = "data-file-menu-trigger";
+
+/** True when the open menu belongs to this row's 3-dot button. */
+function isButtonMenuFor(menu: ContextMenuState | null, entry: FileEntry): boolean {
+  return !!menu && menu.rightAlign && menu.entry.name === entry.name;
+}
+
 export default function FileList({
   entries,
   onOpen,
@@ -85,8 +92,14 @@ export default function FileList({
     });
   };
 
-  // Open the menu from the 3-dot button, right-aligned to the button.
+  // Toggle the menu from the 3-dot button, right-aligned to the button. A
+  // second click on the same row closes it; clicking a different row's button
+  // moves the menu there, so only one is ever open.
   const openMenuFromButton = (e: React.MouseEvent, entry: FileEntry) => {
+    if (isButtonMenuFor(menu, entry)) {
+      setMenu(null);
+      return;
+    }
     const container = scrollRef.current;
     if (!container) return;
     const cRect = container.getBoundingClientRect();
@@ -107,7 +120,9 @@ export default function FileList({
   useEffect(() => {
     if (!menu) return;
     const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Element | null;
+      if (target?.closest(`[${MENU_TRIGGER_ATTR}]`)) return;
+      if (menuRef.current && !menuRef.current.contains(target as Node)) {
         setMenu(null);
       }
     };
@@ -174,7 +189,7 @@ export default function FileList({
   };
 
   if (entries.length === 0 && (!uploadQueue || uploadQueue.length === 0)) {
-    return <div className="flex items-center justify-center h-full text-gray-500 text-sm">Empty directory</div>;
+    return <div className="flex items-center justify-center h-full text-ink-faint text-sm">Empty directory</div>;
   }
 
   return (
@@ -182,10 +197,11 @@ export default function FileList({
       <div className={disabled ? "pointer-events-none opacity-50" : ""}>
         {entries.map((entry) => {
           const isSelected = selectMode && !!selectedNames?.has(entry.name);
+          const menuOpen = isButtonMenuFor(menu, entry);
           return (
             <div
               key={entry.name}
-              className={`w-full flex items-center border-b border-gray-800 ${isSelected ? "bg-blue-600/15" : ""}`}
+              className={`w-full flex items-center border-b border-line-soft ${isSelected ? "bg-blue-600/15" : ""}`}
             >
               {/* Clickable file/folder area */}
               <button
@@ -194,7 +210,7 @@ export default function FileList({
                 onTouchStart={(e) => handleTouchStart(e, entry)}
                 onTouchEnd={handleTouchEnd}
                 onTouchMove={handleTouchEnd}
-                className="flex-1 flex items-center gap-3 px-3 py-2 hover:bg-[#1a1a2e] active:bg-[#1a1a2e] transition-colors text-left min-w-0"
+                className="flex-1 flex items-center gap-3 px-3 py-2 hover:bg-raised active:bg-raised transition-colors text-left min-w-0"
               >
                 {/* Icon */}
                 <span className="text-lg shrink-0">
@@ -203,7 +219,7 @@ export default function FileList({
                       <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
                     </svg>
                   ) : (
-                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-ink-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -214,15 +230,17 @@ export default function FileList({
                   )}
                 </span>
                 {/* Name */}
-                <span className="flex-1 text-sm text-gray-200 truncate">{entry.name}</span>
+                <span className="flex-1 text-sm text-ink-muted truncate">{entry.name}</span>
                 {/* Size */}
-                {!entry.isDirectory && <span className="text-xs text-gray-500 shrink-0">{formatSize(entry.size)}</span>}
+                {!entry.isDirectory && (
+                  <span className="text-xs text-ink-faint shrink-0">{formatSize(entry.size)}</span>
+                )}
               </button>
               {/* Right control: checkbox in select mode, otherwise the 3-dot menu */}
               {selectMode ? (
                 <button
                   onClick={() => onToggleSelect?.(entry)}
-                  className="shrink-0 p-2 text-gray-400 hover:text-white transition-colors"
+                  className="shrink-0 p-2 text-ink-dim hover:text-ink transition-colors"
                   title={isSelected ? "Deselect" : "Select"}
                 >
                   {isSelected ? (
@@ -234,12 +252,20 @@ export default function FileList({
                       />
                     </svg>
                   ) : (
-                    <span className="block w-4 h-4 rounded border border-gray-500" />
+                    <span className="block w-4 h-4 rounded border border-line-strong" />
                   )}
                 </button>
               ) : (
                 <button
-                  className="shrink-0 p-2 text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 active:bg-gray-700 transition-colors"
+                  {...{ [MENU_TRIGGER_ATTR]: entry.name }}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  aria-label={`Actions for ${entry.name}`}
+                  className={`shrink-0 p-2 transition-colors ${
+                    menuOpen
+                      ? "bg-hover text-ink"
+                      : "text-ink-faint hover:text-ink-muted hover:bg-control/50 active:bg-control"
+                  }`}
                   onClick={(e) => openMenuFromButton(e, entry)}
                 >
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -256,7 +282,7 @@ export default function FileList({
       {uploadQueue &&
         uploadQueue.length > 0 &&
         uploadQueue.map((file, i) => (
-          <div key={`upload-${i}`} className="w-full flex items-center gap-3 px-3 py-2 border-b border-gray-800">
+          <div key={`upload-${i}`} className="w-full flex items-center gap-3 px-3 py-2 border-b border-line-soft">
             <span className="shrink-0">
               {file.status === "uploading" || file.status === "pending" ? (
                 <svg className="w-5 h-5 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
@@ -285,8 +311,8 @@ export default function FileList({
                 </svg>
               )}
             </span>
-            <span className="flex-1 text-sm text-gray-400 truncate">{file.name}</span>
-            <span className="text-xs text-gray-500 shrink-0">
+            <span className="flex-1 text-sm text-ink-dim truncate">{file.name}</span>
+            <span className="text-xs text-ink-faint shrink-0">
               {file.status === "uploading"
                 ? `${file.progress}%`
                 : file.status === "error"
@@ -296,7 +322,7 @@ export default function FileList({
             {(file.status === "pending" || file.status === "uploading") && cancelUpload && (
               <button
                 onClick={() => cancelUpload(i)}
-                className="shrink-0 p-0.5 text-gray-500 hover:text-red-400 transition-colors"
+                className="shrink-0 p-0.5 text-ink-faint hover:text-red-400 transition-colors"
                 title="Cancel upload"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -311,47 +337,47 @@ export default function FileList({
       {menu && (
         <div
           ref={menuRef}
-          className="absolute z-50 bg-[#1e1e3a] border border-gray-600 rounded-lg shadow-xl py-1 min-w-[160px]"
+          className="absolute z-50 bg-popover border border-line-strong rounded-lg shadow-xl py-1 min-w-[160px]"
           style={{
             left: menuStyle.left,
             top: menuStyle.top,
             visibility: menuStyle.visible ? "visible" : "hidden",
           }}
         >
-          <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700 truncate">{menu.entry.name}</div>
+          <div className="px-3 py-1.5 text-xs text-ink-dim border-b border-line truncate">{menu.entry.name}</div>
           <button
             onClick={() => menuAction(onOpen)}
-            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
           >
             Open
           </button>
           <button
             onClick={() => menuAction(onRename)}
-            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
           >
             Rename
           </button>
           <button
             onClick={() => menuAction(onCopyPath)}
-            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
           >
             Copy path
           </button>
           <button
             onClick={() => menuAction(onDownload)}
-            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
           >
             {menu.entry.isDirectory ? "Download (zip)" : "Download"}
           </button>
           <button
             onClick={() => menuAction(onInfo)}
-            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
           >
             Info
           </button>
           <button
             onClick={() => menuAction(onDelete)}
-            className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-[#2a2a4a] transition-colors"
+            className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-hover transition-colors"
           >
             Delete
           </button>

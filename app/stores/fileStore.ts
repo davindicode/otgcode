@@ -24,7 +24,7 @@ interface FileState {
   sessions: Record<string, FileSession>;
   activeSessionId: string | null;
 
-  createSession: (id?: string) => string;
+  createSession: (id?: string, name?: string, cwd?: string) => string;
   closeSession: (id: string) => void;
   setActiveSession: (id: string) => void;
   updateSession: (id: string, patch: Partial<FileSession>) => void;
@@ -36,10 +36,10 @@ export const useFileStore = create<FileState>((set, get) => ({
   sessions: {},
   activeSessionId: null,
 
-  createSession: (id) => {
+  createSession: (id, restoredName, restoredCwd) => {
     sessionCounter++;
     const sessionId = id || `files-${Date.now()}`;
-    const name = `Explorer ${sessionCounter}`;
+    const name = restoredName || `Explorer ${sessionCounter}`;
     const { sessions } = get();
     set({
       sessions: {
@@ -47,7 +47,7 @@ export const useFileStore = create<FileState>((set, get) => ({
         [sessionId]: {
           id: sessionId,
           name,
-          cwd: "",
+          cwd: restoredCwd || "",
           entries: [],
           showHidden: false,
           selectedFile: null,

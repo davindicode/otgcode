@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { DEFAULT_FONT_SIZE } from "~/lib/constants";
 import { getSocket } from "~/lib/socket";
 import { useAuthStore } from "./authStore";
+import { useWorkspaceStore } from "./workspaceStore";
 
 interface TerminalSession {
   id: string;
@@ -288,6 +289,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   setFontSize: (size) => {
     set({ fontSize: size });
+    useWorkspaceStore.getState().setFontSize(size);
     // Apply to all existing terminal instances
     const { sessions } = get();
     for (const session of Object.values(sessions)) {

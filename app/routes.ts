@@ -14,4 +14,5 @@ export default [
   route("api/tool-versions", "routes/api/tool-versions.ts"),
   route("api/system-info", "routes/api/system-info.ts"),
   route("api/terminal/cwd", "routes/api/terminal.cwd.ts"),
+  route("api/workspace", "routes/api/workspace.ts"),
 ] satisfies RouteConfig;

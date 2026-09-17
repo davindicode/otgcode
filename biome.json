@@ -25,7 +25,8 @@
         "noStaticElementInteractions": "off",
         "useKeyWithClickEvents": "off",
         "noAutofocus": "off",
-        "useMediaCaption": "off"
+        "useMediaCaption": "off",
+        "useSemanticElements": "off"
       },
       "suspicious": {
         "noExplicitAny": "warn",

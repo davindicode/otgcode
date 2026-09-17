@@ -3,6 +3,8 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal } from "@xterm/xterm";
 import { useEffect, useRef } from "react";
 import { useTerminalStore } from "~/stores/terminalStore";
+import { useWorkspaceStore } from "~/stores/workspaceStore";
+import { xtermTheme } from "./xtermTheme";
 import "@xterm/xterm/css/xterm.css";
 
 export default function TerminalPanel({ sessionId }: { sessionId: string }) {
@@ -14,6 +16,14 @@ export default function TerminalPanel({ sessionId }: { sessionId: string }) {
   const sendInput = useTerminalStore((s) => s.sendInput);
   const resizeTerminal = useTerminalStore((s) => s.resizeTerminal);
   const fontSize = useTerminalStore((s) => s.fontSize);
+  const theme = useWorkspaceStore((s) => s.theme);
+
+  // Terminals are created once and reused, so a theme swap has to be pushed
+  // into the live instance rather than waiting for a remount.
+  useEffect(() => {
+    const term = useTerminalStore.getState().sessions[sessionId]?.terminal;
+    if (term) term.options.theme = xtermTheme(theme);
+  }, [theme, sessionId]);
 
   useEffect(() => {
     const el = terminalRef.current;
@@ -41,29 +51,7 @@ export default function TerminalPanel({ sessionId }: { sessionId: string }) {
         cursorBlink: true,
         fontSize,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-        theme: {
-          background: "#1a1a2e",
-          foreground: "#e0e0e0",
-          cursor: "#e0e0e0",
-          cursorAccent: "#1a1a2e",
-          selectionBackground: "#264f78",
-          black: "#1a1a2e",
-          red: "#f44747",
-          green: "#6a9955",
-          yellow: "#dcdcaa",
-          blue: "#569cd6",
-          magenta: "#c586c0",
-          cyan: "#4ec9b0",
-          white: "#d4d4d4",
-          brightBlack: "#808080",
-          brightRed: "#f44747",
-          brightGreen: "#6a9955",
-          brightYellow: "#dcdcaa",
-          brightBlue: "#569cd6",
-          brightMagenta: "#c586c0",
-          brightCyan: "#4ec9b0",
-          brightWhite: "#ffffff",
-        },
+        theme: xtermTheme(useWorkspaceStore.getState().theme),
         scrollback: 10000,
         allowProposedApi: true,
         wordSeparator: " ()[]{}',\"`",
@@ -112,7 +100,7 @@ export default function TerminalPanel({ sessionId }: { sessionId: string }) {
   }, [sessionId]);
 
   return (
-    <div className="absolute inset-0 bg-[#1a1a2e]">
+    <div className="absolute inset-0 bg-raised">
       <div ref={terminalRef} className="h-full w-full" />
     </div>
   );

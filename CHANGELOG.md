@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-17
+
+A big step toward a proper app: installable, themed, with settings and
+workspace state that persist on the host. Still alpha.
+
 ### Added
+- **Light theme**, with a Dark/Light switch in Settings. Every colour now
+  resolves to a semantic token (`surface`, `ink`, `line`, …) defined once in
+  `app.css`, so both themes stay consistent; the terminal and code editor
+  palettes follow the app theme. The theme is resolved server-side and rendered
+  into `<html>`, so there is no flash of the wrong theme on load.
+- **Persisted workspace** — the pane split, open explorer tabs and their paths,
+  open terminal tabs and their directories, the terminal font size and the
+  theme are saved to `~/.otgcode/workspace.json` on the host and restored on
+  the next load. Settings save themselves the moment you change them, and
+  because they live on the host rather than in browser storage they follow you
+  across refreshes, reconnects and devices.
+- **Installable as an app** — web app manifest, standalone display, maskable
+  icons, iOS home-screen meta and safe-area padding, so it behaves like a
+  native app when added to a home screen.
+- Terminal font size is now a Settings control, alongside the theme.
 - **Optional access password** — a Settings toggle (off by default) that puts a
   login in front of the whole app. Enforced server-side on every HTTP route,
   the `/proxy/:port` reverse proxy (including WebSocket upgrades) and the
@@ -52,6 +72,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   structure is recreated server-side (with path-traversal protection).
 
 ### Changed
+- **Localhost previews moved out of the third panel** into a popup under a new
+  globe icon in the header. Every row was a single line and "Go" opens a real
+  browser tab, so it never needed a column; desktop is now a two-pane split.
+- **Desktop layout is two panes** — explorer and terminal — with the explorer
+  at 1/4 width by default, still draggable (double-click the divider to reset)
+  and now with a minimum width so its toolbar stays usable.
+- **Mobile tab bar is two tabs** — Files and Terminal — matching the desktop
+  focus.
+- The file explorer toolbar scrolls horizontally when its controls outgrow the
+  pane (entering select mode on a narrow explorer), instead of squashing them.
+- Every popup in the app now behaves the same way: its trigger toggles it,
+  stays highlighted while it is open, and opening one closes any other. This
+  covers the header icons and each file row's 3-dot menu, where clicking the
+  button while its menu was open previously closed and immediately reopened it.
+- Default terminal font size is now 8 (was 6).
 - The header info icon is now a proper toggle: it highlights while its popup is
   open and a second click dismisses it (previously a click on the icon while
   open closed and immediately reopened the popup).

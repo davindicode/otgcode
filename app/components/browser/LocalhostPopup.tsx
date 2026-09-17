@@ -72,7 +72,7 @@ function PortRow({ tab }: { tab: BrowserTab }) {
   };
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-[#16162a] border border-gray-700/50 rounded-lg">
+    <div className="flex items-center gap-2 px-2.5 py-1.5 bg-raised border border-line/50 rounded-lg">
       {/* Status dot */}
       {state.status === "checking" && (
         <svg className="w-4 h-4 animate-spin text-blue-500 shrink-0" fill="none" viewBox="0 0 24 24">
@@ -90,7 +90,7 @@ function PortRow({ tab }: { tab: BrowserTab }) {
       )}
 
       {/* Port label */}
-      <span className="text-sm text-gray-300 font-mono shrink-0">:{tab.port}</span>
+      <span className="text-sm text-ink-muted font-mono shrink-0">:{tab.port}</span>
 
       {/* Spacer */}
       <div className="flex-1 min-w-0" />
@@ -99,7 +99,7 @@ function PortRow({ tab }: { tab: BrowserTab }) {
       {url && (
         <button
           onClick={handleCopy}
-          className="p-1 text-gray-500 hover:text-gray-200 transition-colors shrink-0"
+          className="p-1 text-ink-faint hover:text-ink-muted transition-colors shrink-0"
           title={copied ? "Copied!" : "Copy URL"}
         >
           {copied ? (
@@ -146,7 +146,7 @@ function PortRow({ tab }: { tab: BrowserTab }) {
       {/* Delete button */}
       <button
         onClick={() => removeTab(tab.id)}
-        className="p-1 text-gray-600 hover:text-red-400 transition-colors shrink-0"
+        className="p-1 text-ink-ghost hover:text-red-400 transition-colors shrink-0"
         title="Remove"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -179,22 +179,22 @@ function AddPortRow() {
   };
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2">
-      <span className="text-sm text-gray-500 shrink-0">localhost:</span>
+    <div className="flex items-center gap-2 px-1 py-1">
+      <span className="text-sm text-ink-faint shrink-0">localhost:</span>
       <input
         type="text"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && handleAdd()}
         placeholder="port"
-        className={`w-20 bg-[#1a1a2e] text-white border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 ${
-          blocked ? "border-red-500 focus:ring-red-500" : "border-gray-600 focus:ring-blue-500"
+        className={`w-20 bg-raised text-ink border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 ${
+          blocked ? "border-red-500 focus:ring-red-500" : "border-line-strong focus:ring-blue-500"
         }`}
       />
       <button
         onClick={handleAdd}
         disabled={!canAdd}
-        className="p-1 text-gray-400 hover:text-white disabled:text-gray-700 transition-colors shrink-0"
+        className="p-1 text-ink-dim hover:text-ink disabled:text-ink-ghost transition-colors shrink-0"
         title="Add port"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -206,14 +206,55 @@ function AddPortRow() {
   );
 }
 
-export default function BrowserPage() {
+/**
+ * Localhost port list, anchored under the globe in the header. It was a full
+ * third panel, but every row is one line and "Go" opens a real browser tab —
+ * it never needed a column of its own.
+ */
+export default function LocalhostPopup({ onClose }: { onClose: () => void }) {
   const tabs = useBrowserStore((s) => s.tabs);
+  const panelRef = useRef<HTMLDivElement>(null);
   const portsOnly = tabs.filter((t) => t.port);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest("[data-header-panel-trigger]")) return;
+      if (panelRef.current && !panelRef.current.contains(target as Node)) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [onClose]);
+
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#0d0d1a]">
-      {/* Scrollable vertical list: port rows + add input stacked together */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-3 space-y-2">
+    <div
+      ref={panelRef}
+      role="dialog"
+      aria-label="Localhost ports"
+      className="absolute right-2 top-10 z-50 max-h-[min(26rem,calc(100vh-4rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-line bg-surface shadow-xl"
+    >
+      <div className="flex items-center justify-between border-b border-line px-3 py-2">
+        <span className="text-xs font-medium text-ink-muted">Localhost</span>
+        <button onClick={onClose} className="text-ink-faint transition-colors hover:text-ink" aria-label="Close">
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="space-y-2 p-2">
+        {portsOnly.length === 0 && (
+          <p className="px-1 pt-1 text-[11px] text-ink-faint">
+            No ports yet. Add one below to preview a local dev server.
+          </p>
+        )}
         {portsOnly.map((tab) => (
           <PortRow key={tab.id} tab={tab} />
         ))}

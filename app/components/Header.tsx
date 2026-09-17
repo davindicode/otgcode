@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useTerminalStore } from "~/stores/terminalStore";
+import LocalhostPopup from "./browser/LocalhostPopup";
 import SettingsModal from "./SettingsModal";
 
 declare const __APP_VERSION__: string;
 
-type Panel = "info" | "settings";
+type Panel = "info" | "settings" | "localhost";
 
 // Marks the header buttons so the click-outside handler can ignore them —
 // without this, clicking an open panel's own trigger would close it on
@@ -35,11 +36,11 @@ function SystemInfoPopup({ onClose }: { onClose: () => void }) {
   return (
     <div
       ref={popupRef}
-      className="absolute right-2 top-10 z-50 bg-[#16162a] border border-gray-700 rounded-lg shadow-xl w-72 max-h-80 overflow-y-auto"
+      className="absolute right-2 top-10 z-50 bg-surface border border-line rounded-lg shadow-xl w-72 max-h-80 overflow-y-auto"
     >
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
-        <span className="text-xs font-medium text-gray-300">System Info</span>
-        <button onClick={onClose} className="text-gray-500 hover:text-white" aria-label="Close">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-line">
+        <span className="text-xs font-medium text-ink-muted">System Info</span>
+        <button onClick={onClose} className="text-ink-faint hover:text-ink" aria-label="Close">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -57,8 +58,8 @@ function SystemInfoPopup({ onClose }: { onClose: () => void }) {
           {Object.entries(info).map(([key, val]) =>
             val ? (
               <div key={key} className="flex justify-between gap-2 text-[11px]">
-                <span className="text-gray-500 shrink-0">{key}</span>
-                <span className="text-gray-300 text-right break-all">{val}</span>
+                <span className="text-ink-faint shrink-0">{key}</span>
+                <span className="text-ink-muted text-right break-all">{val}</span>
               </div>
             ) : null,
           )}
@@ -88,16 +89,33 @@ export default function Header() {
         : "online";
 
   const triggerClass = (active: boolean) =>
-    `p-1 rounded transition-colors ${active ? "bg-[#2a2a4a] text-white" : "text-gray-500 hover:text-white"}`;
+    `p-1 rounded transition-colors ${active ? "bg-hover text-ink" : "text-ink-faint hover:text-ink"}`;
 
   return (
-    <header className="flex items-center justify-between px-3 py-1.5 bg-[#0d0d1a] border-b border-gray-800 shrink-0 relative">
+    <header className="safe-top flex items-center justify-between px-3 py-1.5 bg-app border-b border-line-soft shrink-0 relative">
       <div className="flex items-center gap-2">
         <img src="/logo-square.png" alt="OTG Code" className="w-6 h-6 rounded" />
-        <span className="text-white font-bold text-sm">OTG Code</span>
-        <span className="text-gray-500 text-[10px] font-mono">v{__APP_VERSION__}</span>
+        <span className="text-ink font-bold text-sm">OTG Code</span>
+        <span className="text-ink-faint text-[10px] font-mono">v{__APP_VERSION__}</span>
       </div>
       <div className="flex items-center gap-2">
+        <button
+          {...{ [TRIGGER_ATTR]: "localhost" }}
+          onClick={() => toggle("localhost")}
+          className={triggerClass(panel === "localhost")}
+          title="Localhost ports"
+          aria-label="Localhost ports"
+          aria-pressed={panel === "localhost"}
+          aria-expanded={panel === "localhost"}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
+            />
+          </svg>
+        </button>
         <button
           {...{ [TRIGGER_ATTR]: "info" }}
           onClick={() => toggle("info")}
@@ -150,6 +168,7 @@ export default function Header() {
           {status}
         </span>
       </div>
+      {panel === "localhost" && <LocalhostPopup onClose={() => setPanel(null)} />}
       {panel === "info" && <SystemInfoPopup onClose={() => setPanel(null)} />}
       {panel === "settings" && <SettingsModal onClose={() => setPanel(null)} />}
     </header>

@@ -30,7 +30,7 @@ function ToastItem({ toast }: { toast: Toast }) {
       type="button"
       onClick={close}
       className={`pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-lg shadow-xl text-xs max-w-[90vw] border ${
-        isError ? "bg-red-900/95 border-red-600 text-red-100" : "bg-[#1e1e3a]/95 border-gray-600 text-gray-100"
+        isError ? "bg-red-900/95 border-red-600 text-red-100" : "bg-popover/95 border-line-strong text-ink"
       } ${leaving ? "animate-toast-out" : "animate-toast-in"}`}
       title="Dismiss"
     >

@@ -38,7 +38,9 @@
 </table>
 
 
-Three panels — **Terminal**, **Files**, and **Browser** — responsive 3-column layout on desktop/landscape, single-panel with bottom tab bar on mobile/portrait (orientation-aware breakpoint). All panels stay mounted in the DOM with CSS visibility toggling, preserving terminal state, WebSocket connections, and iframe content across navigation. Everything routes through a single Cloudflare Quick Tunnel.
+Two panes — **Files** and **Terminal** — a draggable split on desktop/landscape (explorer at 1/4 width by default), single-panel with a two-tab bottom bar on mobile/portrait (orientation-aware breakpoint). Localhost previews, system info and settings live in popups under the header icons. Both panes stay mounted in the DOM with CSS visibility toggling, preserving terminal state and WebSocket connections across navigation. Everything routes through a single Cloudflare Quick Tunnel.
+
+Install it to a home screen and it runs standalone like a native app; the layout, open tabs and your preferences are saved on the host, so a refresh or a reconnect from another device puts you back where you were.
 
 ### Terminal
 - Multi-session tabs (renamable), xterm.js with configurable font size
@@ -79,9 +81,16 @@ Three panels — **Terminal**, **Files**, and **Browser** — responsive 3-colum
 - Failed logins back off exponentially rather than locking out, so a stranger with the URL can't deny you access to your own machine
 
 ### Localhost Preview
+- Port list in a popup under the globe icon in the header — compact, no panel of its own
 - Preview any localhost port in a new tab via the built-in `/proxy/:port` reverse proxy
-- Multi-tab port list with reachability checks and green/amber status indicators
+- Reachability checks with green/amber status indicators, copy-URL and remove per port
 - All localhost previews route through the same main tunnel of the app
+
+### Settings & Preferences
+- **Dark and light themes** — one semantic colour token set drives the whole UI, including the terminal and code editor palettes; resolved server-side so there is no flash of the wrong theme on load
+- **Terminal font size**, adjustable from Settings or the terminal tab bar
+- **Saved on the host, not in the browser** — `~/.otgcode/workspace.json` keeps the theme, font size, pane split, open explorer tabs with their paths, and open terminal tabs with their directories. Preferences save themselves as you change them and follow you across refreshes, reconnects and devices
+- **Installable** — web app manifest, standalone display, maskable icons and iOS safe-area handling
 
 ## Quick Start
 
@@ -153,6 +162,7 @@ Single Express server on one port handles everything:
 ```
 Express (port 7777)
 ├── Auth gate — optional access password, ahead of every route below
+├── Workspace API — layout, open tabs and preferences in ~/.otgcode/workspace.json
 ├── React Router v7 — UI (SSR shell + client-side app)
 ├── Socket.IO — real-time terminal I/O via node-pty
 ├── REST API — file operations (list, read, write, rename, delete, upload, download, mkdir)

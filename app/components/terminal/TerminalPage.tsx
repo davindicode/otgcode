@@ -28,7 +28,7 @@ export default function TerminalPage() {
     <div className="flex flex-col flex-1 min-h-0 min-w-0">
       <div className="flex-1 relative min-h-0 overflow-hidden terminal-focus-area rounded-sm">
         {sessionsArray.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500">
+          <div className="flex items-center justify-center h-full text-ink-faint">
             <p className="text-sm">Click + to create a new terminal</p>
           </div>
         ) : (

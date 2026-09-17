@@ -1,5 +1,119 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Theme tokens.
+
+   Every colour in the app resolves to one of these semantic roles rather than
+   a literal shade, so a theme swap is a matter of redefining this block. The
+   dark values are the original palette; the light set mirrors each role's job
+   (app sits behind surface, surface behind raised, and so on) rather than
+   naively inverting the hex.
+
+   `light` is set on <html> by the theme store (and by an inline script in
+   root.tsx before first paint, so there's no flash of the wrong theme).
+--------------------------------------------------------------------------- */
+:root {
+  color-scheme: dark;
+
+  --t-app: #0d0d1a;         /* window background */
+  --t-panel: #12122a;       /* input drawers */
+  --t-surface: #16162a;     /* toolbars, headers, cards */
+  --t-raised: #1a1a2e;      /* inputs, code areas, terminal */
+  --t-popover: #1e1e3a;     /* menus, dialogs, toasts */
+  --t-hover: #2a2a4a;       /* hovered / active control */
+  --t-disabled: #151520;    /* disabled control */
+
+  --t-line: #374151;        /* default border */
+  --t-line-soft: #1f2937;   /* subtle divider */
+  --t-line-strong: #4b5563; /* emphasised border */
+
+  --t-ink: #ffffff;         /* primary text */
+  --t-ink-muted: #d1d5db;   /* secondary text */
+  --t-ink-dim: #9ca3af;     /* tertiary text, icons */
+  --t-ink-faint: #6b7280;   /* labels, hints */
+  --t-ink-ghost: #4b5563;   /* disabled text */
+
+  --t-control: #374151;     /* neutral button */
+  --t-control-hover: #4b5563;
+
+  --t-tab-action: #1a1e2e;  /* blue-tinted terminal action tabs */
+  --t-tab-action-on: #1a2a3e;
+  --t-tab-app: #1a2e1e;     /* green-tinted app tabs */
+  --t-tab-app-on: #1a3e2a;
+
+  --t-scrim: #090912;       /* modal / offline overlay veil */
+  --t-accent: #569cd6;      /* focus rings, links, dividers */
+  --t-scrollbar: #333333;
+  --t-scrollbar-hover: #555555;
+}
+
+html.light {
+  color-scheme: light;
+
+  --t-app: #f4f5fa;
+  --t-panel: #eaecf4;
+  --t-surface: #ffffff;
+  --t-raised: #f7f8fc;
+  --t-popover: #ffffff;
+  --t-hover: #e3e6f1;
+  --t-disabled: #eef0f5;
+
+  --t-line: #d5d9e4;
+  --t-line-soft: #e6e9f1;
+  --t-line-strong: #c3c8d6;
+
+  --t-ink: #14141f;
+  --t-ink-muted: #33374a;
+  --t-ink-dim: #565c70;
+  --t-ink-faint: #767d92;
+  --t-ink-ghost: #a2a8b8;
+
+  --t-control: #e2e5ee;
+  --t-control-hover: #d2d6e3;
+
+  --t-tab-action: #e8eefb;
+  --t-tab-action-on: #d3e2f8;
+  --t-tab-app: #e9f5ea;
+  --t-tab-app-on: #d3ecd8;
+
+  --t-scrim: #6c7288;
+  --t-accent: #2563eb;
+  --t-scrollbar: #c3c8d6;
+  --t-scrollbar-hover: #a2a8b8;
+}
+
+/* `inline` so utilities emit var(--t-*) and follow a runtime theme swap. */
+@theme inline {
+  --color-app: var(--t-app);
+  --color-panel: var(--t-panel);
+  --color-surface: var(--t-surface);
+  --color-raised: var(--t-raised);
+  --color-popover: var(--t-popover);
+  --color-hover: var(--t-hover);
+  --color-disabled: var(--t-disabled);
+
+  --color-line: var(--t-line);
+  --color-line-soft: var(--t-line-soft);
+  --color-line-strong: var(--t-line-strong);
+
+  --color-ink: var(--t-ink);
+  --color-ink-muted: var(--t-ink-muted);
+  --color-ink-dim: var(--t-ink-dim);
+  --color-ink-faint: var(--t-ink-faint);
+  --color-ink-ghost: var(--t-ink-ghost);
+
+  --color-control: var(--t-control);
+  --color-control-hover: var(--t-control-hover);
+
+  --color-tab-action: var(--t-tab-action);
+  --color-tab-action-on: var(--t-tab-action-on);
+  --color-tab-app: var(--t-tab-app);
+  --color-tab-app-on: var(--t-tab-app-on);
+
+  --color-accent: var(--t-accent);
+  --color-scrim: var(--t-scrim);
+}
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Menlo", "Monaco", "Courier New", monospace;
@@ -10,7 +124,6 @@ body {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  color-scheme: dark;
 }
 
 /* Force the app shell to fill the viewport regardless of wrapper divs */
@@ -40,25 +153,30 @@ body {
 }
 
 .xterm-viewport::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--t-scrollbar);
   border-radius: 4px;
 }
 
 .xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--t-scrollbar-hover);
 }
 
-/* Safe area for iOS bottom bar */
+/* Safe areas — matter once the app is installed to a home screen and the
+   web view runs edge-to-edge behind the status bar / home indicator. */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 /* Loading spinner */
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #333;
-  border-top-color: #569cd6;
+  border: 3px solid var(--t-line);
+  border-top-color: var(--t-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -86,12 +204,12 @@ body {
 
 .divider-handle:hover .divider-line,
 .divider-handle:active .divider-line {
-  background: #569cd6;
+  background: var(--t-accent);
 }
 
 .divider-line {
   width: 2px;
-  background: #333;
+  background: var(--t-line);
   transition: background 0.15s;
 }
 
@@ -106,33 +224,33 @@ body {
 
 /* Prose styling for markdown/notebook preview */
 .prose {
-  color: #d4d4d4;
+  color: var(--t-ink-muted);
   line-height: 1.7;
 }
 .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
-  color: #e0e0e0;
+  color: var(--t-ink);
   margin-top: 1.2em;
   margin-bottom: 0.5em;
   font-weight: 600;
 }
-.prose h1 { font-size: 1.5em; border-bottom: 1px solid #333; padding-bottom: 0.3em; }
-.prose h2 { font-size: 1.3em; border-bottom: 1px solid #333; padding-bottom: 0.2em; }
+.prose h1 { font-size: 1.5em; border-bottom: 1px solid var(--t-line); padding-bottom: 0.3em; }
+.prose h2 { font-size: 1.3em; border-bottom: 1px solid var(--t-line); padding-bottom: 0.2em; }
 .prose h3 { font-size: 1.15em; }
 .prose p { margin: 0.6em 0; }
-.prose a { color: #569cd6; text-decoration: underline; }
+.prose a { color: var(--t-accent); text-decoration: underline; }
 .prose a:hover { color: #7fbfff; }
-.prose strong { color: #e0e0e0; font-weight: 600; }
+.prose strong { color: var(--t-ink); font-weight: 600; }
 .prose em { font-style: italic; }
 .prose code {
-  background: #1e1e3a;
+  background: var(--t-popover);
   padding: 0.15em 0.4em;
   border-radius: 3px;
   font-size: 0.88em;
   font-family: var(--font-mono);
 }
 .prose pre {
-  background: #1a1a2e;
-  border: 1px solid #333;
+  background: var(--t-raised);
+  border: 1px solid var(--t-line);
   border-radius: 6px;
   padding: 0.8em 1em;
   overflow-x: auto;
@@ -149,20 +267,20 @@ body {
 .prose ul { list-style: disc; }
 .prose ol { list-style: decimal; }
 .prose blockquote {
-  border-left: 3px solid #569cd6;
+  border-left: 3px solid var(--t-accent);
   padding-left: 1em;
   margin: 0.8em 0;
-  color: #999;
+  color: var(--t-ink-faint);
 }
 .prose table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
 .prose th, .prose td {
-  border: 1px solid #333;
+  border: 1px solid var(--t-line);
   padding: 0.4em 0.8em;
   text-align: left;
 }
-.prose th { background: #1e1e3a; font-weight: 600; }
+.prose th { background: var(--t-popover); font-weight: 600; }
 .prose img { max-width: 100%; border-radius: 4px; }
-.prose hr { border: none; border-top: 1px solid #333; margin: 1.5em 0; }
+.prose hr { border: none; border-top: 1px solid var(--t-line); margin: 1.5em 0; }
 
 /* Terminal focus indicator — glowing hue around active area */
 .terminal-focus-area {
@@ -202,12 +320,12 @@ button:disabled {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #333;
+  background: var(--t-scrollbar);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: var(--t-scrollbar-hover);
 }
 
 /* Toast slide in/out */

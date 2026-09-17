@@ -29,20 +29,6 @@ const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
-  {
-    id: "browser",
-    label: "Localhost",
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
-        />
-      </svg>
-    ),
-  },
 ];
 
 export default function MobileTabBar() {
@@ -50,13 +36,13 @@ export default function MobileTabBar() {
   const setActiveTab = useUiStore((s) => s.setActiveTab);
 
   return (
-    <nav className="flex items-center border-t border-gray-800 bg-[#0d0d1a] shrink-0 safe-bottom">
+    <nav className="flex items-center border-t border-line-soft bg-app shrink-0 safe-bottom">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => setActiveTab(tab.id)}
           className={`flex-1 flex flex-col items-center gap-1 py-2 transition-colors ${
-            activeTab === tab.id ? "text-blue-400" : "text-gray-500"
+            activeTab === tab.id ? "text-blue-400" : "text-ink-faint"
           }`}
         >
           {tab.icon}

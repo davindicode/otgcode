@@ -1,21 +1,100 @@
 import { useEffect, useRef, useState } from "react";
+import { MAX_FONT_SIZE, MIN_FONT_SIZE } from "~/lib/constants";
 import { useAuthStore } from "~/stores/authStore";
+import { useTerminalStore } from "~/stores/terminalStore";
 import { useToastStore } from "~/stores/toastStore";
+import { useWorkspaceStore } from "~/stores/workspaceStore";
 
 const MIN_PASSWORD_LENGTH = 6;
 
 function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
     <div className="px-3 py-3">
-      <h3 className="text-xs font-medium text-gray-200">{title}</h3>
-      <p className="mt-0.5 text-[11px] leading-relaxed text-gray-500">{description}</p>
+      <h3 className="text-xs font-medium text-ink-muted">{title}</h3>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">{description}</p>
       <div className="mt-3">{children}</div>
     </div>
   );
 }
 
 const inputClass =
-  "w-full rounded border border-gray-700 bg-[#0d0d1a] px-2.5 py-1.5 text-xs text-white placeholder:text-gray-600 focus:border-blue-500 focus:outline-none disabled:opacity-50";
+  "w-full rounded border border-line bg-app px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-ghost focus:border-blue-500 focus:outline-none disabled:opacity-50";
+
+/** Display preferences. Saved to the workspace file the moment they change. */
+function Appearance() {
+  const theme = useWorkspaceStore((s) => s.theme);
+  const setTheme = useWorkspaceStore((s) => s.setTheme);
+  const fontSize = useTerminalStore((s) => s.fontSize);
+  const setFontSize = useTerminalStore((s) => s.setFontSize);
+
+  const themeButton = (value: "dark" | "light", label: string, icon: React.ReactNode) => (
+    <button
+      type="button"
+      onClick={() => setTheme(value)}
+      aria-pressed={theme === value}
+      className={`flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition-colors ${
+        theme === value ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-1 rounded-md border border-line bg-raised p-1">
+        {themeButton(
+          "dark",
+          "Dark",
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+            />
+          </svg>,
+        )}
+        {themeButton(
+          "light",
+          "Light",
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+            />
+          </svg>,
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] text-ink-dim">Terminal font size</span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setFontSize(Math.max(MIN_FONT_SIZE, fontSize - 1))}
+            disabled={fontSize <= MIN_FONT_SIZE}
+            aria-label="Decrease font size"
+            className="rounded border border-line px-2 py-0.5 text-xs text-ink-muted transition-colors hover:text-ink disabled:text-ink-ghost"
+          >
+            −
+          </button>
+          <span className="w-7 text-center text-xs tabular-nums text-ink">{fontSize}</span>
+          <button
+            type="button"
+            onClick={() => setFontSize(Math.min(MAX_FONT_SIZE, fontSize + 1))}
+            disabled={fontSize >= MAX_FONT_SIZE}
+            aria-label="Increase font size"
+            className="rounded border border-line px-2 py-0.5 text-xs text-ink-muted transition-colors hover:text-ink disabled:text-ink-ghost"
+          >
+            +
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** Set, change or remove the access password. */
 function AccessPassword() {
@@ -82,7 +161,7 @@ function AccessPassword() {
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[11px] text-gray-400">
+        <span className="text-[11px] text-ink-dim">
           {enabled ? (
             <span className="text-green-400">On — a login is required</span>
           ) : (
@@ -94,9 +173,7 @@ function AccessPassword() {
             type="button"
             onClick={() => setForm(enabled ? "disable" : "set")}
             className={`shrink-0 rounded px-2 py-1 text-xs font-medium transition-colors ${
-              enabled
-                ? "border border-gray-700 text-gray-300 hover:text-white"
-                : "bg-blue-600 text-white hover:bg-blue-500"
+              enabled ? "border border-line text-ink-muted hover:text-ink" : "bg-blue-600 text-white hover:bg-blue-500"
             }`}
           >
             {enabled ? "Turn off" : "Turn on"}
@@ -169,7 +246,7 @@ function AccessPassword() {
             <button
               type="submit"
               disabled={busy}
-              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:bg-gray-700 disabled:text-gray-500 ${
+              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium text-ink transition-colors disabled:bg-control disabled:text-ink-faint ${
                 form === "disable" ? "bg-red-600 hover:bg-red-500" : "bg-blue-600 hover:bg-blue-500"
               }`}
             >
@@ -180,14 +257,14 @@ function AccessPassword() {
               type="button"
               onClick={reset}
               disabled={busy}
-              className="rounded border border-gray-700 px-2.5 py-1 text-xs text-gray-300 transition-colors hover:text-white disabled:opacity-50"
+              className="rounded border border-line px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
             >
               Cancel
             </button>
           </div>
 
           {form === "set" && (
-            <p className="text-[10px] leading-relaxed text-gray-600">
+            <p className="text-[10px] leading-relaxed text-ink-ghost">
               You stay signed in on this device. Every other open tab is signed out.
             </p>
           )}
@@ -195,7 +272,7 @@ function AccessPassword() {
       )}
 
       {!enabled && form === null && (
-        <p className="mt-2 text-[10px] leading-relaxed text-gray-600">
+        <p className="mt-2 text-[10px] leading-relaxed text-ink-ghost">
           OTG Code serves a real shell as{user ? ` "${user}"` : " the user that launched it"}. With the password off,
           the tunnel URL is the only thing protecting it.
         </p>
@@ -235,11 +312,11 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       ref={panelRef}
       role="dialog"
       aria-label="Settings"
-      className="absolute right-2 top-10 z-50 max-h-[min(26rem,calc(100vh-4rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-gray-700 bg-[#16162a] shadow-xl"
+      className="absolute right-2 top-10 z-50 max-h-[min(26rem,calc(100vh-4rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-line bg-surface shadow-xl"
     >
-      <div className="flex items-center justify-between border-b border-gray-700 px-3 py-2">
-        <span className="text-xs font-medium text-gray-300">Settings</span>
-        <button onClick={onClose} className="text-gray-500 transition-colors hover:text-white" aria-label="Close">
+      <div className="flex items-center justify-between border-b border-line px-3 py-2">
+        <span className="text-xs font-medium text-ink-muted">Settings</span>
+        <button onClick={onClose} className="text-ink-faint transition-colors hover:text-ink" aria-label="Close">
           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -259,7 +336,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={logout}
-              className="rounded border border-gray-700 px-2.5 py-1 text-xs text-gray-300 transition-colors hover:text-white"
+              className="rounded border border-line px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
             >
               Sign out
             </button>

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type TabId = "terminal" | "files" | "browser";
+export type TabId = "terminal" | "files";
 
 interface UiState {
   activeTab: TabId;

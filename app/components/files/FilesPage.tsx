@@ -36,7 +36,7 @@ function FileTabs() {
   const existingNames = sessionsArray.map((s) => s.name);
 
   const folderIcon = (
-    <svg className="w-3 h-3 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-3 h-3 shrink-0 text-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -47,7 +47,7 @@ function FileTabs() {
   );
 
   return (
-    <div className="flex items-center border-b border-gray-700 bg-[#0d0d1a] overflow-x-auto scrollbar-none shrink-0">
+    <div className="flex items-center border-b border-line bg-app overflow-x-auto scrollbar-none shrink-0">
       {sessionsArray.map((session) => (
         <RenamableTab
           key={session.id}
@@ -63,7 +63,7 @@ function FileTabs() {
       ))}
       <button
         onClick={() => createSession()}
-        className="px-3 py-1.5 text-gray-400 hover:text-white hover:bg-[#16162a]/50 transition-colors shrink-0"
+        className="px-3 py-1.5 text-ink-dim hover:text-ink hover:bg-surface/50 transition-colors shrink-0"
         title="New explorer"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -733,16 +733,16 @@ function FileSessionView({ session }: { session: FileSession }) {
   if (selectedFile) {
     if (fileLoading) {
       return (
-        <div className="flex flex-col items-center justify-center h-full bg-[#0d0d1a] text-gray-500 gap-3 px-6">
+        <div className="flex flex-col items-center justify-center h-full bg-app text-ink-faint gap-3 px-6">
           <svg className="w-8 h-8 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
           <span className="text-sm">Opening file...</span>
-          <span className="text-xs text-gray-600 truncate text-center max-w-full">{selectedFile}</span>
+          <span className="text-xs text-ink-ghost truncate text-center max-w-full">{selectedFile}</span>
           <button
             onClick={handleCancelOpen}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors"
+            className="px-4 py-2 bg-control hover:bg-control-hover text-ink rounded text-sm transition-colors"
           >
             Cancel
           </button>
@@ -751,7 +751,7 @@ function FileSessionView({ session }: { session: FileSession }) {
     }
     if (fileError) {
       return (
-        <div className="flex flex-col items-center justify-center h-full bg-[#0d0d1a] text-gray-400 gap-3 px-6">
+        <div className="flex flex-col items-center justify-center h-full bg-app text-ink-dim gap-3 px-6">
           <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path
               strokeLinecap="round"
@@ -760,10 +760,10 @@ function FileSessionView({ session }: { session: FileSession }) {
             />
           </svg>
           <span className="text-sm text-red-400 text-center">{fileError}</span>
-          <span className="text-xs text-gray-600 truncate text-center max-w-full">{selectedFile}</span>
+          <span className="text-xs text-ink-ghost truncate text-center max-w-full">{selectedFile}</span>
           <button
             onClick={handleCloseFile}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors"
+            className="px-4 py-2 bg-control hover:bg-control-hover text-ink rounded text-sm transition-colors"
           >
             Back
           </button>
@@ -790,12 +790,12 @@ function FileSessionView({ session }: { session: FileSession }) {
       />
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#16162a] border-b border-gray-700 shrink-0">
-        <div className="flex items-center gap-0.5">
+      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-surface border-b border-line shrink-0 overflow-x-auto">
+        <div className="flex items-center gap-0.5 shrink-0">
           <button
             onClick={handleNewFile}
             disabled={busy}
-            className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
+            className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
             title="New file"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -810,7 +810,7 @@ function FileSessionView({ session }: { session: FileSession }) {
           <button
             onClick={handleNewFolder}
             disabled={busy}
-            className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
+            className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
             title="New folder"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -825,7 +825,7 @@ function FileSessionView({ session }: { session: FileSession }) {
           <button
             onClick={() => uploadInputRef.current?.click()}
             disabled={busy}
-            className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
+            className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
             title="Upload files"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -839,7 +839,7 @@ function FileSessionView({ session }: { session: FileSession }) {
           <button
             onClick={() => folderInputRef.current?.click()}
             disabled={busy}
-            className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
+            className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
             title="Upload folder"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -873,13 +873,13 @@ function FileSessionView({ session }: { session: FileSession }) {
             onChange={(e) => handleUpload(e.target.files)}
           />
         </div>
-        <div className="flex items-center gap-1 text-sm">
+        <div className="flex items-center gap-1 text-sm shrink-0">
           {selectMode && (
             <>
-              <span className="text-xs text-gray-400 tabular-nums">{selected.size} selected</span>
+              <span className="text-xs text-ink-dim tabular-nums">{selected.size} selected</span>
               <button
                 onClick={toggleSelectAll}
-                className="px-2 py-0.5 text-xs text-gray-300 hover:text-white border border-gray-700 rounded transition-colors"
+                className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line rounded transition-colors"
               >
                 {selected.size === entries.length && entries.length > 0 ? "None" : "All"}
               </button>
@@ -887,7 +887,11 @@ function FileSessionView({ session }: { session: FileSession }) {
                 <button
                   onClick={() => setGroupMenu((v) => !v)}
                   disabled={selected.size === 0}
-                  className="p-1 text-gray-400 hover:text-white disabled:text-gray-700 disabled:pointer-events-none transition-colors"
+                  aria-haspopup="menu"
+                  aria-expanded={groupMenu}
+                  className={`p-1 rounded transition-colors disabled:text-ink-ghost disabled:pointer-events-none ${
+                    groupMenu ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
+                  }`}
                   title="Actions on selected"
                 >
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -902,16 +906,16 @@ function FileSessionView({ session }: { session: FileSession }) {
                       onClick={() => setGroupMenu(false)}
                       aria-label="Close menu"
                     />
-                    <div className="absolute right-0 top-full mt-1 z-50 bg-[#1e1e3a] border border-gray-600 rounded-lg shadow-xl py-1 min-w-[160px]">
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-line-strong rounded-lg shadow-xl py-1 min-w-[160px]">
                       <button
                         onClick={handleGroupDownload}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+                        className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
                       >
                         Download
                       </button>
                       <button
                         onClick={handleGroupDelete}
-                        className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-[#2a2a4a] transition-colors"
+                        className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-hover transition-colors"
                       >
                         Delete
                       </button>
@@ -927,7 +931,7 @@ function FileSessionView({ session }: { session: FileSession }) {
               loadDirectory(cwd);
             }}
             disabled={busy}
-            className="p-1.5 text-gray-400 hover:text-white disabled:text-gray-600 disabled:pointer-events-none transition-colors"
+            className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
             title="Refresh"
             aria-label="Refresh files"
           >
@@ -950,7 +954,7 @@ function FileSessionView({ session }: { session: FileSession }) {
             className={`px-2 py-0.5 text-xs border rounded transition-colors disabled:pointer-events-none disabled:opacity-50 ${
               showHidden
                 ? "border-blue-500/70 bg-blue-500/20 text-blue-200"
-                : "border-gray-700 text-gray-400 hover:border-gray-600 hover:text-white"
+                : "border-line text-ink-dim hover:border-line-strong hover:text-ink"
             }`}
             title={`${showHidden ? "Hide" : "Show"} hidden files`}
           >
@@ -960,7 +964,7 @@ function FileSessionView({ session }: { session: FileSession }) {
             type="button"
             onClick={selectMode ? exitSelectMode : enterSelectMode}
             disabled={busy}
-            className="px-2 py-0.5 text-xs text-gray-300 hover:text-white border border-gray-700 hover:border-gray-600 rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
+            className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line hover:border-line-strong rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
           >
             {selectMode ? "Cancel" : "Select"}
           </button>
@@ -968,7 +972,7 @@ function FileSessionView({ session }: { session: FileSession }) {
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center flex-1 text-gray-500 gap-2">
+        <div className="flex flex-col items-center justify-center flex-1 text-ink-faint gap-2">
           <svg className="w-6 h-6 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -1000,31 +1004,31 @@ function FileSessionView({ session }: { session: FileSession }) {
           onClick={() => setDialog(null)}
         >
           <div
-            className="bg-[#1e1e3a] border border-gray-600 rounded-lg shadow-xl p-4 mx-4 w-full max-w-sm"
+            className="bg-popover border border-line-strong rounded-lg shadow-xl p-4 mx-4 w-full max-w-sm"
             onClick={(e) => e.stopPropagation()}
           >
             {dialog.type === "newFolder" && (
               <>
-                <h3 className="text-sm font-medium text-white mb-3">New Folder</h3>
+                <h3 className="text-sm font-medium text-ink mb-3">New Folder</h3>
                 <input
                   autoFocus
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && confirmNewFolder()}
                   placeholder="Folder name"
-                  className="w-full bg-[#0d0d1a] text-white border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
+                  className="w-full bg-app text-ink border border-line-strong rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
                 />
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={() => setDialog(null)}
-                    className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                    className="px-3 py-1.5 text-sm text-ink-dim hover:text-ink transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={confirmNewFolder}
                     disabled={!inputValue.trim()}
-                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
+                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-control disabled:text-ink-faint text-white rounded transition-colors"
                   >
                     Create
                   </button>
@@ -1033,26 +1037,26 @@ function FileSessionView({ session }: { session: FileSession }) {
             )}
             {dialog.type === "newFile" && (
               <>
-                <h3 className="text-sm font-medium text-white mb-3">New File</h3>
+                <h3 className="text-sm font-medium text-ink mb-3">New File</h3>
                 <input
                   autoFocus
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && confirmNewFile()}
                   placeholder="File name"
-                  className="w-full bg-[#0d0d1a] text-white border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
+                  className="w-full bg-app text-ink border border-line-strong rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
                 />
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={() => setDialog(null)}
-                    className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                    className="px-3 py-1.5 text-sm text-ink-dim hover:text-ink transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={confirmNewFile}
                     disabled={!inputValue.trim()}
-                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
+                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-control disabled:text-ink-faint text-white rounded transition-colors"
                   >
                     Create
                   </button>
@@ -1061,25 +1065,25 @@ function FileSessionView({ session }: { session: FileSession }) {
             )}
             {dialog.type === "rename" && (
               <>
-                <h3 className="text-sm font-medium text-white mb-3">Rename</h3>
+                <h3 className="text-sm font-medium text-ink mb-3">Rename</h3>
                 <input
                   autoFocus
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && confirmRename()}
-                  className="w-full bg-[#0d0d1a] text-white border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
+                  className="w-full bg-app text-ink border border-line-strong rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
                 />
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={() => setDialog(null)}
-                    className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                    className="px-3 py-1.5 text-sm text-ink-dim hover:text-ink transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={confirmRename}
                     disabled={!inputValue.trim() || inputValue.trim() === dialog.entry.name}
-                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
+                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-control disabled:text-ink-faint text-white rounded transition-colors"
                   >
                     Rename
                   </button>
@@ -1088,9 +1092,9 @@ function FileSessionView({ session }: { session: FileSession }) {
             )}
             {dialog.type === "delete" && (
               <>
-                <h3 className="text-sm font-medium text-white mb-2">Delete</h3>
-                <p className="text-sm text-gray-300 mb-1">
-                  Are you sure you want to delete <span className="text-white font-medium">{dialog.entry.name}</span>?
+                <h3 className="text-sm font-medium text-ink mb-2">Delete</h3>
+                <p className="text-sm text-ink-muted mb-1">
+                  Are you sure you want to delete <span className="text-ink font-medium">{dialog.entry.name}</span>?
                 </p>
                 {dialog.entry.isDirectory && (
                   <p className="text-xs text-yellow-400 mb-3">
@@ -1101,7 +1105,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={() => setDialog(null)}
-                    className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                    className="px-3 py-1.5 text-sm text-ink-dim hover:text-ink transition-colors"
                   >
                     Cancel
                   </button>
@@ -1120,9 +1124,9 @@ function FileSessionView({ session }: { session: FileSession }) {
                 const n = dialog.entries.length;
                 return (
                   <>
-                    <h3 className="text-sm font-medium text-white mb-2">Delete {n} items</h3>
-                    <p className="text-sm text-gray-300 mb-1">
-                      Are you sure you want to delete <span className="text-white font-medium">{n}</span> selected item
+                    <h3 className="text-sm font-medium text-ink mb-2">Delete {n} items</h3>
+                    <p className="text-sm text-ink-muted mb-1">
+                      Are you sure you want to delete <span className="text-ink font-medium">{n}</span> selected item
                       {n === 1 ? "" : "s"}?
                     </p>
                     {folderCount > 0 && (
@@ -1135,7 +1139,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => setDialog(null)}
-                        className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                        className="px-3 py-1.5 text-sm text-ink-dim hover:text-ink transition-colors"
                       >
                         Cancel
                       </button>
@@ -1151,7 +1155,7 @@ function FileSessionView({ session }: { session: FileSession }) {
               })()}
             {dialog.type === "info" && (
               <>
-                <h3 className="text-sm font-medium text-white mb-3">File Info</h3>
+                <h3 className="text-sm font-medium text-ink mb-3">File Info</h3>
                 <table className="w-full text-sm">
                   <tbody>
                     {[
@@ -1162,9 +1166,9 @@ function FileSessionView({ session }: { session: FileSession }) {
                       ["Permissions", dialog.entry.permissions],
                       ["Path", fullPath(dialog.entry.name)],
                     ].map(([label, value]) => (
-                      <tr key={label} className="border-b border-gray-700/50">
-                        <td className="py-1.5 pr-3 text-gray-400 whitespace-nowrap">{label}</td>
-                        <td className="py-1.5 text-gray-200 break-all">{value}</td>
+                      <tr key={label} className="border-b border-line/50">
+                        <td className="py-1.5 pr-3 text-ink-dim whitespace-nowrap">{label}</td>
+                        <td className="py-1.5 text-ink-muted break-all">{value}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1172,7 +1176,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                 <div className="flex justify-end mt-3">
                   <button
                     onClick={() => setDialog(null)}
-                    className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                    className="px-3 py-1.5 text-sm bg-control hover:bg-control-hover text-ink rounded transition-colors"
                   >
                     Close
                   </button>

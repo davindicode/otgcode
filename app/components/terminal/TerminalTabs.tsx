@@ -20,7 +20,7 @@ export default function TerminalTabs() {
   };
 
   return (
-    <div className="flex items-center border-t border-gray-700 bg-[#16162a] shrink-0">
+    <div className="flex items-center border-t border-line bg-surface shrink-0">
       {/* Tabs — scrollable */}
       <div className="flex items-center overflow-x-auto scrollbar-none flex-1 min-w-0">
         {sessionsArray.map((session) => (
@@ -49,7 +49,7 @@ export default function TerminalTabs() {
         ))}
         <button
           onClick={handleNew}
-          className="px-3 py-2 text-gray-400 hover:text-white hover:bg-[#1a1a2e]/50 transition-colors shrink-0"
+          className="px-3 py-2 text-ink-dim hover:text-ink hover:bg-raised/50 transition-colors shrink-0"
           title="New terminal"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -59,20 +59,20 @@ export default function TerminalTabs() {
       </div>
 
       {/* Font size controls */}
-      <div className="flex items-center gap-0.5 px-2 shrink-0 border-l border-gray-700">
+      <div className="flex items-center gap-0.5 px-2 shrink-0 border-l border-line">
         <button
           onClick={() => setFontSize(Math.max(MIN_FONT_SIZE, fontSize - 1))}
           disabled={fontSize <= MIN_FONT_SIZE}
-          className="px-0.5 text-gray-400 hover:text-white disabled:text-gray-600 transition-colors leading-none"
+          className="px-0.5 text-ink-dim hover:text-ink disabled:text-ink-ghost transition-colors leading-none"
           title="Decrease font size"
         >
           <span className="text-[10px] font-bold">a</span>
         </button>
-        <span className="text-[10px] text-gray-500 w-4 text-center tabular-nums">{fontSize}</span>
+        <span className="text-[10px] text-ink-faint w-4 text-center tabular-nums">{fontSize}</span>
         <button
           onClick={() => setFontSize(Math.min(MAX_FONT_SIZE, fontSize + 1))}
           disabled={fontSize >= MAX_FONT_SIZE}
-          className="px-0.5 text-gray-400 hover:text-white disabled:text-gray-600 transition-colors leading-none"
+          className="px-0.5 text-ink-dim hover:text-ink disabled:text-ink-ghost transition-colors leading-none"
           title="Increase font size"
         >
           <span className="text-[15px] font-bold">A</span>

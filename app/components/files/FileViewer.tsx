@@ -58,9 +58,9 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 bg-[#16162a] border-b border-gray-700 shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 bg-surface border-b border-line shrink-0">
         <span
-          className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
+          className="text-sm text-ink-muted whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
           title={path}
         >
           {path}
@@ -70,7 +70,7 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
           <button
             onClick={() => setLoop((l) => !l)}
             className={`p-1 rounded transition-colors ${
-              loop ? "bg-blue-600 text-white" : "bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white"
+              loop ? "bg-blue-600 text-white" : "bg-control hover:bg-control-hover text-ink-muted hover:text-ink"
             }`}
             title={loop ? "Loop: on" : "Loop: off"}
           >
@@ -82,7 +82,7 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
           </button>
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
-            className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
             download
             title="Download"
           >
@@ -96,7 +96,7 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
           </a>
           <button
             onClick={onClose}
-            className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
             title="Close"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,7 +105,7 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
           </button>
         </div>
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-[#0d0d1a] p-4 overflow-auto">
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-app p-4 overflow-auto">
         {type === "video" ? (
           <video {...mediaProps} playsInline className="max-w-full max-h-full rounded" />
         ) : (
@@ -114,7 +114,7 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
         {mediaError && (
           <div className="max-w-lg rounded-lg border border-red-500/30 bg-red-950/20 px-4 py-3 text-center">
             <p className="text-sm text-red-300">{mediaError}</p>
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-ink-dim">
               MP4 is a container; a file that plays in a desktop app may still use a codec unavailable in this browser.
               You can download the file and play it locally.
             </p>
@@ -162,7 +162,7 @@ function LazyPdfPage({
       {render ? (
         <Page pageNumber={pageNumber} scale={scale} className="shadow-lg" renderTextLayer renderAnnotationLayer />
       ) : (
-        <div className="w-full max-w-[800px] rounded bg-[#16162a]/40" style={{ height: Math.round(1000 * scale) }} />
+        <div className="w-full max-w-[800px] rounded bg-surface/40" style={{ height: Math.round(1000 * scale) }} />
       )}
     </div>
   );
@@ -185,33 +185,33 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 bg-[#16162a] border-b border-gray-700 shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 bg-surface border-b border-line shrink-0">
         <span
-          className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
+          className="text-sm text-ink-muted whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
           title={path}
         >
           {path}
         </span>
         <CopyPathButton path={path} />
         <div className="flex items-center gap-2 shrink-0">
-          {numPages > 0 && <span className="text-[10px] text-gray-500">{numPages} pg</span>}
-          <div className="flex items-center gap-1 border border-gray-700 rounded overflow-hidden">
-            <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">
+          {numPages > 0 && <span className="text-[10px] text-ink-faint">{numPages} pg</span>}
+          <div className="flex items-center gap-1 border border-line rounded overflow-hidden">
+            <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-ink-dim hover:text-ink hover:bg-control">
               -
             </button>
             <button
               onClick={zoomFit}
-              className="px-2 py-0.5 text-[10px] text-gray-400 hover:text-white hover:bg-gray-700 tabular-nums"
+              className="px-2 py-0.5 text-[10px] text-ink-dim hover:text-ink hover:bg-control tabular-nums"
             >
               {Math.round(scale * 100)}%
             </button>
-            <button onClick={zoomIn} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">
+            <button onClick={zoomIn} className="px-2 py-0.5 text-xs text-ink-dim hover:text-ink hover:bg-control">
               +
             </button>
           </div>
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
-            className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
             download
             title="Download"
           >
@@ -225,7 +225,7 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
           </a>
           <button
             onClick={onClose}
-            className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
             title="Close"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -234,11 +234,11 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
           </button>
         </div>
       </div>
-      <div ref={containerRef} className="flex-1 min-h-0 overflow-auto bg-[#0d0d1a]">
+      <div ref={containerRef} className="flex-1 min-h-0 overflow-auto bg-app">
         <Document
           file={pdfUrl}
           onLoadSuccess={onDocumentLoadSuccess}
-          loading={<div className="flex items-center justify-center h-full text-gray-500 text-sm">Loading PDF...</div>}
+          loading={<div className="flex items-center justify-center h-full text-ink-faint text-sm">Loading PDF...</div>}
           error={<div className="flex items-center justify-center h-full text-red-400 text-sm">Failed to load PDF</div>}
         >
           <div className="flex flex-col items-center gap-2 p-4">
@@ -278,9 +278,9 @@ export default function FileViewer({ path, content, onSave, onClose }: FileViewe
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 bg-[#16162a] border-b border-gray-700 shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 bg-surface border-b border-line shrink-0">
         <span
-          className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
+          className="text-sm text-ink-muted whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
           title={path}
         >
           {path}
@@ -289,7 +289,7 @@ export default function FileViewer({ path, content, onSave, onClose }: FileViewe
         <div className="flex items-center gap-2 shrink-0">
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
-            className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
             download
             title="Download"
           >
@@ -303,7 +303,7 @@ export default function FileViewer({ path, content, onSave, onClose }: FileViewe
           </a>
           <button
             onClick={onClose}
-            className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
             title="Close"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -312,7 +312,7 @@ export default function FileViewer({ path, content, onSave, onClose }: FileViewe
           </button>
         </div>
       </div>
-      <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
+      <div className="flex-1 flex items-center justify-center text-ink-faint text-sm">
         Cannot preview this file type (.{ext || "unknown"})
       </div>
     </div>

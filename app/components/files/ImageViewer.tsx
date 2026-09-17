@@ -72,9 +72,9 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 bg-[#16162a] border-b border-gray-700 shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 bg-surface border-b border-line shrink-0">
         <span
-          className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
+          className="text-sm text-ink-muted whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
           title={path}
         >
           {path}
@@ -84,7 +84,7 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
           {isGif && (
             <button
               onClick={() => setReplayKey((k) => k + 1)}
-              className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+              className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
               title="Replay GIF"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -94,24 +94,24 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
             </button>
           )}
           {/* Zoom controls */}
-          <div className="flex items-center gap-1 border border-gray-700 rounded overflow-hidden">
-            <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">
+          <div className="flex items-center gap-1 border border-line rounded overflow-hidden">
+            <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-ink-dim hover:text-ink hover:bg-control">
               -
             </button>
             <button
               onClick={zoomFit}
-              className="px-2 py-0.5 text-[10px] text-gray-400 hover:text-white hover:bg-gray-700 tabular-nums"
+              className="px-2 py-0.5 text-[10px] text-ink-dim hover:text-ink hover:bg-control tabular-nums"
             >
               {Math.round(zoom * 100)}%
             </button>
-            <button onClick={zoomIn} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">
+            <button onClick={zoomIn} className="px-2 py-0.5 text-xs text-ink-dim hover:text-ink hover:bg-control">
               +
             </button>
           </div>
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
             download
-            className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
             title="Download"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -124,7 +124,7 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
           </a>
           <button
             onClick={onClose}
-            className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
             title="Close"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,7 +135,7 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
       </div>
       <div
         ref={containerRef}
-        className={`flex-1 overflow-auto bg-[#0d0d1a] select-none ${grabbing ? "cursor-grabbing" : "cursor-grab"}`}
+        className={`flex-1 overflow-auto bg-app select-none ${grabbing ? "cursor-grabbing" : "cursor-grab"}`}
         onMouseDown={handleMouseDown}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
