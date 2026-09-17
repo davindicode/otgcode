@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- File explorer **Move** — a Move item in each entry's menu turns the explorer
+  into a destination picker: the toolbar's controls are replaced by "Move to
+  this directory" and Cancel, the entry being moved is highlighted, row menus
+  are hidden, and only folders stay clickable. Cancel returns to the folder the
+  move started from. Backed by a dedicated endpoint that refuses to overwrite
+  an existing name, refuses a folder into itself, and falls back to copy-delete
+  across filesystems — `fs.rename` would silently clobber the destination.
+
 ## [0.2.0] - 2026-09-17
 
 A big step toward a proper app: installable, themed, with settings and

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dirname, isExternalUrl, normalizePath, resolvePath, toInlineDownloadUrl } from "./paths";
+import { basename, dirname, isExternalUrl, normalizePath, planMove, resolvePath, toInlineDownloadUrl } from "./paths";
 
 describe("dirname", () => {
   it("returns the directory of a file path", () => {
@@ -64,5 +64,49 @@ describe("isExternalUrl", () => {
 describe("toInlineDownloadUrl", () => {
   it("builds an inline download URL with the path encoded", () => {
     expect(toInlineDownloadUrl("/home/u/a b.png")).toBe("/api/files/download?path=%2Fhome%2Fu%2Fa%20b.png&inline=1");
+  });
+});
+
+describe("planMove", () => {
+  it("resolves the destination, keeping the entry's name", () => {
+    const { target, name, error } = planMove("/home/me/src/note.txt", "/home/me/dest");
+    expect(target).toBe("/home/me/dest/note.txt");
+    expect(name).toBe("note.txt");
+    expect(error).toBeNull();
+  });
+
+  it("refuses a move into the folder the entry is already in", () => {
+    expect(planMove("/home/me/src/note.txt", "/home/me/src").error).toMatch(/already in this folder/);
+    expect(planMove("/home/me/src/note.txt", "/home/me/src/").error).toMatch(/already in this folder/);
+    expect(planMove("/home/me/src/note.txt", "/home/me/other/../src").error).toMatch(/already in this folder/);
+  });
+
+  it("refuses moving a folder into itself or a descendant", () => {
+    expect(planMove("/home/me/folder", "/home/me/folder").error).toMatch(/already in this folder|inside itself/);
+    expect(planMove("/home/me/folder", "/home/me/folder/inner").error).toMatch(/inside itself/);
+    expect(planMove("/home/me/folder", "/home/me/folder/a/b/c").error).toMatch(/inside itself/);
+  });
+
+  it("allows a sibling whose name merely starts the same", () => {
+    expect(planMove("/home/me/folder", "/home/me/folder-2").error).toBeNull();
+  });
+
+  it("normalises traversal in the destination", () => {
+    expect(planMove("/home/me/src/note.txt", "/home/me/dest/../elsewhere").target).toBe("/home/me/elsewhere/note.txt");
+  });
+
+  it("handles a source at the filesystem root", () => {
+    expect(planMove("/thing", "/home/me")).toEqual({ target: "/home/me/thing", name: "thing", error: null });
+  });
+});
+
+describe("basename", () => {
+  it("returns the last segment", () => {
+    expect(basename("/home/me/note.txt")).toBe("note.txt");
+    expect(basename("/home/me/folder")).toBe("folder");
+    expect(basename("/thing")).toBe("thing");
+  });
+  it("ignores a trailing slash", () => {
+    expect(basename("/home/me/folder/")).toBe("folder");
   });
 });

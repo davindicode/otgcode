@@ -10,6 +10,7 @@ export default [
   route("api/files/upload", "routes/api/files.upload.ts"),
   route("api/files/download", "routes/api/files.download.ts"),
   route("api/files/mkdir", "routes/api/files.mkdir.ts"),
+  route("api/files/move", "routes/api/files.move.ts"),
   route("api/tmux/sessions", "routes/api/tmux.sessions.ts"),
   route("api/tool-versions", "routes/api/tool-versions.ts"),
   route("api/system-info", "routes/api/system-info.ts"),

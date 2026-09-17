@@ -17,6 +17,11 @@ interface FileListProps {
   onRename: (entry: FileEntry) => void;
   onDownload: (entry: FileEntry) => void;
   onCopyPath: (entry: FileEntry) => void;
+  onMove: (entry: FileEntry) => void;
+  /** Picking a destination for `movingName`: rows lose their menus. */
+  moveMode?: boolean;
+  /** Name of the entry being moved, highlighted while it is in view. */
+  movingName?: string | null;
   selectMode?: boolean;
   selectedNames?: Set<string>;
   onToggleSelect?: (entry: FileEntry) => void;
@@ -57,6 +62,9 @@ export default function FileList({
   onRename,
   onDownload,
   onCopyPath,
+  onMove,
+  moveMode = false,
+  movingName = null,
   selectMode = false,
   selectedNames,
   onToggleSelect,
@@ -198,19 +206,28 @@ export default function FileList({
         {entries.map((entry) => {
           const isSelected = selectMode && !!selectedNames?.has(entry.name);
           const menuOpen = isButtonMenuFor(menu, entry);
+          const isMoving = moveMode && entry.name === movingName;
+          // In move mode only folders are worth clicking — they are the
+          // destinations; opening a file would drop you out of the flow.
+          const rowDisabled = moveMode && !entry.isDirectory;
           return (
             <div
               key={entry.name}
-              className={`w-full flex items-center border-b border-line-soft ${isSelected ? "bg-blue-600/15" : ""}`}
+              className={`w-full flex items-center border-b border-line-soft ${
+                isMoving ? "bg-blue-600/25 ring-1 ring-inset ring-blue-500/60" : isSelected ? "bg-blue-600/15" : ""
+              }`}
             >
               {/* Clickable file/folder area */}
               <button
                 onClick={() => (selectMode ? onToggleSelect?.(entry) : onOpen(entry))}
-                onContextMenu={(e) => handleContextMenu(e, entry)}
-                onTouchStart={(e) => handleTouchStart(e, entry)}
+                onContextMenu={moveMode ? undefined : (e) => handleContextMenu(e, entry)}
+                onTouchStart={moveMode ? undefined : (e) => handleTouchStart(e, entry)}
                 onTouchEnd={handleTouchEnd}
                 onTouchMove={handleTouchEnd}
-                className="flex-1 flex items-center gap-3 px-3 py-2 hover:bg-raised active:bg-raised transition-colors text-left min-w-0"
+                disabled={rowDisabled}
+                className={`flex-1 flex items-center gap-3 px-3 py-2 transition-colors text-left min-w-0 ${
+                  rowDisabled ? "opacity-45 cursor-default" : "hover:bg-raised active:bg-raised"
+                }`}
               >
                 {/* Icon */}
                 <span className="text-lg shrink-0">
@@ -230,14 +247,18 @@ export default function FileList({
                   )}
                 </span>
                 {/* Name */}
-                <span className="flex-1 text-sm text-ink-muted truncate">{entry.name}</span>
+                <span className={`flex-1 text-sm truncate ${isMoving ? "text-ink font-medium" : "text-ink-muted"}`}>
+                  {entry.name}
+                </span>
+                {isMoving && <span className="shrink-0 text-[10px] text-blue-300 uppercase tracking-wide">moving</span>}
                 {/* Size */}
                 {!entry.isDirectory && (
                   <span className="text-xs text-ink-faint shrink-0">{formatSize(entry.size)}</span>
                 )}
               </button>
-              {/* Right control: checkbox in select mode, otherwise the 3-dot menu */}
-              {selectMode ? (
+              {/* Right control: checkbox in select mode, the 3-dot menu normally,
+                  and nothing at all while picking a move destination. */}
+              {moveMode ? null : selectMode ? (
                 <button
                   onClick={() => onToggleSelect?.(entry)}
                   className="shrink-0 p-2 text-ink-dim hover:text-ink transition-colors"
@@ -356,6 +377,12 @@ export default function FileList({
             className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
           >
             Rename
+          </button>
+          <button
+            onClick={() => menuAction(onMove)}
+            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
+          >
+            Move
           </button>
           <button
             onClick={() => menuAction(onCopyPath)}

@@ -142,6 +142,9 @@ function FileSessionView({ session }: { session: FileSession }) {
   // reload. Folded into `busy` so the explorer stays frozen until the new tree
   // is loaded — navigation can't slip in and then get reset to cwd.
   const [opBusy, setOpBusy] = useState(false);
+  // Set while the explorer is being used to pick a destination for an entry.
+  // `originCwd` is where the move started, so Cancel can put the user back.
+  const [moveSource, setMoveSource] = useState<{ name: string; path: string; originCwd: string } | null>(null);
   const showToast = useToastStore((s) => s.show);
   // Explorer is "busy" (frozen) whenever an upload is in flight, while its
   // done-display + post-upload refresh is pending (uploadQueue not yet cleared),
@@ -455,6 +458,45 @@ function FileSessionView({ session }: { session: FileSession }) {
   };
 
   const handleInfo = (entry: FileEntry) => setDialog({ type: "info", entry });
+
+  // Move is a mode, not a dialog: the explorer itself becomes the destination
+  // picker, so the user can browse to wherever they want it.
+  const handleMove = (entry: FileEntry) => {
+    setMoveSource({ name: entry.name, path: fullPath(entry.name), originCwd: cwd });
+    setSelectMode(false);
+    setSelected(new Set());
+    setGroupMenu(false);
+  };
+
+  const cancelMove = async () => {
+    const origin = moveSource?.originCwd;
+    setMoveSource(null);
+    // Put them back where the move started, as if nothing happened.
+    if (origin && origin !== cwd) await loadDirectory(origin);
+  };
+
+  const confirmMove = async () => {
+    if (!moveSource) return;
+    await withBusy(async () => {
+      try {
+        const res = await fetch("/api/files/move", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourcePath: moveSource.path, destDir: cwd }),
+        });
+        const data = await res.json();
+        if (data.error) {
+          showToast(data.error);
+          return;
+        }
+        setMoveSource(null);
+        await loadDirectory(cwd);
+        showToast(`Moved "${moveSource.name}" here`, "info");
+      } catch (err: unknown) {
+        showToast(err instanceof Error ? err.message : "Move failed");
+      }
+    });
+  };
 
   const cancelUpload = (index: number) => {
     const xhr = uploadXhrs.current.get(index);
@@ -789,186 +831,217 @@ function FileSessionView({ session }: { session: FileSession }) {
         disabled={busy}
       />
 
-      {/* Toolbar */}
+      {/* Toolbar — while picking a move destination every normal control is
+          replaced by the confirm/cancel pair, so the only things on offer are
+          navigating and deciding. */}
       <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-surface border-b border-line shrink-0 overflow-x-auto">
-        <div className="flex items-center gap-0.5 shrink-0">
-          <button
-            onClick={handleNewFile}
-            disabled={busy}
-            className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
-            title="New file"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"
-              />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14 2v6h6M12 18v-6M9 15h6" />
-            </svg>
-          </button>
-          <button
-            onClick={handleNewFolder}
-            disabled={busy}
-            className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
-            title="New folder"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-              />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 11v6M9 14h6" />
-            </svg>
-          </button>
-          <button
-            onClick={() => uploadInputRef.current?.click()}
-            disabled={busy}
-            className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
-            title="Upload files"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5 5 5M12 15V3"
-              />
-            </svg>
-          </button>
-          <button
-            onClick={() => folderInputRef.current?.click()}
-            disabled={busy}
-            className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
-            title="Upload folder"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-              />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 11v5m-2.5-2.5L12 11l2.5 2.5" />
-            </svg>
-          </button>
-          <input
-            ref={uploadInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={(e) => handleUpload(e.target.files)}
-          />
-          <input
-            ref={(el) => {
-              folderInputRef.current = el;
-              // webkitdirectory isn't a typed React prop; set it imperatively.
-              if (el) {
-                el.setAttribute("webkitdirectory", "");
-                el.setAttribute("directory", "");
-              }
-            }}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={(e) => handleUpload(e.target.files)}
-          />
-        </div>
-        <div className="flex items-center gap-1 text-sm shrink-0">
-          {selectMode && (
-            <>
-              <span className="text-xs text-ink-dim tabular-nums">{selected.size} selected</span>
+        {moveSource ? (
+          <>
+            <span className="min-w-0 truncate text-xs text-ink-dim">
+              Moving <span className="font-medium text-ink">{moveSource.name}</span>
+            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
-                onClick={toggleSelectAll}
-                className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line rounded transition-colors"
+                type="button"
+                onClick={confirmMove}
+                disabled={busy || cwd === moveSource.originCwd}
+                title={cwd === moveSource.originCwd ? "Browse to another folder first" : undefined}
+                className="px-2 py-0.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors disabled:bg-control disabled:text-ink-faint disabled:pointer-events-none"
               >
-                {selected.size === entries.length && entries.length > 0 ? "None" : "All"}
+                Move to this directory
               </button>
-              <div className="relative">
-                <button
-                  onClick={() => setGroupMenu((v) => !v)}
-                  disabled={selected.size === 0}
-                  aria-haspopup="menu"
-                  aria-expanded={groupMenu}
-                  className={`p-1 rounded transition-colors disabled:text-ink-ghost disabled:pointer-events-none ${
-                    groupMenu ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
-                  }`}
-                  title="Actions on selected"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
-                  </svg>
-                </button>
-                {groupMenu && (
-                  <>
-                    <button
-                      type="button"
-                      className="fixed inset-0 z-40 cursor-default"
-                      onClick={() => setGroupMenu(false)}
-                      aria-label="Close menu"
-                    />
-                    <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-line-strong rounded-lg shadow-xl py-1 min-w-[160px]">
-                      <button
-                        onClick={handleGroupDownload}
-                        className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
-                      >
-                        Download
-                      </button>
-                      <button
-                        onClick={handleGroupDelete}
-                        className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-hover transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </>
-          )}
-          <button
-            onClick={() => {
-              if (selectMode) exitSelectMode();
-              loadDirectory(cwd);
-            }}
-            disabled={busy}
-            className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
-            title="Refresh"
-            aria-label="Refresh files"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              <button
+                type="button"
+                onClick={cancelMove}
+                disabled={busy}
+                className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line hover:border-line-strong rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button
+                onClick={handleNewFile}
+                disabled={busy}
+                className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
+                title="New file"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"
+                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14 2v6h6M12 18v-6M9 15h6" />
+                </svg>
+              </button>
+              <button
+                onClick={handleNewFolder}
+                disabled={busy}
+                className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
+                title="New folder"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 11v6M9 14h6" />
+                </svg>
+              </button>
+              <button
+                onClick={() => uploadInputRef.current?.click()}
+                disabled={busy}
+                className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
+                title="Upload files"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5 5 5M12 15V3"
+                  />
+                </svg>
+              </button>
+              <button
+                onClick={() => folderInputRef.current?.click()}
+                disabled={busy}
+                className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
+                title="Upload folder"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 11v5m-2.5-2.5L12 11l2.5 2.5" />
+                </svg>
+              </button>
+              <input
+                ref={uploadInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => handleUpload(e.target.files)}
               />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (selectMode) exitSelectMode();
-              toggleHidden(!showHidden);
-            }}
-            disabled={busy}
-            aria-pressed={showHidden}
-            className={`px-2 py-0.5 text-xs border rounded transition-colors disabled:pointer-events-none disabled:opacity-50 ${
-              showHidden
-                ? "border-blue-500/70 bg-blue-500/20 text-blue-200"
-                : "border-line text-ink-dim hover:border-line-strong hover:text-ink"
-            }`}
-            title={`${showHidden ? "Hide" : "Show"} hidden files`}
-          >
-            Hidden
-          </button>
-          <button
-            type="button"
-            onClick={selectMode ? exitSelectMode : enterSelectMode}
-            disabled={busy}
-            className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line hover:border-line-strong rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
-          >
-            {selectMode ? "Cancel" : "Select"}
-          </button>
-        </div>
+              <input
+                ref={(el) => {
+                  folderInputRef.current = el;
+                  // webkitdirectory isn't a typed React prop; set it imperatively.
+                  if (el) {
+                    el.setAttribute("webkitdirectory", "");
+                    el.setAttribute("directory", "");
+                  }
+                }}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => handleUpload(e.target.files)}
+              />
+            </div>
+            <div className="flex items-center gap-1 text-sm shrink-0">
+              {selectMode && (
+                <>
+                  <span className="text-xs text-ink-dim tabular-nums">{selected.size} selected</span>
+                  <button
+                    onClick={toggleSelectAll}
+                    className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line rounded transition-colors"
+                  >
+                    {selected.size === entries.length && entries.length > 0 ? "None" : "All"}
+                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setGroupMenu((v) => !v)}
+                      disabled={selected.size === 0}
+                      aria-haspopup="menu"
+                      aria-expanded={groupMenu}
+                      className={`p-1 rounded transition-colors disabled:text-ink-ghost disabled:pointer-events-none ${
+                        groupMenu ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
+                      }`}
+                      title="Actions on selected"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
+                      </svg>
+                    </button>
+                    {groupMenu && (
+                      <>
+                        <button
+                          type="button"
+                          className="fixed inset-0 z-40 cursor-default"
+                          onClick={() => setGroupMenu(false)}
+                          aria-label="Close menu"
+                        />
+                        <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-line-strong rounded-lg shadow-xl py-1 min-w-[160px]">
+                          <button
+                            onClick={handleGroupDownload}
+                            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
+                          >
+                            Download
+                          </button>
+                          <button
+                            onClick={handleGroupDelete}
+                            className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-hover transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+              <button
+                onClick={() => {
+                  if (selectMode) exitSelectMode();
+                  loadDirectory(cwd);
+                }}
+                disabled={busy}
+                className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"
+                title="Refresh"
+                aria-label="Refresh files"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectMode) exitSelectMode();
+                  toggleHidden(!showHidden);
+                }}
+                disabled={busy}
+                aria-pressed={showHidden}
+                className={`px-2 py-0.5 text-xs border rounded transition-colors disabled:pointer-events-none disabled:opacity-50 ${
+                  showHidden
+                    ? "border-blue-500/70 bg-blue-500/20 text-blue-200"
+                    : "border-line text-ink-dim hover:border-line-strong hover:text-ink"
+                }`}
+                title={`${showHidden ? "Hide" : "Show"} hidden files`}
+              >
+                Hidden
+              </button>
+              <button
+                type="button"
+                onClick={selectMode ? exitSelectMode : enterSelectMode}
+                disabled={busy}
+                className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line hover:border-line-strong rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
+              >
+                {selectMode ? "Cancel" : "Select"}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {loading ? (
@@ -988,6 +1061,9 @@ function FileSessionView({ session }: { session: FileSession }) {
           onRename={handleRename}
           onDownload={handleDownload}
           onCopyPath={handleCopyPath}
+          onMove={handleMove}
+          moveMode={!!moveSource}
+          movingName={moveSource && moveSource.originCwd === cwd ? moveSource.name : null}
           selectMode={selectMode}
           selectedNames={selected}
           onToggleSelect={toggleSelect}
