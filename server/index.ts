@@ -8,6 +8,8 @@ import { createServer } from "http";
 import { tmpdir } from "os";
 import { basename, dirname, join, resolve } from "path";
 import { Server as SocketIOServer } from "socket.io";
+import { isPasswordEnabled } from "./auth.js";
+import { authGate, gateSocketIO, mountAuthRoutes } from "./auth-routes.js";
 import { mountProxy } from "./proxy.js";
 import { registerSocketHandlers } from "./socket-handlers.js";
 import { startTunnel } from "./tunnel.js";
@@ -40,10 +42,19 @@ async function main() {
     path: "/socket.io",
     cors: { origin: "*" },
   });
+  // Reject unauthenticated sockets before any handler can create a PTY.
+  gateSocketIO(io);
   registerSocketHandlers(io);
 
   // Remove default request size limits for uploads
   httpServer.maxHeadersCount = 0;
+
+  // Optional access password. The gate is mounted ahead of every route below
+  // (uploads, zip download, proxy, React Router) so nothing is reachable while
+  // the app is locked, and ahead of the auth router so that changing the
+  // password still requires a valid session once one is set.
+  app.use(authGate);
+  mountAuthRoutes(app);
 
   // Streaming file upload (handles large files without buffering into memory)
   app.post("/api/files/upload", (req, res) => {
@@ -297,7 +308,12 @@ async function main() {
   });
 
   httpServer.listen(PORT, () => {
-    console.log(`\n  OTG Code running on http://localhost:${PORT}\n`);
+    console.log(`\n  OTG Code running on http://localhost:${PORT}`);
+    console.log(
+      isPasswordEnabled()
+        ? "  Access password: on\n"
+        : "  Access password: off (enable it in Settings for an extra layer)\n",
+    );
   });
 
   if (useTunnel) {

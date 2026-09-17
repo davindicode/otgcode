@@ -14,3 +14,8 @@ export function getSocket(): Socket {
   }
   return socket;
 }
+
+/** True once a socket has been created (i.e. the app got past the lock screen). */
+export function hasSocket(): boolean {
+  return socket !== null;
+}

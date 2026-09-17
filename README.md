@@ -72,6 +72,12 @@ Three panels — **Terminal**, **Files**, and **Browser** — responsive 3-colum
   - **Video Player** — mp4, webm, ogg, mov, mkv, avi
   - **Audio Player** — mp3, wav, ogg, flac, aac, m4a
 
+### Security
+- **Optional access password** — off by default; turn it on from the Settings cog in the header to require a login before the terminal, files and browser panels load
+- Enforced on the server for every request, the localhost proxy (HTTP + WebSocket) and the Socket.IO handshake — not just the UI
+- Salted **scrypt** hash stored in `~/.otgcode/config.json` (mode 600); sessions are signed HttpOnly cookies, and changing or removing the password signs every device out
+- Failed logins back off exponentially rather than locking out, so a stranger with the URL can't deny you access to your own machine
+
 ### Localhost Preview
 - Preview any localhost port in a new tab via the built-in `/proxy/:port` reverse proxy
 - Multi-tab port list with reachability checks and green/amber status indicators
@@ -94,6 +100,11 @@ cp .env.example .env
 ```
 
 The `start.sh` script installs dependencies if needed, builds the app, starts the server, and launches a Cloudflare Quick Tunnel — printing a public URL you can open on any device. On macOS it also clears Gatekeeper quarantine flags on node-pty binaries. If `cloudflared` is not found in your PATH, the script auto-downloads it to `.bin/` (supports macOS, Linux, and Windows on x64/arm64).
+
+> [!WARNING]
+> **Keep the tunnel URL private.** Anyone who opens it gets a terminal on the host as the user that launched OTG Code, plus read/write access to that user's files. By default the URL is the only thing protecting it. For a second layer, turn on the **access password** in Settings (the cog in the header, top right) — it puts a login in front of the app and is enforced server-side on the API, the localhost proxy and the terminal socket.
+>
+> Locked yourself out? Set `passwordEnabled` to `false` in `~/.otgcode/config.json` on the host and restart.
 
 <details>
 <summary><strong>DNS tip:</strong> Tunnel URL not resolving? Set your DNS to 1.1.1.1</summary>
@@ -141,6 +152,7 @@ Single Express server on one port handles everything:
 
 ```
 Express (port 7777)
+├── Auth gate — optional access password, ahead of every route below
 ├── React Router v7 — UI (SSR shell + client-side app)
 ├── Socket.IO — real-time terminal I/O via node-pty
 ├── REST API — file operations (list, read, write, rename, delete, upload, download, mkdir)

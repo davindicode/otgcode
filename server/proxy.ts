@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { createProxyMiddleware, type RequestHandler } from "http-proxy-middleware";
+import { isRequestAuthenticated } from "./auth.js";
 
 const BLOCKED_PORTS = new Set<number>();
 for (let p = 1; p <= 1023; p++) {
@@ -121,11 +122,17 @@ export function mountProxy(app: Express, httpServer: Server, otgPort: number): v
     getProxy(port)(req, res, next);
   });
 
-  // WebSocket upgrade for proxy
+  // WebSocket upgrade for proxy. Express middleware (including the auth gate)
+  // never sees upgrades, so the password has to be re-checked here.
   httpServer.on("upgrade", (req, socket, head) => {
     const url = req.url || "";
     const match = url.match(/^\/proxy\/(\d+)(\/.*)?$/);
     if (!match) return;
+
+    if (!isRequestAuthenticated(req.headers.cookie)) {
+      socket.destroy();
+      return;
+    }
 
     const port = parseInt(match[1], 10);
     if (BLOCKED_PORTS.has(port)) {

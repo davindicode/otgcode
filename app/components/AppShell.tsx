@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuthStore } from "~/stores/authStore";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { useUiStore } from "~/stores/uiStore";
 import BrowserPage from "./browser/BrowserPage";
@@ -6,6 +7,7 @@ import ConnectionGate from "./ConnectionGate";
 import FilesPage from "./files/FilesPage";
 import Header from "./Header";
 import MobileTabBar from "./MobileTabBar";
+import PasswordGate from "./PasswordGate";
 import ResizablePanels from "./ResizablePanels";
 import Toaster from "./Toaster";
 import InputBox from "./terminal/InputBox";
@@ -34,10 +36,29 @@ export default function AppShell() {
   const isDesktop = useIsDesktop();
   const socketConnected = useTerminalStore((s) => s.socketConnected);
   const initSocket = useTerminalStore((s) => s.initSocket);
+  const authLoaded = useAuthStore((s) => s.loaded);
+  const locked = useAuthStore((s) => s.enabled && !s.authenticated);
+  const refreshAuth = useAuthStore((s) => s.refresh);
 
   useEffect(() => {
-    initSocket();
-  }, [initSocket]);
+    refreshAuth();
+  }, [refreshAuth]);
+
+  // Hold the socket back until we know the app isn't locked — connecting first
+  // would just be rejected by the server's socket gate.
+  useEffect(() => {
+    if (authLoaded && !locked) initSocket();
+  }, [authLoaded, locked, initSocket]);
+
+  if (!authLoaded) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-[#0d0d1a]">
+        <div className="spinner" />
+      </div>
+    );
+  }
+
+  if (locked) return <PasswordGate />;
 
   return (
     <div className="app-shell bg-[#0d0d1a] text-white">

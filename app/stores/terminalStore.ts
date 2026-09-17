@@ -3,6 +3,7 @@ import type { Terminal } from "@xterm/xterm";
 import { create } from "zustand";
 import { DEFAULT_FONT_SIZE } from "~/lib/constants";
 import { getSocket } from "~/lib/socket";
+import { useAuthStore } from "./authStore";
 
 interface TerminalSession {
   id: string;
@@ -88,6 +89,13 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         updated[id] = { ...session, status: "disconnected" };
       }
       set({ sessions: updated });
+    });
+
+    // The server rejects the handshake when the access password is on and the
+    // session cookie is missing or stale (expired, or invalidated by a password
+    // change). Surface the lock screen instead of retrying forever.
+    socket.on("connect_error", (err: Error) => {
+      if (err?.message === "unauthorized") useAuthStore.getState().lock();
     });
 
     socket.on("terminal_ready", (data: { sessionId: string }) => {

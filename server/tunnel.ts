@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from "child_process";
 import { existsSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import { isPasswordEnabled, localUsername } from "./auth.js";
 
 // Main OTG Code tunnel
 let mainTunnelProcess: ChildProcess | null = null;
@@ -29,6 +30,28 @@ function findCloudflared(): string {
   const localExe = join(binDir, "cloudflared.exe");
   if (existsSync(localExe)) return localExe;
   return "cloudflared";
+}
+
+// A quick-tunnel URL is unauthenticated and publicly routable: anyone who has
+// it gets this machine's terminal as the launching user, plus read/write access
+// to every file that user can reach. Say so next to the URL, every time.
+export function tunnelPrivacyWarning(username: string, passwordEnabled: boolean): string {
+  const lines = [
+    "  ⚠  Keep this URL private.",
+    `     Anyone who reaches it gets a terminal on this machine as "${username}",`,
+    "     plus read/write access to your files.",
+  ];
+  if (passwordEnabled) {
+    lines.push("     An access password is set, so visitors have to log in first.");
+  } else {
+    lines.push("     There is no login — the URL is the only thing protecting it.");
+    lines.push("     Add an access password in Settings (cog, top right) for a second layer.");
+  }
+  return lines.join("\n");
+}
+
+function printTunnelPrivacyWarning(): void {
+  console.log(`\n${tunnelPrivacyWarning(localUsername(), isPasswordEnabled())}\n`);
 }
 
 // How long to wait for a quick-tunnel URL before giving up on one attempt.
@@ -97,7 +120,8 @@ function spawnTunnelOnce(port: number): Promise<string | null> {
       const match = text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
       if (match && !resolved) {
         mainTunnelUrl = match[0];
-        console.log(`\n  Tunnel URL: ${match[0]}\n`);
+        console.log(`\n  Tunnel URL: ${match[0]}`);
+        printTunnelPrivacyWarning();
         settle(match[0]);
       }
     };

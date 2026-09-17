@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Optional access password** — a Settings toggle (off by default) that puts a
+  login in front of the whole app. Enforced server-side on every HTTP route,
+  the `/proxy/:port` reverse proxy (including WebSocket upgrades) and the
+  Socket.IO handshake, so the terminal cannot be reached by talking to the
+  socket directly. The password is stored as a salted scrypt hash in
+  `~/.otgcode/config.json` (mode 600) and sessions are signed cookies; changing
+  or removing the password invalidates every existing session. Failed attempts
+  back off exponentially instead of locking the account, so nobody can shut the
+  owner out of their own machine.
+- **Settings panel** — a cog in the header, next to the info icon, holding the
+  access-password controls and a sign-out action.
+- Tunnel startup now prints a privacy warning next to the Quick Tunnel URL,
+  naming the user whose shell the URL exposes and pointing at the password
+  setting when none is configured.
 - Media previews now show an informative browser, codec, or network error when
   a video or audio file cannot be played.
 - App-wide offline/reconnecting gate: the interface dims and becomes fully
@@ -38,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   structure is recreated server-side (with path-traversal protection).
 
 ### Changed
+- The header info icon is now a proper toggle: it highlights while its popup is
+  open and a second click dismisses it (previously a click on the icon while
+  open closed and immediately reopened the popup).
 - File downloads and inline media previews now stream from disk with HTTP range
   support, improving large-video loading and seeking without buffering the
   entire file in server memory.
