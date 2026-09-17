@@ -34,6 +34,28 @@ interface FileViewerProps {
 function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "audio"; onClose: () => void }) {
   const src = `/api/files/download?path=${encodeURIComponent(path)}&inline=1`;
   const [loop, setLoop] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+
+  const handleMediaError = (event: React.SyntheticEvent<HTMLMediaElement>) => {
+    const code = event.currentTarget.error?.code;
+    const messages: Record<number, string> = {
+      1: "Playback was stopped before the file finished loading.",
+      2: "The media could not be loaded because of a network or server error.",
+      3: "The browser could not decode this file. Its codec may not be supported.",
+      4: `This ${type} format or codec is not supported by this browser.`,
+    };
+    setMediaError(messages[code ?? 0] ?? `This ${type} could not be played.`);
+  };
+
+  const mediaProps = {
+    src,
+    controls: true,
+    loop,
+    preload: "metadata" as const,
+    onError: handleMediaError,
+    onLoadedMetadata: () => setMediaError(null),
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 bg-[#16162a] border-b border-gray-700 shrink-0">
@@ -83,18 +105,20 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
           </button>
         </div>
       </div>
-      <div className="flex-1 flex items-center justify-center bg-[#0d0d1a] p-4 overflow-auto">
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-[#0d0d1a] p-4 overflow-auto">
         {type === "video" ? (
-          <video
-            src={src}
-            controls
-            playsInline
-            loop={loop}
-            preload="metadata"
-            className="max-w-full max-h-full rounded"
-          />
+          <video {...mediaProps} playsInline className="max-w-full max-h-full rounded" />
         ) : (
-          <audio src={src} controls loop={loop} preload="metadata" className="w-full max-w-md" />
+          <audio {...mediaProps} className="w-full max-w-md" />
+        )}
+        {mediaError && (
+          <div className="max-w-lg rounded-lg border border-red-500/30 bg-red-950/20 px-4 py-3 text-center">
+            <p className="text-sm text-red-300">{mediaError}</p>
+            <p className="mt-1 text-xs text-gray-400">
+              MP4 is a container; a file that plays in a desktop app may still use a codec unavailable in this browser.
+              You can download the file and play it locally.
+            </p>
+          </div>
         )}
       </div>
     </div>

@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Media previews now show an informative browser, codec, or network error when
+  a video or audio file cannot be played.
 - App-wide offline/reconnecting gate: the interface dims and becomes fully
   non-interactive while the server socket is disconnected, with a spinner and
   animated connecting message until the VPS connection is ready.
@@ -36,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   structure is recreated server-side (with path-traversal protection).
 
 ### Changed
+- File downloads and inline media previews now stream from disk with HTTP range
+  support, improving large-video loading and seeking without buffering the
+  entire file in server memory.
 - Opening image/PDF/video/audio files no longer reads the whole file as text
   first — they stream straight from the file API, so large media/PDFs open
   immediately instead of hanging.
