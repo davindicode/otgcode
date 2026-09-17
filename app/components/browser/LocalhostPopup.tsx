@@ -72,7 +72,7 @@ function PortRow({ tab }: { tab: BrowserTab }) {
   };
 
   return (
-    <div className="flex items-center gap-2 px-2.5 py-1.5 bg-raised border border-line/50 rounded-lg">
+    <div className="flex items-center gap-2 px-2.5 py-1.5 bg-raised border border-line/50 rounded-panel">
       {/* Status dot */}
       {state.status === "checking" && (
         <svg className="w-4 h-4 animate-spin text-blue-500 shrink-0" fill="none" viewBox="0 0 24 24">
@@ -130,7 +130,7 @@ function PortRow({ tab }: { tab: BrowserTab }) {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors shrink-0 flex items-center gap-1"
+          className="px-3 py-1 relief-accent text-white rounded-control text-xs font-medium transition-colors shrink-0 flex items-center gap-1"
         >
           Go
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -187,7 +187,7 @@ function AddPortRow() {
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && handleAdd()}
         placeholder="port"
-        className={`w-20 bg-raised text-ink border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 ${
+        className={`w-20 bg-raised text-ink border rounded-control px-2 py-1 text-sm focus:outline-none focus:ring-1 ${
           blocked ? "border-red-500 focus:ring-red-500" : "border-line-strong focus:ring-blue-500"
         }`}
       />
@@ -238,7 +238,7 @@ export default function LocalhostPopup({ onClose }: { onClose: () => void }) {
       ref={panelRef}
       role="dialog"
       aria-label="Localhost ports"
-      className="absolute right-2 top-10 z-50 max-h-[min(26rem,calc(100vh-4rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-line bg-surface shadow-xl"
+      className="absolute right-2 top-10 z-50 max-h-[min(26rem,calc(100vh-4rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto glass rounded-panel"
     >
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <span className="text-xs font-medium text-ink-muted">Localhost</span>

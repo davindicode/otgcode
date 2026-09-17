@@ -69,8 +69,8 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setLoop((l) => !l)}
-            className={`p-1 rounded transition-colors ${
-              loop ? "bg-blue-600 text-white" : "bg-control hover:bg-control-hover text-ink-muted hover:text-ink"
+            className={`p-1 rounded-control transition-colors ${
+              loop ? "relief-accent text-white" : "relief text-ink-muted hover:text-ink"
             }`}
             title={loop ? "Loop: on" : "Loop: off"}
           >
@@ -82,7 +82,7 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
           </button>
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
-            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
+            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
             download
             title="Download"
           >
@@ -94,11 +94,7 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
               />
             </svg>
           </a>
-          <button
-            onClick={onClose}
-            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
-            title="Close"
-          >
+          <button onClick={onClose} className="relief p-1 text-ink-muted hover:text-ink rounded-control" title="Close">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -107,12 +103,12 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
       </div>
       <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-app p-4 overflow-auto">
         {type === "video" ? (
-          <video {...mediaProps} playsInline className="max-w-full max-h-full rounded" />
+          <video {...mediaProps} playsInline className="max-w-full max-h-full rounded-control" />
         ) : (
           <audio {...mediaProps} className="w-full max-w-md" />
         )}
         {mediaError && (
-          <div className="max-w-lg rounded-lg border border-red-500/30 bg-red-950/20 px-4 py-3 text-center">
+          <div className="max-w-lg rounded-panel border border-red-500/30 bg-red-950/20 px-4 py-3 text-center">
             <p className="text-sm text-red-300">{mediaError}</p>
             <p className="mt-1 text-xs text-ink-dim">
               MP4 is a container; a file that plays in a desktop app may still use a codec unavailable in this browser.
@@ -162,7 +158,10 @@ function LazyPdfPage({
       {render ? (
         <Page pageNumber={pageNumber} scale={scale} className="shadow-lg" renderTextLayer renderAnnotationLayer />
       ) : (
-        <div className="w-full max-w-[800px] rounded bg-surface/40" style={{ height: Math.round(1000 * scale) }} />
+        <div
+          className="w-full max-w-[800px] rounded-control bg-surface/40"
+          style={{ height: Math.round(1000 * scale) }}
+        />
       )}
     </div>
   );
@@ -195,7 +194,7 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
         <CopyPathButton path={path} />
         <div className="flex items-center gap-2 shrink-0">
           {numPages > 0 && <span className="text-[10px] text-ink-faint">{numPages} pg</span>}
-          <div className="flex items-center gap-1 border border-line rounded overflow-hidden">
+          <div className="flex items-center gap-1 border border-line rounded-control overflow-hidden">
             <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-ink-dim hover:text-ink hover:bg-control">
               -
             </button>
@@ -211,7 +210,7 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
           </div>
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
-            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
+            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
             download
             title="Download"
           >
@@ -223,11 +222,7 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
               />
             </svg>
           </a>
-          <button
-            onClick={onClose}
-            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
-            title="Close"
-          >
+          <button onClick={onClose} className="relief p-1 text-ink-muted hover:text-ink rounded-control" title="Close">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -289,7 +284,7 @@ export default function FileViewer({ path, content, onSave, onClose }: FileViewe
         <div className="flex items-center gap-2 shrink-0">
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
-            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
+            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
             download
             title="Download"
           >
@@ -301,11 +296,7 @@ export default function FileViewer({ path, content, onSave, onClose }: FileViewe
               />
             </svg>
           </a>
-          <button
-            onClick={onClose}
-            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
-            title="Close"
-          >
+          <button onClick={onClose} className="relief p-1 text-ink-muted hover:text-ink rounded-control" title="Close">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>

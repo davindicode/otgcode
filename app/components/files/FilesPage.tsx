@@ -784,7 +784,7 @@ function FileSessionView({ session }: { session: FileSession }) {
           <span className="text-xs text-ink-ghost truncate text-center max-w-full">{selectedFile}</span>
           <button
             onClick={handleCancelOpen}
-            className="px-4 py-2 bg-control hover:bg-control-hover text-ink rounded text-sm transition-colors"
+            className="px-4 py-2 relief text-ink rounded-control text-sm transition-colors"
           >
             Cancel
           </button>
@@ -805,7 +805,7 @@ function FileSessionView({ session }: { session: FileSession }) {
           <span className="text-xs text-ink-ghost truncate text-center max-w-full">{selectedFile}</span>
           <button
             onClick={handleCloseFile}
-            className="px-4 py-2 bg-control hover:bg-control-hover text-ink rounded text-sm transition-colors"
+            className="px-4 py-2 relief text-ink rounded-control text-sm transition-colors"
           >
             Back
           </button>
@@ -834,7 +834,7 @@ function FileSessionView({ session }: { session: FileSession }) {
       {/* Toolbar — while picking a move destination every normal control is
           replaced by the confirm/cancel pair, so the only things on offer are
           navigating and deciding. */}
-      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-surface border-b border-line shrink-0 overflow-x-auto">
+      <div className="bar-edge flex items-center justify-between gap-2 px-3 py-1.5 bg-surface border-b border-line shrink-0 overflow-x-auto">
         {moveSource ? (
           <>
             <span className="min-w-0 truncate text-xs text-ink-dim">
@@ -846,7 +846,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                 onClick={confirmMove}
                 disabled={busy || cwd === moveSource.originCwd}
                 title={cwd === moveSource.originCwd ? "Browse to another folder first" : undefined}
-                className="px-2 py-0.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors disabled:bg-control disabled:text-ink-faint disabled:pointer-events-none"
+                className="px-2 py-0.5 text-xs font-medium relief-accent text-white rounded-control transition-colors disabled:bg-control disabled:text-ink-faint disabled:pointer-events-none"
               >
                 Move to this directory
               </button>
@@ -854,7 +854,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                 type="button"
                 onClick={cancelMove}
                 disabled={busy}
-                className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line hover:border-line-strong rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
+                className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line hover:border-line-strong rounded-control transition-colors disabled:pointer-events-none disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -950,7 +950,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                   <span className="text-xs text-ink-dim tabular-nums">{selected.size} selected</span>
                   <button
                     onClick={toggleSelectAll}
-                    className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line rounded transition-colors"
+                    className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line rounded-control transition-colors"
                   >
                     {selected.size === entries.length && entries.length > 0 ? "None" : "All"}
                   </button>
@@ -960,7 +960,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                       disabled={selected.size === 0}
                       aria-haspopup="menu"
                       aria-expanded={groupMenu}
-                      className={`p-1 rounded transition-colors disabled:text-ink-ghost disabled:pointer-events-none ${
+                      className={`p-1 rounded-control transition-colors disabled:text-ink-ghost disabled:pointer-events-none ${
                         groupMenu ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
                       }`}
                       title="Actions on selected"
@@ -977,7 +977,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                           onClick={() => setGroupMenu(false)}
                           aria-label="Close menu"
                         />
-                        <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-line-strong rounded-lg shadow-xl py-1 min-w-[160px]">
+                        <div className="absolute right-0 top-full mt-1 z-50 glass rounded-panel py-1 min-w-[160px]">
                           <button
                             onClick={handleGroupDownload}
                             className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
@@ -1022,7 +1022,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                 }}
                 disabled={busy}
                 aria-pressed={showHidden}
-                className={`px-2 py-0.5 text-xs border rounded transition-colors disabled:pointer-events-none disabled:opacity-50 ${
+                className={`px-2 py-0.5 text-xs border rounded-control transition-colors disabled:pointer-events-none disabled:opacity-50 ${
                   showHidden
                     ? "border-blue-500/70 bg-blue-500/20 text-blue-200"
                     : "border-line text-ink-dim hover:border-line-strong hover:text-ink"
@@ -1035,7 +1035,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                 type="button"
                 onClick={selectMode ? exitSelectMode : enterSelectMode}
                 disabled={busy}
-                className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line hover:border-line-strong rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
+                className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line hover:border-line-strong rounded-control transition-colors disabled:pointer-events-none disabled:opacity-50"
               >
                 {selectMode ? "Cancel" : "Select"}
               </button>
@@ -1079,10 +1079,7 @@ function FileSessionView({ session }: { session: FileSession }) {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
           onClick={() => setDialog(null)}
         >
-          <div
-            className="bg-popover border border-line-strong rounded-lg shadow-xl p-4 mx-4 w-full max-w-sm"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="glass rounded-panel p-4 mx-4 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             {dialog.type === "newFolder" && (
               <>
                 <h3 className="text-sm font-medium text-ink mb-3">New Folder</h3>
@@ -1092,7 +1089,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && confirmNewFolder()}
                   placeholder="Folder name"
-                  className="w-full bg-app text-ink border border-line-strong rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
+                  className="w-full bg-app text-ink border border-line-strong rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
                 />
                 <div className="flex justify-end gap-2">
                   <button
@@ -1104,7 +1101,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                   <button
                     onClick={confirmNewFolder}
                     disabled={!inputValue.trim()}
-                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-control disabled:text-ink-faint text-white rounded transition-colors"
+                    className="px-3 py-1.5 text-sm relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
                   >
                     Create
                   </button>
@@ -1120,7 +1117,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && confirmNewFile()}
                   placeholder="File name"
-                  className="w-full bg-app text-ink border border-line-strong rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
+                  className="w-full bg-app text-ink border border-line-strong rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
                 />
                 <div className="flex justify-end gap-2">
                   <button
@@ -1132,7 +1129,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                   <button
                     onClick={confirmNewFile}
                     disabled={!inputValue.trim()}
-                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-control disabled:text-ink-faint text-white rounded transition-colors"
+                    className="px-3 py-1.5 text-sm relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
                   >
                     Create
                   </button>
@@ -1147,7 +1144,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && confirmRename()}
-                  className="w-full bg-app text-ink border border-line-strong rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
+                  className="w-full bg-app text-ink border border-line-strong rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
                 />
                 <div className="flex justify-end gap-2">
                   <button
@@ -1159,7 +1156,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                   <button
                     onClick={confirmRename}
                     disabled={!inputValue.trim() || inputValue.trim() === dialog.entry.name}
-                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-control disabled:text-ink-faint text-white rounded transition-colors"
+                    className="px-3 py-1.5 text-sm relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
                   >
                     Rename
                   </button>
@@ -1187,7 +1184,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                   </button>
                   <button
                     onClick={confirmDelete}
-                    className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                    className="px-3 py-1.5 text-sm relief-accent relief-danger text-white rounded-control transition-colors"
                   >
                     Delete
                   </button>
@@ -1221,7 +1218,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                       </button>
                       <button
                         onClick={confirmDeleteMany}
-                        className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                        className="px-3 py-1.5 text-sm relief-accent relief-danger text-white rounded-control transition-colors"
                       >
                         Delete {n}
                       </button>
@@ -1252,7 +1249,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                 <div className="flex justify-end mt-3">
                   <button
                     onClick={() => setDialog(null)}
-                    className="px-3 py-1.5 text-sm bg-control hover:bg-control-hover text-ink rounded transition-colors"
+                    className="px-3 py-1.5 text-sm relief text-ink rounded-control transition-colors"
                   >
                     Close
                   </button>
@@ -1265,7 +1262,7 @@ function FileSessionView({ session }: { session: FileSession }) {
 
       {/* Drag & drop upload overlay */}
       {dragging && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-blue-950/70 border-2 border-dashed border-blue-400 rounded-lg pointer-events-none">
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-blue-950/70 border-2 border-dashed border-blue-400 rounded-panel pointer-events-none">
           <div className="flex flex-col items-center gap-2 text-blue-200">
             <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
               <path

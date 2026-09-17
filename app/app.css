@@ -45,6 +45,40 @@
   --t-accent: #569cd6;      /* focus rings, links, dividers */
   --t-scrollbar: #333333;
   --t-scrollbar-hover: #555555;
+
+  /* Control relief — a vertical gradient plus a 1px top highlight, so a
+     control reads as a raised surface catching light from above rather than a
+     flat fill. Kept shallow on purpose: this UI is dense, and deep shadows at
+     24px button heights turn into noise. */
+  --t-ctl-from: #3d4453;
+  --t-ctl-to: #2d323d;
+  --t-ctl-from-hover: #4a5262;
+  --t-ctl-to-hover: #373d4a;
+  --t-ctl-edge: rgba(255, 255, 255, 0.11);
+  --t-ctl-lift: 0 1px 2px rgba(0, 0, 0, 0.38);
+  --t-ctl-press: inset 0 2px 3px rgba(0, 0, 0, 0.45);
+
+  --t-acc-from: #3f8cf7;
+  --t-acc-to: #2563eb;
+  --t-acc-from-hover: #559af9;
+  --t-acc-to-hover: #2f6fe0;
+  --t-acc-edge: rgba(255, 255, 255, 0.26);
+
+  --t-danger-from: #ef4444;
+  --t-danger-to: #c62828;
+  --t-danger-from-hover: #f35b5b;
+  --t-danger-to-hover: #d13030;
+
+  /* Glass — overlays only, where translucency establishes layering over the
+     content behind them. */
+  --t-glass-bg: rgba(24, 24, 44, 0.74);
+  --t-glass-border: rgba(255, 255, 255, 0.1);
+  --t-glass-edge: rgba(255, 255, 255, 0.07);
+  --t-glass-blur: 18px;
+  --t-glass-shadow: 0 18px 44px -14px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.4);
+
+  /* Top-edge highlight that separates stacked bars (header, toolbars). */
+  --t-bar-edge: rgba(255, 255, 255, 0.045);
 }
 
 html.light {
@@ -80,6 +114,35 @@ html.light {
   --t-accent: #2563eb;
   --t-scrollbar: #c3c8d6;
   --t-scrollbar-hover: #a2a8b8;
+
+  /* Light theme: the highlight moves to plain white and the shadow carries
+     more of the work, since there is less contrast to borrow from. */
+  --t-ctl-from: #ffffff;
+  --t-ctl-to: #e8ebf3;
+  --t-ctl-from-hover: #ffffff;
+  --t-ctl-to-hover: #dde1ec;
+  --t-ctl-edge: rgba(255, 255, 255, 0.9);
+  --t-ctl-lift: 0 1px 2px rgba(23, 27, 40, 0.14), 0 0 0 1px rgba(23, 27, 40, 0.05);
+  --t-ctl-press: inset 0 2px 3px rgba(23, 27, 40, 0.16);
+
+  --t-acc-from: #4f92f8;
+  --t-acc-to: #2563eb;
+  --t-acc-from-hover: #63a0fa;
+  --t-acc-to-hover: #2f6fe0;
+  --t-acc-edge: rgba(255, 255, 255, 0.38);
+
+  --t-danger-from: #f05252;
+  --t-danger-to: #d02c2c;
+  --t-danger-from-hover: #f46767;
+  --t-danger-to-hover: #dc3838;
+
+  --t-glass-bg: rgba(255, 255, 255, 0.76);
+  --t-glass-border: rgba(23, 27, 40, 0.1);
+  --t-glass-edge: rgba(255, 255, 255, 0.8);
+  --t-glass-blur: 18px;
+  --t-glass-shadow: 0 18px 44px -16px rgba(23, 27, 40, 0.3), 0 2px 8px rgba(23, 27, 40, 0.1);
+
+  --t-bar-edge: rgba(255, 255, 255, 0.7);
 }
 
 /* `inline` so utilities emit var(--t-*) and follow a runtime theme swap. */
@@ -115,6 +178,11 @@ html.light {
 }
 
 @theme {
+  /* One radius scale instead of ad-hoc values: tight on controls (VS Code
+     density), softer on the floating surfaces. */
+  --radius-control: 6px;
+  --radius-panel: 10px;
+
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Menlo", "Monaco", "Courier New", monospace;
 }
@@ -301,8 +369,12 @@ button, a[download], [role="button"] {
 }
 
 button:active:not(:disabled), a[download]:active, [role="button"]:active {
-  transform: scale(0.93);
-  opacity: 0.8;
+  transform: scale(0.97);
+}
+
+/* Controls carrying their own pressed state don't need the scale nudge too. */
+.relief:active:not(:disabled), .relief-accent:active:not(:disabled) {
+  transform: none;
 }
 
 button:disabled {
@@ -326,6 +398,117 @@ button:disabled {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--t-scrollbar-hover);
+}
+
+/* ---------------------------------------------------------------------------
+   Material classes.
+
+   Defined once here rather than as long utility strings on 124 buttons, so the
+   look stays consistent and is tuned in one place.
+--------------------------------------------------------------------------- */
+
+/* Raised neutral control: gradient body, lit top edge, tight drop shadow. */
+.relief {
+  background-image: linear-gradient(to bottom, var(--t-ctl-from), var(--t-ctl-to));
+  box-shadow: inset 0 1px 0 var(--t-ctl-edge), var(--t-ctl-lift);
+  transition: background-image 0.15s, box-shadow 0.15s, color 0.15s;
+}
+
+.relief:hover:not(:disabled) {
+  background-image: linear-gradient(to bottom, var(--t-ctl-from-hover), var(--t-ctl-to-hover));
+}
+
+/* Pressed: the light flips to the inside, so the control reads as pushed in.
+   This replaces most of the old scale-down squash. */
+.relief:active:not(:disabled) {
+  background-image: linear-gradient(to bottom, var(--t-ctl-to), var(--t-ctl-from));
+  box-shadow: var(--t-ctl-press);
+}
+
+/* Same treatment in the accent colour, for primary actions. */
+.relief-accent {
+  background-image: linear-gradient(to bottom, var(--t-acc-from), var(--t-acc-to));
+  box-shadow: inset 0 1px 0 var(--t-acc-edge), var(--t-ctl-lift);
+  transition: background-image 0.15s, box-shadow 0.15s;
+}
+
+.relief-accent:hover:not(:disabled) {
+  background-image: linear-gradient(to bottom, var(--t-acc-from-hover), var(--t-acc-to-hover));
+}
+
+.relief-accent:active:not(:disabled) {
+  background-image: linear-gradient(to bottom, var(--t-acc-to), var(--t-acc-from));
+  box-shadow: var(--t-ctl-press);
+}
+
+/* Destructive actions keep the relief, in red. */
+.relief-danger {
+  background-image: linear-gradient(to bottom, var(--t-danger-from), var(--t-danger-to));
+  box-shadow: inset 0 1px 0 var(--t-acc-edge), var(--t-ctl-lift);
+}
+
+.relief-danger:hover:not(:disabled) {
+  background-image: linear-gradient(to bottom, var(--t-danger-from-hover), var(--t-danger-to-hover));
+}
+
+.relief-danger:active:not(:disabled) {
+  background-image: linear-gradient(to bottom, var(--t-danger-to), var(--t-danger-from));
+  box-shadow: var(--t-ctl-press);
+}
+
+/* One disabled appearance for every relief control. The gradient is the fill,
+   so it needs an explicit colour here or a disabled control would render
+   transparent. */
+.relief:disabled,
+.relief-accent:disabled,
+.relief-danger:disabled {
+  background-image: none;
+  background-color: var(--t-disabled);
+  box-shadow: none;
+  color: var(--t-ink-ghost);
+}
+
+/* Floating surfaces only — popups, menus, dialogs. Never on list rows or the
+   terminal: backdrop-filter over a canvas is expensive and buys nothing. */
+.glass {
+  background-color: var(--t-glass-bg);
+  backdrop-filter: blur(var(--t-glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--t-glass-blur)) saturate(140%);
+  border: 1px solid var(--t-glass-border);
+  box-shadow: inset 0 1px 0 var(--t-glass-edge), var(--t-glass-shadow);
+}
+
+/* Browsers without backdrop-filter get an opaque panel rather than an
+   unreadable translucent one. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background-color: var(--t-popover);
+  }
+}
+
+/* Error toasts: the same glass, tinted red. */
+.glass-danger {
+  background-color: color-mix(in oklab, #b91c1c 72%, var(--t-glass-bg));
+  border-color: color-mix(in oklab, #ef4444 55%, transparent);
+}
+
+/* The selected tab catches the same top light as a raised control, so it
+   reads as the front-most layer rather than just a differently-filled cell. */
+.tab-active {
+  box-shadow: inset 0 1px 0 var(--t-ctl-edge);
+}
+
+/* Stacked bars (header, toolbars, tab strips) get a hairline lit top edge so
+   the layers separate without another border. */
+.bar-edge {
+  box-shadow: inset 0 1px 0 var(--t-bar-edge);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .relief,
+  .relief-accent {
+    transition: none;
+  }
 }
 
 /* Toast slide in/out */

@@ -553,7 +553,7 @@ export default function InputBox() {
 
   // --- Styles ---
   const tabBase =
-    "px-2.5 py-0.5 text-[11px] rounded border whitespace-nowrap transition-colors shrink-0 select-none touch-manipulation";
+    "px-2.5 py-0.5 text-[11px] rounded-control border whitespace-nowrap transition-colors shrink-0 select-none touch-manipulation";
   const tabDisabledAction = `${tabBase} bg-disabled text-ink-ghost border-line/50 cursor-not-allowed`;
   const tabDisabledApp = `${tabBase} bg-disabled text-ink-ghost border-line/50 cursor-not-allowed`;
   // Action tabs (cmds, cd, code, sticky) — blue
@@ -565,11 +565,11 @@ export default function InputBox() {
 
   // Popup action buttons: neutral gray
   const keyBtn =
-    "px-2 py-0.5 text-[11px] bg-raised text-ink-dim hover:text-ink hover:bg-hover disabled:text-ink-ghost rounded border border-line whitespace-nowrap transition-colors select-none touch-manipulation";
+    "px-2 py-0.5 text-[11px] bg-raised text-ink-dim hover:text-ink hover:bg-hover disabled:text-ink-ghost rounded-control border border-line whitespace-nowrap transition-colors select-none touch-manipulation";
   const exitBtn =
-    "px-2 py-0.5 text-[11px] bg-raised text-red-400 hover:text-red-300 hover:bg-hover disabled:text-ink-ghost rounded border border-red-800 whitespace-nowrap transition-colors select-none touch-manipulation";
+    "px-2 py-0.5 text-[11px] bg-raised text-red-400 hover:text-red-300 hover:bg-hover disabled:text-ink-ghost rounded-control border border-red-800 whitespace-nowrap transition-colors select-none touch-manipulation";
   const saveExitBtn =
-    "px-2 py-0.5 text-[11px] bg-raised text-green-400 hover:text-green-300 hover:bg-hover disabled:text-ink-ghost rounded border border-green-800 whitespace-nowrap transition-colors select-none touch-manipulation";
+    "px-2 py-0.5 text-[11px] bg-raised text-green-400 hover:text-green-300 hover:bg-hover disabled:text-ink-ghost rounded-control border border-green-800 whitespace-nowrap transition-colors select-none touch-manipulation";
 
   // --- Determine which tabs to show ---
   // Editor mode (nano/vim): only editor tab + sticky (+ tmux if in tmux)
@@ -704,7 +704,7 @@ export default function InputBox() {
                   key={dir}
                   onClick={() => handleCdTo(dir)}
                   disabled={!activeSessionId}
-                  className="px-2 py-0.5 text-[11px] bg-tab-action text-purple-400 hover:text-purple-200 hover:bg-hover disabled:text-ink-ghost rounded border border-purple-800/50 whitespace-nowrap transition-colors select-none touch-manipulation"
+                  className="px-2 py-0.5 text-[11px] bg-tab-action text-purple-400 hover:text-purple-200 hover:bg-hover disabled:text-ink-ghost rounded-control border border-purple-800/50 whitespace-nowrap transition-colors select-none touch-manipulation"
                   title={`cd ${dir}`}
                 >
                   {dir}
@@ -723,9 +723,9 @@ export default function InputBox() {
               <button
                 key={m.id}
                 onClick={() => setStickyMode(m.id)}
-                className={`px-2 py-0.5 text-[10px] rounded border transition-colors select-none ${
+                className={`px-2 py-0.5 text-[10px] rounded-control border transition-colors select-none ${
                   stickyMode === m.id
-                    ? "bg-blue-600 text-white border-blue-500"
+                    ? "relief-accent text-white border-blue-500"
                     : "bg-raised text-ink-faint hover:text-ink border-line"
                 }`}
               >
@@ -797,12 +797,12 @@ export default function InputBox() {
                 onChange={(e) => setEditorFileName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("nano")}
                 placeholder="filename or path..."
-                className="flex-1 bg-raised text-ink border border-line rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
               <button
                 onClick={() => handleOpenEditor("nano")}
                 disabled={!editorFileName.trim() || !activeSessionId}
-                className="px-2 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 disabled:bg-control disabled:text-ink-faint text-white rounded transition-colors"
+                className="px-2 py-1 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
               >
                 Open
               </button>
@@ -854,12 +854,12 @@ export default function InputBox() {
                 onChange={(e) => setEditorFileName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("vim")}
                 placeholder="filename or path..."
-                className="flex-1 bg-raised text-ink border border-line rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
               <button
                 onClick={() => handleOpenEditor("vim")}
                 disabled={!editorFileName.trim() || !activeSessionId}
-                className="px-2 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 disabled:bg-control disabled:text-ink-faint text-white rounded transition-colors"
+                className="px-2 py-1 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
               >
                 Open
               </button>
@@ -908,7 +908,7 @@ export default function InputBox() {
                     <div key={s.name} className="flex items-center gap-2">
                       <button
                         onClick={() => handleTmuxAttach(s.name)}
-                        className="flex-1 text-left px-2 py-1 text-[11px] bg-raised text-ink-muted hover:text-ink hover:bg-hover rounded border border-line transition-colors"
+                        className="flex-1 text-left px-2 py-1 text-[11px] bg-raised text-ink-muted hover:text-ink hover:bg-hover rounded-control border border-line transition-colors"
                       >
                         <span className="font-medium">{s.name}</span>
                         <span className="text-ink-faint ml-2">{s.windows}w</span>
@@ -937,12 +937,12 @@ export default function InputBox() {
                   onChange={(e) => setTmuxNewName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleTmuxNew()}
                   placeholder="New session name..."
-                  className="flex-1 bg-raised text-ink border border-line rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <button
                   onClick={handleTmuxNew}
                   disabled={!tmuxNewName.trim() || !activeSessionId}
-                  className="px-2 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 disabled:bg-control disabled:text-ink-faint text-white rounded transition-colors"
+                  className="px-2 py-1 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
                 >
                   Create
                 </button>
@@ -993,7 +993,7 @@ export default function InputBox() {
                   createPortal(
                     <div
                       ref={codeVendorMenuRef}
-                      className="fixed bg-raised border border-line-strong rounded shadow-lg min-w-[80px] py-0.5"
+                      className="fixed bg-raised border border-line-strong rounded-control shadow-lg min-w-[80px] py-0.5"
                       style={{
                         zIndex: 9999,
                         ...(() => {
@@ -1027,7 +1027,7 @@ export default function InputBox() {
                       }}
                       disabled={!activeSessionId}
                       title={cmd.title}
-                      className="px-2 py-0.5 text-[11px] bg-raised text-purple-400 hover:text-purple-200 hover:bg-hover disabled:text-ink-ghost rounded border border-purple-800/60 whitespace-nowrap transition-colors select-none"
+                      className="px-2 py-0.5 text-[11px] bg-raised text-purple-400 hover:text-purple-200 hover:bg-hover disabled:text-ink-ghost rounded-control border border-purple-800/60 whitespace-nowrap transition-colors select-none"
                     >
                       {cmd.label}
                     </button>
@@ -1053,7 +1053,7 @@ export default function InputBox() {
                       }}
                       disabled={!activeSessionId}
                       title={cmd.title}
-                      className="px-2 py-0.5 text-[11px] bg-raised text-cyan-400 hover:text-cyan-200 hover:bg-hover disabled:text-ink-ghost rounded border border-cyan-800/60 whitespace-nowrap transition-colors select-none"
+                      className="px-2 py-0.5 text-[11px] bg-raised text-cyan-400 hover:text-cyan-200 hover:bg-hover disabled:text-ink-ghost rounded-control border border-cyan-800/60 whitespace-nowrap transition-colors select-none"
                     >
                       {cmd.label}
                     </button>
@@ -1097,7 +1097,7 @@ export default function InputBox() {
                 }
               }}
               placeholder="commit message..."
-              className="flex-1 bg-raised text-ink border border-line rounded px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+              className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
             />
             <button
               onClick={() => {
@@ -1108,7 +1108,7 @@ export default function InputBox() {
                 }
               }}
               disabled={!gitCommitMsg.trim() || !activeSessionId}
-              className="px-2 py-0.5 text-[11px] bg-green-700 hover:bg-green-600 disabled:bg-control disabled:text-ink-faint text-white rounded transition-colors shrink-0"
+              className="px-2 py-0.5 text-[11px] bg-green-700 hover:bg-green-600 disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors shrink-0"
             >
               Commit
             </button>
@@ -1120,13 +1120,13 @@ export default function InputBox() {
               value={gitConfigName}
               onChange={(e) => setGitConfigName(e.target.value)}
               placeholder="user.name"
-              className="flex-1 bg-raised text-ink border border-line rounded px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+              className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
             />
             <input
               value={gitConfigEmail}
               onChange={(e) => setGitConfigEmail(e.target.value)}
               placeholder="user.email"
-              className="flex-1 bg-raised text-ink border border-line rounded px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+              className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
             />
             <button
               onClick={() => {
@@ -1137,7 +1137,7 @@ export default function InputBox() {
                   sendInput(activeSessionId, `git config --global user.email '${gitConfigEmail.trim()}'\n`);
               }}
               disabled={!activeSessionId || (!gitConfigName.trim() && !gitConfigEmail.trim())}
-              className="px-2 py-0.5 text-[11px] bg-blue-700 hover:bg-blue-600 disabled:bg-control disabled:text-ink-faint text-white rounded transition-colors shrink-0"
+              className="px-2 py-0.5 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors shrink-0"
             >
               Set
             </button>
@@ -1153,13 +1153,13 @@ export default function InputBox() {
           onChange={handleInput}
           placeholder="Type anything... (Enter for newline)"
           rows={1}
-          className="flex-1 bg-raised text-ink border border-line-strong rounded-lg px-3 py-2 text-[16px] leading-5 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="flex-1 bg-raised text-ink border border-line-strong rounded-panel px-3 py-2 text-[16px] leading-5 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
           style={{ maxHeight: 120 }}
         />
         <button
           onClick={handleSend}
           disabled={!text || !activeSessionId}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-control disabled:text-ink-faint text-white rounded-lg text-sm font-medium transition-colors"
+          className="px-4 py-2 relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-panel text-sm font-medium transition-colors"
         >
           Send
         </button>

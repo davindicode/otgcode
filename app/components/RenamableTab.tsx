@@ -52,7 +52,7 @@ export default function RenamableTab({
       }}
       className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-sm border-r border-line-soft shrink-0 transition-colors ${
         isActive
-          ? "bg-surface text-ink border-b-2 border-b-blue-500"
+          ? "tab-active bg-surface text-ink border-b-2 border-b-blue-500"
           : "text-ink-dim hover:text-ink hover:bg-surface/50"
       }`}
     >
@@ -68,7 +68,7 @@ export default function RenamableTab({
           }}
           onBlur={commit}
           onClick={(e) => e.stopPropagation()}
-          className="bg-app text-ink text-xs border border-line-strong rounded px-1 py-0.5 w-20 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="bg-app text-ink text-xs border border-line-strong rounded-control px-1 py-0.5 w-20 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
       ) : (
         <span className="truncate max-w-[80px]">{name}</span>
@@ -79,7 +79,7 @@ export default function RenamableTab({
             e.stopPropagation();
             onClose();
           }}
-          className="ml-0.5 p-0.5 rounded hover:bg-control-hover text-ink-faint hover:text-ink-muted transition-colors"
+          className="ml-0.5 p-0.5 rounded-control hover:bg-control-hover text-ink-faint hover:text-ink-muted transition-colors"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

@@ -36,7 +36,7 @@ export default function MobileTabBar() {
   const setActiveTab = useUiStore((s) => s.setActiveTab);
 
   return (
-    <nav className="flex items-center border-t border-line-soft bg-app shrink-0 safe-bottom">
+    <nav className="bar-edge flex items-center border-t border-line-soft bg-app shrink-0 safe-bottom">
       {tabs.map((tab) => (
         <button
           key={tab.id}

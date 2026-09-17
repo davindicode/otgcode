@@ -18,7 +18,7 @@ function Section({ title, description, children }: { title: string; description:
 }
 
 const inputClass =
-  "w-full rounded border border-line bg-app px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-ghost focus:border-blue-500 focus:outline-none disabled:opacity-50";
+  "w-full rounded-control border border-line bg-app px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-ghost focus:border-blue-500 focus:outline-none disabled:opacity-50";
 
 /** Display preferences. Saved to the workspace file the moment they change. */
 function Appearance() {
@@ -32,7 +32,7 @@ function Appearance() {
       type="button"
       onClick={() => setTheme(value)}
       aria-pressed={theme === value}
-      className={`flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition-colors ${
+      className={`flex flex-1 items-center justify-center gap-1.5 rounded-control px-2 py-1.5 text-xs font-medium transition-colors ${
         theme === value ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
       }`}
     >
@@ -43,7 +43,7 @@ function Appearance() {
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-1 rounded-md border border-line bg-raised p-1">
+      <div className="flex gap-1 rounded-control border border-line bg-raised p-1">
         {themeButton(
           "dark",
           "Dark",
@@ -76,7 +76,7 @@ function Appearance() {
             onClick={() => setFontSize(Math.max(MIN_FONT_SIZE, fontSize - 1))}
             disabled={fontSize <= MIN_FONT_SIZE}
             aria-label="Decrease font size"
-            className="rounded border border-line px-2 py-0.5 text-xs text-ink-muted transition-colors hover:text-ink disabled:text-ink-ghost"
+            className="rounded-control border border-line px-2 py-0.5 text-xs text-ink-muted transition-colors hover:text-ink disabled:text-ink-ghost"
           >
             −
           </button>
@@ -86,7 +86,7 @@ function Appearance() {
             onClick={() => setFontSize(Math.min(MAX_FONT_SIZE, fontSize + 1))}
             disabled={fontSize >= MAX_FONT_SIZE}
             aria-label="Increase font size"
-            className="rounded border border-line px-2 py-0.5 text-xs text-ink-muted transition-colors hover:text-ink disabled:text-ink-ghost"
+            className="rounded-control border border-line px-2 py-0.5 text-xs text-ink-muted transition-colors hover:text-ink disabled:text-ink-ghost"
           >
             +
           </button>
@@ -172,8 +172,10 @@ function AccessPassword() {
           <button
             type="button"
             onClick={() => setForm(enabled ? "disable" : "set")}
-            className={`shrink-0 rounded px-2 py-1 text-xs font-medium transition-colors ${
-              enabled ? "border border-line text-ink-muted hover:text-ink" : "bg-blue-600 text-white hover:bg-blue-500"
+            className={`shrink-0 rounded-control px-2 py-1 text-xs font-medium transition-colors ${
+              enabled
+                ? "border border-line text-ink-muted hover:text-ink"
+                : "relief-accent text-white hover:bg-blue-500"
             }`}
           >
             {enabled ? "Turn off" : "Turn on"}
@@ -246,8 +248,8 @@ function AccessPassword() {
             <button
               type="submit"
               disabled={busy}
-              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium text-ink transition-colors disabled:bg-control disabled:text-ink-faint ${
-                form === "disable" ? "bg-red-600 hover:bg-red-500" : "bg-blue-600 hover:bg-blue-500"
+              className={`flex items-center gap-1.5 rounded-control px-2.5 py-1 text-xs font-medium text-ink transition-colors disabled:bg-control disabled:text-ink-faint ${
+                form === "disable" ? "relief-accent relief-danger" : "relief-accent"
               }`}
             >
               {busy && <span className="spinner spinner-sm" aria-hidden="true" />}
@@ -257,7 +259,7 @@ function AccessPassword() {
               type="button"
               onClick={reset}
               disabled={busy}
-              className="rounded border border-line px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
+              className="rounded-control border border-line px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
             >
               Cancel
             </button>
@@ -312,7 +314,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       ref={panelRef}
       role="dialog"
       aria-label="Settings"
-      className="absolute right-2 top-10 z-50 max-h-[min(26rem,calc(100vh-4rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-line bg-surface shadow-xl"
+      className="absolute right-2 top-10 z-50 max-h-[min(26rem,calc(100vh-4rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto glass rounded-panel"
     >
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <span className="text-xs font-medium text-ink-muted">Settings</span>
@@ -336,7 +338,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={logout}
-              className="rounded border border-line px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
+              className="rounded-control border border-line px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
             >
               Sign out
             </button>

@@ -36,7 +36,7 @@ function SystemInfoPopup({ onClose }: { onClose: () => void }) {
   return (
     <div
       ref={popupRef}
-      className="absolute right-2 top-10 z-50 bg-surface border border-line rounded-lg shadow-xl w-72 max-h-80 overflow-y-auto"
+      className="absolute right-2 top-10 z-50 bg-surface border border-line rounded-panel shadow-xl w-72 max-h-80 overflow-y-auto"
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-line">
         <span className="text-xs font-medium text-ink-muted">System Info</span>
@@ -89,12 +89,12 @@ export default function Header() {
         : "online";
 
   const triggerClass = (active: boolean) =>
-    `p-1 rounded transition-colors ${active ? "bg-hover text-ink" : "text-ink-faint hover:text-ink"}`;
+    `p-1 rounded-control transition-colors ${active ? "bg-hover text-ink" : "text-ink-faint hover:text-ink"}`;
 
   return (
-    <header className="safe-top flex items-center justify-between px-3 py-1.5 bg-app border-b border-line-soft shrink-0 relative">
+    <header className="bar-edge safe-top flex items-center justify-between px-3 py-1.5 bg-app border-b border-line-soft shrink-0 relative">
       <div className="flex items-center gap-2">
-        <img src="/logo-square.png" alt="OTG Code" className="w-6 h-6 rounded" />
+        <img src="/logo-square.png" alt="OTG Code" className="w-6 h-6 rounded-control" />
         <span className="text-ink font-bold text-sm">OTG Code</span>
         <span className="text-ink-faint text-[10px] font-mono">v{__APP_VERSION__}</span>
       </div>

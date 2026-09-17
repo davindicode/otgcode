@@ -130,11 +130,11 @@ function NotebookPreview({ content, fontSize }: { content: string; fontSize: num
   return (
     <div className="overflow-auto h-full bg-app p-4 space-y-3" style={{ fontSize: `${fontSize}px` }}>
       {cells.map((cell, i) => (
-        <div key={i} className="rounded border border-line overflow-hidden">
+        <div key={i} className="rounded-control border border-line overflow-hidden">
           {/* Cell header */}
           <div className="flex items-center gap-2 px-3 py-1 bg-surface text-xs text-ink-dim">
             <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+              className={`px-1.5 py-0.5 rounded-control text-[10px] font-medium ${
                 cell.cell_type === "code" ? "bg-blue-900/50 text-blue-300" : "bg-green-900/50 text-green-300"
               }`}
             >
@@ -222,11 +222,11 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
         </span>
         <CopyPathButton path={path} />
         <div className="flex items-center gap-1.5 shrink-0">
-          <div className="flex items-center bg-app rounded overflow-hidden border border-line">
+          <div className="flex items-center bg-app rounded-control overflow-hidden border border-line">
             <button
               onClick={() => setMode("edit")}
               className={`px-2 py-0.5 text-xs transition-colors ${
-                mode === "edit" ? "bg-blue-600 text-white" : "text-ink-dim hover:text-ink"
+                mode === "edit" ? "relief-accent text-white" : "text-ink-dim hover:text-ink"
               }`}
             >
               Edit
@@ -235,7 +235,7 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
               onClick={() => setMode("plain")}
               title="Plain text — easier selection & copy on mobile"
               className={`px-2 py-0.5 text-xs transition-colors ${
-                mode === "plain" ? "bg-blue-600 text-white" : "text-ink-dim hover:text-ink"
+                mode === "plain" ? "relief-accent text-white" : "text-ink-dim hover:text-ink"
               }`}
             >
               Plain
@@ -244,7 +244,7 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
               <button
                 onClick={() => setMode("preview")}
                 className={`px-2 py-0.5 text-xs transition-colors ${
-                  mode === "preview" ? "bg-blue-600 text-white" : "text-ink-dim hover:text-ink"
+                  mode === "preview" ? "relief-accent text-white" : "text-ink-dim hover:text-ink"
                 }`}
               >
                 Preview
@@ -253,7 +253,7 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
           </div>
           {/* Font size / Zoom controls */}
           {isHtml && mode === "preview" ? (
-            <div className="flex items-center gap-1 border border-line rounded overflow-hidden">
+            <div className="flex items-center gap-1 border border-line rounded-control overflow-hidden">
               <button
                 onClick={() => setHtmlZoom((z) => Math.max(25, z - 25))}
                 className="px-2 py-0.5 text-xs text-ink-dim hover:text-ink hover:bg-control"
@@ -274,7 +274,7 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
               </button>
             </div>
           ) : (
-            <div className="flex items-center border border-line rounded overflow-hidden">
+            <div className="flex items-center border border-line rounded-control overflow-hidden">
               <button
                 onClick={() => setEditorFontSize((s) => Math.max(6, s - 1))}
                 className="px-1.5 py-0.5 text-ink-dim hover:text-ink hover:bg-control transition-colors leading-none"
@@ -293,7 +293,7 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
             download
-            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
+            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
             title="Download"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -308,7 +308,7 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
           <button
             onClick={handleSave}
             disabled={!dirty}
-            className="p-1 bg-blue-600 hover:bg-blue-700 disabled:bg-control disabled:text-ink-faint text-white rounded transition-colors"
+            className="p-1 relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
             title="Save"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -320,11 +320,7 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 3v4h-4M7 17h10M7 13h10" />
             </svg>
           </button>
-          <button
-            onClick={onClose}
-            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
-            title="Close"
-          >
+          <button onClick={onClose} className="relief p-1 text-ink-muted hover:text-ink rounded-control" title="Close">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>

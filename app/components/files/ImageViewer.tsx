@@ -84,7 +84,7 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
           {isGif && (
             <button
               onClick={() => setReplayKey((k) => k + 1)}
-              className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
+              className="relief p-1 text-ink-muted hover:text-ink rounded-control"
               title="Replay GIF"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -94,7 +94,7 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
             </button>
           )}
           {/* Zoom controls */}
-          <div className="flex items-center gap-1 border border-line rounded overflow-hidden">
+          <div className="flex items-center gap-1 border border-line rounded-control overflow-hidden">
             <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-ink-dim hover:text-ink hover:bg-control">
               -
             </button>
@@ -111,7 +111,7 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
             download
-            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
+            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
             title="Download"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -122,11 +122,7 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
               />
             </svg>
           </a>
-          <button
-            onClick={onClose}
-            className="p-1 bg-control hover:bg-control-hover text-ink-muted hover:text-ink rounded transition-colors"
-            title="Close"
-          >
+          <button onClick={onClose} className="relief p-1 text-ink-muted hover:text-ink rounded-control" title="Close">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>

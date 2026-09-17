@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Visual pass: a material system.** Controls now carry a subtle vertical
+  gradient, a 1px lit top edge and a tight drop shadow, with a real pressed
+  state that flips the light inward — the tactile quality of claymorphism at
+  developer-tool density, without the padding and deep shadows that would bury
+  a terminal and a file tree. Overlays that float above content (menus,
+  popups, dialogs, toasts, the lock screen) are frosted glass; list rows and
+  the terminal stay flat, since `backdrop-filter` over a canvas costs a lot
+  and buys nothing. Adds a two-step radius scale (6px controls, 10px panels)
+  in place of 81 bare `rounded` next to 12 `rounded-lg`, and replaces the
+  global 7% press-squash with 3% for plain elements and none for controls that
+  now depress on their own.
+
 ### Added
 - File explorer **Move** — a Move item in each entry's menu turns the explorer
   into a destination picker: the toolbar's controls are replaced by "Move to

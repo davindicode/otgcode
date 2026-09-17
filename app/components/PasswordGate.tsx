@@ -41,12 +41,9 @@ export default function PasswordGate() {
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-app px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-xs rounded-xl border border-line/70 bg-surface p-6 shadow-2xl"
-      >
+      <form onSubmit={handleSubmit} className="w-full max-w-xs glass rounded-panel p-6">
         <div className="flex flex-col items-center gap-3">
-          <img src="/logo-square.png" alt="" className="h-10 w-10 rounded" />
+          <img src="/logo-square.png" alt="" className="h-10 w-10 rounded-control" />
           <div className="text-center">
             <h1 className="text-sm font-semibold text-ink">OTG Code is locked</h1>
             <p className="mt-1 text-[11px] text-ink-faint">
@@ -68,7 +65,7 @@ export default function PasswordGate() {
           autoComplete="current-password"
           placeholder="Password"
           disabled={busy}
-          className="mt-5 w-full rounded border border-line bg-app px-3 py-2 text-sm text-ink placeholder:text-ink-ghost focus:border-blue-500 focus:outline-none disabled:opacity-50"
+          className="mt-5 w-full rounded-control border border-line bg-app px-3 py-2 text-sm text-ink placeholder:text-ink-ghost focus:border-blue-500 focus:outline-none disabled:opacity-50"
         />
 
         {error && (
@@ -80,7 +77,7 @@ export default function PasswordGate() {
         <button
           type="submit"
           disabled={busy || !password}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:bg-control disabled:text-ink-faint"
+          className="mt-4 flex w-full items-center justify-center gap-2 relief-accent rounded-control px-3 py-2 text-sm font-medium text-white disabled:bg-control disabled:text-ink-faint"
         >
           {busy && <span className="spinner spinner-sm" aria-hidden="true" />}
           {busy ? "Unlocking..." : "Unlock"}

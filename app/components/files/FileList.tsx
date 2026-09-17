@@ -273,7 +273,7 @@ export default function FileList({
                       />
                     </svg>
                   ) : (
-                    <span className="block w-4 h-4 rounded border border-line-strong" />
+                    <span className="block w-4 h-4 rounded-control border border-line-strong" />
                   )}
                 </button>
               ) : (
@@ -358,7 +358,7 @@ export default function FileList({
       {menu && (
         <div
           ref={menuRef}
-          className="absolute z-50 bg-popover border border-line-strong rounded-lg shadow-xl py-1 min-w-[160px]"
+          className="absolute z-50 glass rounded-panel py-1 min-w-[160px]"
           style={{
             left: menuStyle.left,
             top: menuStyle.top,
