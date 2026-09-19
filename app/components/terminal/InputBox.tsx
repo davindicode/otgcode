@@ -454,7 +454,7 @@ export default function InputBox() {
   // Long-press repeat with scroll detection
   const repeatRef = useRef<{
     timeout: ReturnType<typeof setTimeout>;
-    interval: ReturnType<typeof setInterval>;
+    interval: ReturnType<typeof setInterval> | null;
     fired: boolean;
     startX: number;
     startY: number;
@@ -469,7 +469,7 @@ export default function InputBox() {
         const interval = setInterval(() => handleQuickKey(key), 80);
         if (repeatRef.current) repeatRef.current.interval = interval;
       }, 120);
-      repeatRef.current = { timeout, interval: null as any, fired: false, startX: x, startY: y };
+      repeatRef.current = { timeout, interval: null, fired: false, startX: x, startY: y };
     },
     [handleQuickKey],
   );
@@ -477,7 +477,8 @@ export default function InputBox() {
   const cancelRepeat = useCallback(() => {
     if (repeatRef.current) {
       clearTimeout(repeatRef.current.timeout);
-      clearInterval(repeatRef.current.interval);
+      // null until the hold actually starts repeating.
+      if (repeatRef.current.interval) clearInterval(repeatRef.current.interval);
       repeatRef.current = null;
     }
   }, []);
@@ -534,7 +535,6 @@ export default function InputBox() {
     if (activeGroup !== CD_TAB) return;
     setCdDirs([]);
     if (activeSessionId) fetchDirs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId]);
 
   const toggleGroup = (id: string) => {

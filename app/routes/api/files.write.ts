@@ -1,4 +1,5 @@
 import { writeFile } from "fs/promises";
+import { errorMessage } from "~/lib/errors";
 import type { Route } from "./+types/files.write";
 
 export async function action({ request }: Route.ActionArgs) {
@@ -16,7 +17,7 @@ export async function action({ request }: Route.ActionArgs) {
   try {
     await writeFile(filePath, content, "utf-8");
     return Response.json({ success: true, path: filePath });
-  } catch (err: any) {
-    return Response.json({ error: err.message }, { status: 400 });
+  } catch (err: unknown) {
+    return Response.json({ error: errorMessage(err) }, { status: 400 });
   }
 }

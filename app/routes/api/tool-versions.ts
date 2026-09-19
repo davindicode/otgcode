@@ -5,9 +5,10 @@ import type { Route } from "./+types/tool-versions";
 function run(cmd: string): string | null {
   try {
     return execSync(cmd, { encoding: "utf-8", timeout: 2000, stdio: ["ignore", "pipe", "pipe"] }).trim();
-  } catch (err: any) {
-    // Some commands write to stderr or exit non-zero but still have output
-    return err?.stdout?.trim() || err?.stderr?.trim() || null;
+  } catch (err: unknown) {
+    // Some commands write to stderr or exit non-zero but still have output.
+    const failure = err as { stdout?: string; stderr?: string };
+    return failure.stdout?.trim() || failure.stderr?.trim() || null;
   }
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { formatSize } from "~/lib/format";
 import type { FileEntry } from "~/stores/fileStore";
 
 interface UploadFile {
@@ -28,13 +29,6 @@ interface FileListProps {
   uploadQueue?: UploadFile[];
   cancelUpload?: (index: number) => void;
   disabled?: boolean;
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
 }
 
 interface ContextMenuState {

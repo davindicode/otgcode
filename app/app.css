@@ -36,11 +36,8 @@
   --t-control: #374151;     /* neutral button */
   --t-control-hover: #4b5563;
 
-  --t-tab-action: #1a1e2e;  /* blue-tinted terminal action tabs */
   --t-tab-action-on: #1a2a3e;
-  --t-tab-cli: #241a33;     /* purple-tinted CLI-tool tabs */
   --t-tab-cli-on: #35204d;
-  --t-tab-app: #1a2e1e;     /* green-tinted program tabs */
   --t-tab-app-on: #1a3e2a;
   --t-tab-action-ink: #93c5fd;
   --t-tab-action-ink-on: #d8ecff;
@@ -120,11 +117,8 @@ html.light {
   --t-control: #d8dde8;
   --t-control-hover: #cad0de;
 
-  --t-tab-action: #e8eefb;
   --t-tab-action-on: #cfe0fb;
-  --t-tab-cli: #f1eafb;
   --t-tab-cli-on: #e2d2f8;
-  --t-tab-app: #e9f5ea;
   --t-tab-app-on: #cfead6;
   --t-tab-action-ink: #1d4ed8;
   --t-tab-action-ink-on: #1035a6;
@@ -192,11 +186,8 @@ html.light {
   --color-control: var(--t-control);
   --color-control-hover: var(--t-control-hover);
 
-  --color-tab-action: var(--t-tab-action);
   --color-tab-action-on: var(--t-tab-action-on);
-  --color-tab-app: var(--t-tab-app);
   --color-tab-app-on: var(--t-tab-app-on);
-  --color-tab-cli: var(--t-tab-cli);
   --color-tab-cli-on: var(--t-tab-cli-on);
   --color-tab-action-ink: var(--t-tab-action-ink);
   --color-tab-action-ink-on: var(--t-tab-action-ink-on);
@@ -270,13 +261,6 @@ body {
   background: var(--t-scrollbar-hover);
 }
 
-/* Bottom safe area — matters once the app is installed to a home screen and
-   the web view runs edge-to-edge behind the home indicator. The top inset is
-   handled by .app-shell. */
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
 /* Loading spinner */
 .spinner {
   width: 32px;
@@ -296,27 +280,6 @@ body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-/* Resizable panel dividers — wide touch target, thin visible line */
-.divider-handle {
-  width: 12px;
-  cursor: col-resize;
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  touch-action: none;
-}
-
-.divider-handle:hover .divider-line,
-.divider-handle:active .divider-line {
-  background: var(--t-accent);
-}
-
-.divider-line {
-  width: 2px;
-  background: var(--t-line);
-  transition: background 0.15s;
 }
 
 /* Hide scrollbar for breadcrumb bar */
@@ -542,12 +505,6 @@ button:disabled {
 .glass-danger {
   background-color: color-mix(in oklab, #b91c1c 72%, var(--t-glass-bg));
   border-color: color-mix(in oklab, #ef4444 55%, transparent);
-}
-
-/* The selected tab catches the same top light as a raised control, so it
-   reads as the front-most layer rather than just a differently-filled cell. */
-.tab-active {
-  box-shadow: inset 0 1px 0 var(--t-ctl-edge);
 }
 
 /* Stacked bars (header, toolbars, tab strips) get a hairline lit top edge so

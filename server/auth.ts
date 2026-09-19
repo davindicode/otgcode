@@ -69,11 +69,6 @@ export function saveConfig(next: AuthConfig): void {
   cached = next;
 }
 
-/** Drop the in-memory copy so the next read comes from disk (tests). */
-export function resetConfigCache(): void {
-  cached = null;
-}
-
 export function isPasswordEnabled(): boolean {
   const config = loadConfig();
   return config.passwordEnabled && !!config.passwordHash;

@@ -99,6 +99,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ASCII spinner frames when the locale doesn't advertise UTF-8.
 
 ### Fixed
+- Stopping the server with Ctrl+C now shuts the Cloudflare tunnel down.
+  `start.sh` pkilled cloudflared on exit, but running the server directly
+  (`pnpm start:tunnel`) left the tunnel process alive.
+- File sizes are formatted consistently — three copies of the helper had
+  drifted, so the same file could show "1.5 kB" in a viewer and "1.5 KB" in
+  the explorer, and the viewer's copy stopped at MB.
 - Terminal tabs show a terminal icon instead of a connection dot, and file
   tabs show an icon for what they hold (image, video, audio, PDF, text). The
   dot restated what the connecting gate already says, and left the terminal as

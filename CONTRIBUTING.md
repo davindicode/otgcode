@@ -81,7 +81,7 @@ time, so bumping `package.json` is enough to update it.
 
 ```
 app/                  React Router (SSR) frontend
-  components/         UI — browser/, files/, terminal/
+  components/         UI — shell, tab bar, browser/, files/, terminal/
   routes/             routes + routes/api/ (file ops, tmux, system info)
   stores/             Zustand stores
   lib/                shared client helpers (clipboard, socket, constants)

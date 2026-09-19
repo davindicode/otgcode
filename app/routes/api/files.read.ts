@@ -1,5 +1,6 @@
 import { readFile, stat } from "fs/promises";
 import { lookup } from "mime-types";
+import { errorMessage } from "~/lib/errors";
 import type { Route } from "./+types/files.read";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -30,7 +31,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
 
     return Response.json({ error: "File too large for text preview", size: stats.size, mimeType }, { status: 413 });
-  } catch (err: any) {
-    return Response.json({ error: err.message }, { status: 400 });
+  } catch (err: unknown) {
+    return Response.json({ error: errorMessage(err) }, { status: 400 });
   }
 }

@@ -1,4 +1,5 @@
 import { mkdir } from "fs/promises";
+import { errorMessage } from "~/lib/errors";
 import type { Route } from "./+types/files.mkdir";
 
 export async function action({ request }: Route.ActionArgs) {
@@ -14,7 +15,7 @@ export async function action({ request }: Route.ActionArgs) {
   try {
     await mkdir(dirPath, { recursive: true });
     return Response.json({ success: true });
-  } catch (err: any) {
-    return Response.json({ error: err.message }, { status: 400 });
+  } catch (err: unknown) {
+    return Response.json({ error: errorMessage(err) }, { status: 400 });
   }
 }

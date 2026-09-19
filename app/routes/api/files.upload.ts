@@ -1,5 +1,6 @@
 import { writeFile } from "fs/promises";
 import { join } from "path";
+import { errorMessage } from "~/lib/errors";
 import type { Route } from "./+types/files.upload";
 
 export async function action({ request }: Route.ActionArgs) {
@@ -20,7 +21,7 @@ export async function action({ request }: Route.ActionArgs) {
     const dest = join(dir, file.name);
     await writeFile(dest, buffer);
     return Response.json({ success: true, path: dest });
-  } catch (err: any) {
-    return Response.json({ error: err.message }, { status: 400 });
+  } catch (err: unknown) {
+    return Response.json({ error: errorMessage(err) }, { status: 400 });
   }
 }

@@ -208,18 +208,10 @@ async function runTunnelAttempts(port: number, progress: Progress): Promise<stri
   return null;
 }
 
-export function getMainTunnelUrl(): string | null {
-  return mainTunnelUrl;
-}
-
 export function stopTunnel(): void {
   if (mainTunnelProcess) {
     mainTunnelProcess.kill();
     mainTunnelProcess = null;
     mainTunnelUrl = null;
   }
-}
-
-export function stopAllTunnels(): void {
-  stopTunnel();
 }

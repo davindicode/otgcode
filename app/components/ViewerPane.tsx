@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isDirectViewerFile } from "~/lib/fileTypes";
+import { formatSize } from "~/lib/format";
 import { useTabsStore } from "~/stores/tabsStore";
 import { useToastStore } from "~/stores/toastStore";
 import FileViewer from "./files/FileViewer";
 
 type Load = { status: "loading" } | { status: "ready"; content: string | null } | { status: "error"; message: string };
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} kB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 /**
  * A viewer tab: one file, opened from an explorer. Owns the fetch that used to

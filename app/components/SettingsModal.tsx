@@ -339,7 +339,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
 
         <Section
           title="Access password"
-          description="Require a password before the terminal, files and browser panels load. Off by default."
+          description="Require a password before anything loads — terminal, files, and the localhost proxy. Off by default."
         >
           <AccessPassword />
         </Section>

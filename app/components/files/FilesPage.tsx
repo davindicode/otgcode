@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { copyText } from "~/lib/clipboard";
+import { errorMessage } from "~/lib/errors";
+import { formatSize } from "~/lib/format";
 import { type FileEntry, type FileSession, useFileStore } from "~/stores/fileStore";
 import { useTabsStore } from "~/stores/tabsStore";
 import { useToastStore } from "~/stores/toastStore";
 import Breadcrumbs from "./Breadcrumbs";
 import FileList from "./FileList";
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
-}
 
 type Dialog =
   | { type: "newFolder" }
@@ -47,8 +42,8 @@ function FileSessionView({ session }: { session: FileSession }) {
         }
         patch({ cwd: data.dir, entries: data.entries, error: null, loading: false });
         return null;
-      } catch (err: any) {
-        const message = err?.message || "Failed to load directory";
+      } catch (err: unknown) {
+        const message = errorMessage(err, "Failed to load directory");
         patch({ error: message, loading: false });
         return message;
       }
@@ -237,8 +232,8 @@ function FileSessionView({ session }: { session: FileSession }) {
       const data = await res.json();
       if (data.error) patch({ error: data.error });
       else await loadDirectory(cwd);
-    } catch (err: any) {
-      patch({ error: err.message });
+    } catch (err: unknown) {
+      patch({ error: errorMessage(err) });
     }
     setDialog(null);
   };
@@ -259,8 +254,8 @@ function FileSessionView({ session }: { session: FileSession }) {
       const data = await res.json();
       if (data.error) patch({ error: data.error });
       else await loadDirectory(cwd);
-    } catch (err: any) {
-      patch({ error: err.message });
+    } catch (err: unknown) {
+      patch({ error: errorMessage(err) });
     }
     setDialog(null);
   };
@@ -277,8 +272,8 @@ function FileSessionView({ session }: { session: FileSession }) {
       const data = await res.json();
       if (data.error) patch({ error: data.error });
       else await loadDirectory(cwd);
-    } catch (err: any) {
-      patch({ error: err.message });
+    } catch (err: unknown) {
+      patch({ error: errorMessage(err) });
     }
     setDialog(null);
   };
@@ -331,8 +326,8 @@ function FileSessionView({ session }: { session: FileSession }) {
       const data = await res.json();
       if (data.error) patch({ error: data.error });
       else await loadDirectory(cwd);
-    } catch (err: any) {
-      patch({ error: err.message });
+    } catch (err: unknown) {
+      patch({ error: errorMessage(err) });
     }
     setDialog(null);
   };
@@ -539,8 +534,9 @@ function FileSessionView({ session }: { session: FileSession }) {
       } else {
         setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "done", progress: 100 } : f)));
       }
-    } catch (err: any) {
-      setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "error", error: err.message } : f)));
+    } catch (err: unknown) {
+      const message = errorMessage(err, "Upload failed");
+      setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "error", error: message } : f)));
     }
   };
 

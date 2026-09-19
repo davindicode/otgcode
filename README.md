@@ -75,7 +75,7 @@ Install it to a home screen and it runs standalone like a native app; the layout
   - **Audio Player** — mp3, wav, ogg, flac, aac, m4a
 
 ### Security
-- **Optional access password** — off by default; turn it on from the Settings cog in the header to require a login before the terminal, files and browser panels load
+- **Optional access password** — off by default; turn it on from the Settings cog in the header to require a login before anything loads
 - Enforced on the server for every request, the localhost proxy (HTTP + WebSocket) and the Socket.IO handshake — not just the UI
 - Salted **scrypt** hash stored in `~/.otgcode/config.json` (mode 600); sessions are signed HttpOnly cookies, and changing or removing the password signs every device out
 - Failed logins back off exponentially rather than locking out, so a stranger with the URL can't deny you access to your own machine

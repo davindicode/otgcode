@@ -40,8 +40,3 @@ export function saveWorkspace(patch: unknown): Workspace {
   }
   return next;
 }
-
-/** Drop the in-memory copy (tests). */
-export function resetWorkspaceCache(): void {
-  cached = null;
-}

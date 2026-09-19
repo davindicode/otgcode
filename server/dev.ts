@@ -177,8 +177,8 @@ async function main() {
       });
 
       writeNext();
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Upload failed" });
     }
   });
 
@@ -218,10 +218,11 @@ async function main() {
   });
 
   // Global error handler
-  app.use((err: any, _req: any, res: any, _next: any) => {
-    console.error("SSR error:", err.message);
+  app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const failure = err instanceof Error ? err : new Error(String(err));
+    console.error("SSR error:", failure.message);
     if (!res.headersSent) {
-      res.status(500).send(`<pre style="color:red">${err.stack || err.message}</pre>`);
+      res.status(500).send(`<pre style="color:red">${failure.stack || failure.message}</pre>`);
     }
   });
 

@@ -1,5 +1,6 @@
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
+import { errorMessage } from "~/lib/errors";
 import type { Route } from "./+types/files.list";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -35,7 +36,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     });
 
     return Response.json({ dir, entries: results });
-  } catch (err: any) {
-    return Response.json({ error: err.message }, { status: 400 });
+  } catch (err: unknown) {
+    return Response.json({ error: errorMessage(err) }, { status: 400 });
   }
 }

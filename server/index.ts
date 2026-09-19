@@ -13,7 +13,7 @@ import { authGate, gateSocketIO, mountAuthRoutes } from "./auth-routes.js";
 import { dim, localAddresses } from "./cli.js";
 import { mountProxy } from "./proxy.js";
 import { registerSocketHandlers } from "./socket-handlers.js";
-import { startTunnel } from "./tunnel.js";
+import { startTunnel, stopTunnel } from "./tunnel.js";
 
 const PORT = parseInt(process.env.OTG_PORT || "7777", 10);
 const useTunnel = process.argv.includes("--tunnel");
@@ -224,8 +224,8 @@ async function main() {
       });
 
       writeNext();
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Upload failed" });
     }
   });
 
@@ -297,9 +297,10 @@ async function main() {
   // URL" — on a public tunnel that's constant bot/scanner noise (probes for
   // /test.cgi, /whois.cgi, etc.), not real errors. Respond 404 quietly instead
   // of letting Express log a full stack trace for each. Real errors still log.
-  app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const status = err?.status ?? err?.statusCode;
-    if (status === 404 || /No route matches URL/.test(err?.message ?? "")) {
+  app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const failure = err as { status?: number; statusCode?: number; message?: string } | null;
+    const status = failure?.status ?? failure?.statusCode;
+    if (status === 404 || /No route matches URL/.test(failure?.message ?? "")) {
       if (!res.headersSent) res.status(404).end();
       return;
     }
@@ -326,6 +327,22 @@ async function main() {
   });
 
   if (useTunnel) {
+    // cloudflared is a child process, and Node does not take children with it
+    // on exit. start.sh pkills them, but running the server directly (pnpm
+    // start:tunnel) would otherwise leave the tunnel alive after Ctrl+C.
+    const shutdown = (signal: NodeJS.Signals) => {
+      stopTunnel();
+      process.kill(process.pid, signal);
+    };
+    process.once("SIGINT", () => {
+      process.removeAllListeners("SIGINT");
+      shutdown("SIGINT");
+    });
+    process.once("SIGTERM", () => {
+      process.removeAllListeners("SIGTERM");
+      shutdown("SIGTERM");
+    });
+
     await startTunnel(PORT);
   }
 }
