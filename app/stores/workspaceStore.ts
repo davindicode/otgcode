@@ -71,6 +71,29 @@ if (typeof window !== "undefined") {
   });
 }
 
+// Matches the .theme-transition duration in app.css.
+const THEME_FADE_MS = 260;
+let fadeTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Swap the theme behind a short cross-fade. The transition class only lives
+ * for the length of the swap — leaving it on would delay every hover and
+ * active state in the app by the same amount.
+ */
+function applyTheme(theme: Theme): void {
+  const root = document.documentElement;
+  root.classList.add("theme-transition");
+  root.classList.toggle("light", theme === "light");
+  root.classList.toggle("dark", theme === "dark");
+
+  // Re-toggling mid-fade restarts the window rather than cutting it short.
+  if (fadeTimer) clearTimeout(fadeTimer);
+  fadeTimer = setTimeout(() => {
+    root.classList.remove("theme-transition");
+    fadeTimer = null;
+  }, THEME_FADE_MS);
+}
+
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   loaded: false,
   theme: "dark",
@@ -101,8 +124,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   setTheme: (theme) => {
     set({ theme });
-    document.documentElement.classList.toggle("light", theme === "light");
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    applyTheme(theme);
     queue({ theme });
   },
 

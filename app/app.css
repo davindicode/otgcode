@@ -563,6 +563,39 @@ button:disabled {
   }
 }
 
+/* Theme cross-fade.
+
+   Custom properties don't interpolate, so a theme swap is instant unless the
+   properties that read them are transitioning. This class is added to <html>
+   for the length of the swap and then removed: applying it permanently would
+   put a 260ms lag on every hover and active state in the app.
+
+   Canvas-rendered surfaces (the terminal, the code editor) repaint their own
+   colours and cannot take part, so they switch instantly regardless. */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition:
+    background-color 260ms ease,
+    border-color 260ms ease,
+    color 260ms ease,
+    fill 260ms ease,
+    stroke 260ms ease,
+    box-shadow 260ms ease,
+    text-shadow 260ms ease !important;
+  transition-delay: 0s !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-transition,
+  .theme-transition *,
+  .theme-transition *::before,
+  .theme-transition *::after {
+    transition: none !important;
+  }
+}
+
 /* Text inputs. One definition so every field in the app -- settings, dialogs,
    the port box, the terminal's own input -- shares a surface, a border and a
    focus ring. Call sites keep only their sizing and layout classes. */

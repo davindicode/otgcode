@@ -58,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The terminal's text field sits evenly between the tab strip and the nav
   keys, and grows to three lines before scrolling inside itself — with no
   scrollbar, since the field visibly growing already says there is more.
+- Switching theme cross-fades over 260ms instead of snapping. Canvas-rendered
+  surfaces (terminal, code editor) still change instantly — they repaint their
+  own colours and can't take part in a CSS transition.
 - Input drawers slide open and closed instead of snapping, animating to each
   drawer's own height.
 - The "Ctrl+" tab is now **combos** — it sends any modifier combination, not
