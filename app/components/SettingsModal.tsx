@@ -17,8 +17,7 @@ function Section({ title, description, children }: { title: string; description:
   );
 }
 
-const inputClass =
-  "w-full rounded-control border border-line bg-app px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-ghost focus:border-blue-500 focus:outline-none disabled:opacity-50";
+const inputClass = "field w-full px-2.5 py-1.5 text-xs";
 
 function FontRow({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
   const step = (delta: number) => onChange(Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, value + delta)));

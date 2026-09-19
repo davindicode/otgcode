@@ -65,7 +65,7 @@ export default function PasswordGate() {
           autoComplete="current-password"
           placeholder="Password"
           disabled={busy}
-          className="mt-5 w-full rounded-control border border-line bg-app px-3 py-2 text-sm text-ink placeholder:text-ink-ghost focus:border-blue-500 focus:outline-none disabled:opacity-50"
+          className="field mt-5 w-full px-3 py-2 text-sm"
         />
 
         {error && (

@@ -710,7 +710,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && confirmNewFolder()}
                   placeholder="Folder name"
-                  className="w-full bg-app text-ink border border-line-strong rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
+                  className="field mb-3 w-full px-3 py-2 text-sm"
                 />
                 <div className="flex justify-end gap-2">
                   <button
@@ -738,7 +738,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && confirmNewFile()}
                   placeholder="File name"
-                  className="w-full bg-app text-ink border border-line-strong rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
+                  className="field mb-3 w-full px-3 py-2 text-sm"
                 />
                 <div className="flex justify-end gap-2">
                   <button
@@ -765,7 +765,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && confirmRename()}
-                  className="w-full bg-app text-ink border border-line-strong rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
+                  className="field mb-3 w-full px-3 py-2 text-sm"
                 />
                 <div className="flex justify-end gap-2">
                   <button

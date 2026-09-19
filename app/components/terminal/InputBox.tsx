@@ -298,8 +298,7 @@ function AddCommandDialog({
     onClose();
   };
 
-  const field =
-    "w-full rounded-control border border-line bg-raised px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-ghost focus:border-blue-500 focus:outline-none";
+  const field = "field w-full px-2.5 py-1.5 text-xs";
 
   return createPortal(
     <div className="scrim fixed inset-0 z-[160] flex items-center justify-center px-4">
@@ -996,7 +995,7 @@ export default function InputBox() {
                     onChange={(e) => setEditorFileName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("nano")}
                     placeholder="filename or path..."
-                    className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="field flex-1 px-2 py-1 text-[11px]"
                   />
                   <button
                     onClick={() => handleOpenEditor("nano")}
@@ -1058,7 +1057,7 @@ export default function InputBox() {
                     onChange={(e) => setEditorFileName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("vim")}
                     placeholder="filename or path..."
-                    className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="field flex-1 px-2 py-1 text-[11px]"
                   />
                   <button
                     onClick={() => handleOpenEditor("vim")}
@@ -1151,7 +1150,7 @@ export default function InputBox() {
                       onChange={(e) => setTmuxNewName(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleTmuxNew()}
                       placeholder="New session name..."
-                      className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="field flex-1 px-2 py-1 text-[11px]"
                     />
                     <button
                       onClick={handleTmuxNew}
@@ -1311,7 +1310,7 @@ export default function InputBox() {
                     }
                   }}
                   placeholder="commit message..."
-                  className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+                  className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
                 />
                 <button
                   onClick={() => {
@@ -1334,13 +1333,13 @@ export default function InputBox() {
                   value={gitConfigName}
                   onChange={(e) => setGitConfigName(e.target.value)}
                   placeholder="user.name"
-                  className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+                  className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
                 />
                 <input
                   value={gitConfigEmail}
                   onChange={(e) => setGitConfigEmail(e.target.value)}
                   placeholder="user.email"
-                  className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+                  className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
                 />
                 <button
                   onClick={() => {
@@ -1370,7 +1369,7 @@ export default function InputBox() {
                   onChange={handleInput}
                   placeholder="Type anything... (Enter for newline)"
                   rows={1}
-                  className="flex-1 bg-raised text-ink border border-line-strong rounded-panel px-3 py-2 text-[16px] leading-5 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="field flex-1 resize-none rounded-panel px-3 py-2 text-[16px] leading-5"
                   style={{ maxHeight: 120 }}
                 />
                 <button

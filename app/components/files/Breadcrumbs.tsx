@@ -66,7 +66,7 @@ export default function Breadcrumbs({ path, onNavigate, onGoUp, canGoUp, disable
             if (e.key === "Enter") handleTextSubmit();
             if (e.key === "Escape") setTextMode(false);
           }}
-          className="flex-1 bg-app text-ink text-sm px-2 py-1 mr-1 rounded-control border border-line-strong focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+          className="field mr-1 flex-1 px-2 py-1 font-mono text-sm"
         />
       ) : (
         <div

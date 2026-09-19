@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Modal backdrops are frosted glass rather than a flat dim wash — the
   connecting gate, confirm dialogs and the add-command dialog all share one
   scrim.
+- Every text input in the app — settings, dialogs, the localhost port box, the
+  terminal's own input — shares one definition, replacing seven near-duplicate
+  styles that had drifted apart in surface, border and focus ring. Rejected
+  input (a blocked port) now shows it on the field itself rather than only in
+  the message beside it.
+- The localhost popup's add button matches the tab strip's +.
 - Tab strip picks up the same raised treatment as the rest of the controls:
   the + is a proper button and the active tab reads as lifted.
 - Input group tabs are coloured by sector, so the strip reads at a glance:

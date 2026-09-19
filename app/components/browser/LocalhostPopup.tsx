@@ -180,24 +180,22 @@ function AddPortRow() {
 
   return (
     <div className="flex items-center gap-2 px-1 py-1">
-      <span className="text-sm text-ink-faint shrink-0">localhost:</span>
+      <span className="shrink-0 text-xs text-ink-faint">localhost:</span>
       <input
         type="text"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && handleAdd()}
         placeholder="port"
-        className={`w-20 bg-raised text-ink border rounded-control px-2 py-1 text-sm focus:outline-none focus:ring-1 ${
-          blocked ? "border-red-500 focus:ring-red-500" : "border-line-strong focus:ring-blue-500"
-        }`}
+        className={`field w-20 px-2 py-1 text-sm ${blocked ? "field-invalid" : ""}`}
       />
       <button
         onClick={handleAdd}
         disabled={!canAdd}
-        className="p-1 text-ink-dim hover:text-ink disabled:text-ink-ghost transition-colors shrink-0"
+        className="relief shrink-0 rounded-control p-1.5 text-ink-dim hover:text-ink"
         title="Add port"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
       </button>

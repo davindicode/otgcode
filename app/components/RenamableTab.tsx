@@ -76,7 +76,7 @@ export default function RenamableTab({
           }}
           onBlur={commit}
           onClick={(e) => e.stopPropagation()}
-          className="bg-app text-ink text-xs border border-line-strong rounded-control px-1 py-0.5 w-20 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="field w-20 px-1 py-0.5 text-xs"
         />
       ) : (
         <span className="truncate max-w-[80px]">{name}</span>
