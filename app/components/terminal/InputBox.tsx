@@ -225,6 +225,10 @@ const GIT_QUICK_CMDS: { label: string; title: string; command: string }[] = [
 // Matches the .drawer transition in app.css.
 const DRAWER_MS = 280;
 
+// Grow to three lines, then scroll inside the field: 3 × leading-5, plus the
+// field's py-2 and its 1px borders.
+const TEXTAREA_MAX_PX = 3 * 20 + 16 + 2;
+
 const TEXT_TAB = "__text__";
 const STICKY_TAB = "__sticky__";
 const TMUX_TAB = "__tmux__";
@@ -432,7 +436,7 @@ export default function InputBox() {
     setText(e.target.value);
     const ta = e.target;
     ta.style.height = "auto";
-    ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+    ta.style.height = `${Math.min(ta.scrollHeight, TEXTAREA_MAX_PX)}px`;
   };
 
   const handleQuickKey = useCallback(
@@ -1362,15 +1366,15 @@ export default function InputBox() {
           an unselected input area collapses to just the tab strip. */}
           {drawerGroup === TEXT_TAB && (
             <>
-              <div className="flex gap-2 px-2 pt-2 pb-1">
+              <div className="flex gap-2 px-2 py-2">
                 <textarea
                   ref={textareaRef}
                   value={text}
                   onChange={handleInput}
                   placeholder="Type anything... (Enter for newline)"
                   rows={1}
-                  className="field flex-1 resize-none rounded-panel px-3 py-2 text-[16px] leading-5"
-                  style={{ maxHeight: 120 }}
+                  className="field scrollbar-none flex-1 resize-none rounded-panel px-3 py-2 text-[16px] leading-5"
+                  style={{ maxHeight: TEXTAREA_MAX_PX }}
                 />
                 <button
                   onClick={handleSend}
@@ -1382,7 +1386,7 @@ export default function InputBox() {
               </div>
 
               {/* Nav keys travel with the text input. */}
-              <div className="flex items-center gap-1 px-2 pb-1.5 overflow-x-auto scrollbar-none">
+              <div className="flex items-center gap-1 px-2 pt-1 pb-2 overflow-x-auto scrollbar-none">
                 {NAV_KEYS.map((qk) => (
                   <button
                     key={qk.label}

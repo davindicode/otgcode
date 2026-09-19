@@ -55,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The terminal input is a tab group, not a pinned row.** "text" joins cmds,
   cd, combos and the rest; with no group selected the input area collapses to
   just the tab strip, giving the terminal the full pane.
+- The terminal's text field sits evenly between the tab strip and the nav
+  keys, and grows to three lines before scrolling inside itself — with no
+  scrollbar, since the field visibly growing already says there is more.
 - Input drawers slide open and closed instead of snapping, animating to each
   drawer's own height.
 - The "Ctrl+" tab is now **combos** — it sends any modifier combination, not
