@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   emitting thousands of carriage returns — and falls back from braille to
   ASCII spinner frames when the locale doesn't advertise UTF-8.
 
+### Fixed
+- Header lost its top padding in the material pass, sitting flush against the
+  top edge. The safe-area inset was applied to the header as a `padding-top`,
+  and because the custom classes are unlayered they override Tailwind's
+  layered utilities — so on any device without a notch it replaced the bar's
+  padding with zero. The inset now sits on the app frame, which has no padding
+  utility to collide with.
+
 ### Changed
 - `start.sh` no longer hides a failing step behind tidy output: the captured
   log is printed under a ✗ and the step's real exit code is preserved.

@@ -194,12 +194,16 @@ body {
   overflow: hidden;
 }
 
-/* Force the app shell to fill the viewport regardless of wrapper divs */
+/* Force the app shell to fill the viewport regardless of wrapper divs.
+   Carries the top safe-area inset for installed/notched devices: the frame is
+   the right owner, and unlike a bar it has no padding utility to collide
+   with. body shares the app background, so the inset area blends in. */
 .app-shell {
   position: fixed;
   inset: 0;
   display: flex;
   flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 /* xterm.js overrides */
@@ -229,14 +233,11 @@ body {
   background: var(--t-scrollbar-hover);
 }
 
-/* Safe areas — matter once the app is installed to a home screen and the
-   web view runs edge-to-edge behind the status bar / home indicator. */
+/* Bottom safe area — matters once the app is installed to a home screen and
+   the web view runs edge-to-edge behind the home indicator. The top inset is
+   handled by .app-shell. */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-.safe-top {
-  padding-top: env(safe-area-inset-top, 0px);
 }
 
 /* Loading spinner */
