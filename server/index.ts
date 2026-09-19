@@ -307,13 +307,16 @@ async function main() {
     else next(err);
   });
 
-  httpServer.listen(PORT, () => {
-    console.log(`\n  OTG Code running on http://localhost:${PORT}`);
-    console.log(
-      isPasswordEnabled()
-        ? "  Access password: on\n"
-        : "  Access password: off (enable it in Settings for an extra layer)\n",
-    );
+  await new Promise<void>((ready) => {
+    httpServer.listen(PORT, () => {
+      console.log(`\n  OTG Code running on http://localhost:${PORT}`);
+      console.log(
+        isPasswordEnabled()
+          ? "  Access password: on\n"
+          : "  Access password: off (enable it in Settings for an extra layer)\n",
+      );
+      ready();
+    });
   });
 
   if (useTunnel) {

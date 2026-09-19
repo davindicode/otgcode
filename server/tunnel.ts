@@ -3,6 +3,7 @@ import { existsSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { isPasswordEnabled, localUsername } from "./auth.js";
+import { type Progress, startProgress } from "./progress.js";
 
 // Main OTG Code tunnel
 let mainTunnelProcess: ChildProcess | null = null;
@@ -61,7 +62,7 @@ const TUNNEL_MAX_ATTEMPTS = 3;
 
 // Spawn cloudflared once and resolve with the quick-tunnel URL, or null if it
 // exits / errors / times out before emitting one.
-function spawnTunnelOnce(port: number): Promise<string | null> {
+function spawnTunnelOnce(port: number, progress: Progress): Promise<string | null> {
   return new Promise((resolve) => {
     const cfBin = findCloudflared();
 
@@ -81,7 +82,7 @@ function spawnTunnelOnce(port: number): Promise<string | null> {
         stdio: ["ignore", "pipe", "pipe"],
       });
     } catch (err) {
-      console.log(`  cloudflared failed to spawn: ${(err as Error).message}`);
+      progress.log(`  cloudflared failed to spawn: ${(err as Error).message}`);
       resolve(null);
       return;
     }
@@ -98,30 +99,29 @@ function spawnTunnelOnce(port: number): Promise<string | null> {
 
     const timeout = setTimeout(() => {
       if (!resolved) {
-        console.log("  cloudflared timed out before producing a tunnel URL");
+        progress.log("  cloudflared timed out before producing a tunnel URL");
         settle(null);
       }
     }, TUNNEL_STARTUP_TIMEOUT_MS);
 
     const handleData = (data: Buffer) => {
       const text = data.toString();
-      // Surface cloudflared's own progress/errors so pre-URL failures aren't
-      // silent. Once we have a URL, stop — the rest is benign runtime noise
+      // Surface cloudflared's own failures so a pre-URL problem isn't silent.
+      // Its progress chatter is dropped: the spinner already says we're
+      // waiting. Once we have a URL, stop — the rest is benign runtime noise
       // (ICMP/ping_group_range warnings, etc.).
       if (!resolved) {
         for (const line of text.split("\n")) {
           const trimmed = line.trim();
           if (!trimmed) continue;
-          if (/Requesting new quick Tunnel|ERR |error=|failed/i.test(trimmed)) {
-            console.log(`  [cloudflared] ${trimmed}`);
+          if (/ERR |error=|failed/i.test(trimmed)) {
+            progress.log(`  [cloudflared] ${trimmed}`);
           }
         }
       }
       const match = text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
       if (match && !resolved) {
         mainTunnelUrl = match[0];
-        console.log(`\n  Tunnel URL: ${match[0]}`);
-        printTunnelPrivacyWarning();
         settle(match[0]);
       }
     };
@@ -130,14 +130,14 @@ function spawnTunnelOnce(port: number): Promise<string | null> {
     proc.stderr?.on("data", handleData);
     proc.on("error", (err) => {
       if (!resolved) {
-        console.log(`  cloudflared error: ${err.message}`);
+        progress.log(`  cloudflared error: ${err.message}`);
         settle(null);
       }
     });
     proc.on("exit", (code, signal) => {
       // If we already have a URL this is a later teardown; otherwise it died early.
       if (!resolved) {
-        console.log(`  cloudflared exited early (code=${code} signal=${signal}) before producing a URL`);
+        progress.log(`  cloudflared exited early (code=${code} signal=${signal}) before producing a URL`);
         settle(null);
       }
       if (mainTunnelProcess === proc) {
@@ -151,9 +151,23 @@ function spawnTunnelOnce(port: number): Promise<string | null> {
 // Start the main OTG Code tunnel, retrying on early exit / timeout since
 // trycloudflare quick-tunnel registration is intermittently flaky.
 export async function startTunnel(port: number): Promise<string | null> {
+  const progress = startProgress("Generating tunnel URL");
+  try {
+    return await runTunnelAttempts(port, progress);
+  } finally {
+    progress.stop();
+  }
+}
+
+async function runTunnelAttempts(port: number, progress: Progress): Promise<string | null> {
   for (let attempt = 1; attempt <= TUNNEL_MAX_ATTEMPTS; attempt++) {
-    const url = await spawnTunnelOnce(port);
-    if (url) return url;
+    const url = await spawnTunnelOnce(port, progress);
+    if (url) {
+      progress.stop();
+      console.log(`\n  Tunnel URL: ${url}`);
+      printTunnelPrivacyWarning();
+      return url;
+    }
 
     // Make sure a dead/stalled process is cleaned up before retrying.
     if (mainTunnelProcess) {
@@ -162,8 +176,9 @@ export async function startTunnel(port: number): Promise<string | null> {
     }
 
     if (attempt < TUNNEL_MAX_ATTEMPTS) {
-      console.log(`  Tunnel attempt ${attempt}/${TUNNEL_MAX_ATTEMPTS} failed, retrying...`);
+      progress.log(`  Tunnel attempt ${attempt}/${TUNNEL_MAX_ATTEMPTS} failed, retrying...`);
     } else {
+      progress.stop();
       console.log(`\n  Could not establish a Cloudflare tunnel after ${TUNNEL_MAX_ATTEMPTS} attempts.`);
       console.log(`  Server is still running locally at http://localhost:${port}\n`);
     }

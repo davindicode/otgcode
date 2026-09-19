@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Startup now shows an animated **"Generating tunnel URL"** while waiting on
+  cloudflared, so the wait reads as working rather than hung, and `start.sh`
+  reports each step with a spinner, a tick and its duration. Animation is
+  TTY-only — piped to a file or a CI log each step prints once instead of
+  emitting thousands of carriage returns — and falls back from braille to
+  ASCII spinner frames when the locale doesn't advertise UTF-8.
+
 ### Changed
+- `start.sh` no longer hides a failing step behind tidy output: the captured
+  log is printed under a ✗ and the step's real exit code is preserved.
+- Tunnel startup no longer echoes cloudflared's "Requesting new quick Tunnel"
+  progress line — the spinner already says that. Genuine failures still print.
 - **Visual pass: a material system.** Controls now carry a subtle vertical
   gradient, a 1px lit top edge and a tight drop shadow, with a real pressed
   state that flips the light inward — the tactile quality of claymorphism at
