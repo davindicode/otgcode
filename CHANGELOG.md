@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **One pane, one tab strip.** The split pane, the per-panel tab rows and the
+  mobile tab bar are gone. Every tab — terminal, explorer, or an open file —
+  lives in a single VS Code-style strip at the top, and `+` asks which kind to
+  create. Opening a file from an explorer spawns its own tab and focuses it,
+  so an explorer stays a file browser instead of turning into an editor;
+  reopening a file that's already open just focuses its tab.
+- **Controls live at the bottom for every tab type.** The explorer's toolbar
+  moved from a header into the bottom bar, where the terminal's input box
+  already sat, so the control surface is always in the same place and changes
+  with the active tab.
+- Every control in the terminal input area now uses the same raised treatment
+  as the Send button, instead of flat fills with coloured borders.
+
 ### Added
+- Viewer tabs are restored on reload along with terminal and explorer tabs
+  (which files were open, not unsaved edits).
 - Startup now shows an animated **"Generating tunnel URL"** while waiting on
   cloudflared, so the wait reads as working rather than hung, and `start.sh`
   reports each step with a spinner, a tick and its duration. Animation is

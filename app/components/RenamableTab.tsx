@@ -9,6 +9,10 @@ interface RenamableTabProps {
   onClose: () => void;
   icon?: React.ReactNode;
   showClose?: boolean;
+  /** Viewer tabs are named by their file, so renaming them would be a lie. */
+  renamable?: boolean;
+  /** Native tooltip — used to show a viewer tab's full path. */
+  title?: string;
 }
 
 export default function RenamableTab({
@@ -20,6 +24,8 @@ export default function RenamableTab({
   onClose,
   icon,
   showClose = true,
+  renamable = true,
+  title,
 }: RenamableTabProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(name);
@@ -47,9 +53,11 @@ export default function RenamableTab({
     <div
       onClick={onClick}
       onDoubleClick={(e) => {
+        if (!renamable) return;
         e.stopPropagation();
         setEditing(true);
       }}
+      title={title}
       className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-sm border-r border-line-soft shrink-0 transition-colors ${
         isActive
           ? "tab-active bg-surface text-ink border-b-2 border-b-blue-500"
@@ -57,7 +65,7 @@ export default function RenamableTab({
       }`}
     >
       {icon}
-      {editing ? (
+      {editing && renamable ? (
         <input
           ref={inputRef}
           value={editValue}

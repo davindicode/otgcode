@@ -38,7 +38,7 @@
 </table>
 
 
-Two panes — **Files** and **Terminal** — a draggable split on desktop/landscape (explorer at 1/4 width by default), single-panel with a two-tab bottom bar on mobile/portrait (orientation-aware breakpoint). Localhost previews, system info and settings live in popups under the header icons. Both panes stay mounted in the DOM with CSS visibility toggling, preserving terminal state and WebSocket connections across navigation. Everything routes through a single Cloudflare Quick Tunnel.
+One pane with a single tab strip, VS Code style. Tabs come in three kinds — **Terminal**, **Explorer**, and the **viewer/editor** tabs that open when you pick a file in an explorer. `+` asks which kind to create; file tabs are spawned by the explorer, so an explorer always stays a file browser. Each tab's controls sit in the bottom bar and change with the tab. Localhost previews, system info and settings live in popups under the header icons. Every tab stays mounted in the DOM with CSS visibility toggling, preserving terminal state and WebSocket connections across switches. Everything routes through a single Cloudflare Quick Tunnel.
 
 Install it to a home screen and it runs standalone like a native app; the layout, open tabs and your preferences are saved on the host, so a refresh or a reconnect from another device puts you back where you were.
 
@@ -89,7 +89,7 @@ Install it to a home screen and it runs standalone like a native app; the layout
 ### Settings & Preferences
 - **Dark and light themes** — one semantic colour token set drives the whole UI, including the terminal and code editor palettes; resolved server-side so there is no flash of the wrong theme on load
 - **Terminal font size**, adjustable from Settings or the terminal tab bar
-- **Saved on the host, not in the browser** — `~/.otgcode/workspace.json` keeps the theme, font size, pane split, open explorer tabs with their paths, and open terminal tabs with their directories. Preferences save themselves as you change them and follow you across refreshes, reconnects and devices
+- **Saved on the host, not in the browser** — `~/.otgcode/workspace.json` keeps the theme, font size, and every open tab with its directory or file. Preferences save themselves as you change them and follow you across refreshes, reconnects and devices
 - **Installable** — web app manifest, standalone display, maskable icons and iOS safe-area handling
 
 ## Quick Start

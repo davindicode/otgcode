@@ -1,92 +1,62 @@
 import { useEffect, useState } from "react";
 import { useAuthStore } from "~/stores/authStore";
-import { useFileStore } from "~/stores/fileStore";
+import { toWorkspaceTabs, useTabsStore } from "~/stores/tabsStore";
 import { useTerminalStore } from "~/stores/terminalStore";
-import { useUiStore } from "~/stores/uiStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
 import ConnectionGate from "./ConnectionGate";
 import FilesPage from "./files/FilesPage";
 import Header from "./Header";
-import MobileTabBar from "./MobileTabBar";
 import PasswordGate from "./PasswordGate";
-import ResizablePanels from "./ResizablePanels";
+import TabBar from "./TabBar";
 import Toaster from "./Toaster";
 import InputBox from "./terminal/InputBox";
-import TerminalPage from "./terminal/TerminalPage";
-
-// Desktop layout requires landscape orientation AND at least 768px width,
-// OR at least 1024px width in any orientation.
-// This ensures portrait tablets get the mobile single-panel UI.
-const DESKTOP_QUERY = "(min-width: 1024px), (min-width: 768px) and (orientation: landscape)";
-
-function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(
-    typeof window !== "undefined" ? window.matchMedia(DESKTOP_QUERY).matches : true,
-  );
-  useEffect(() => {
-    const mq = window.matchMedia(DESKTOP_QUERY);
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isDesktop;
-}
+import TerminalPane from "./terminal/TerminalPane";
+import ViewerPane from "./ViewerPane";
 
 /**
- * Re-open the explorer and terminal tabs recorded in the workspace file. Runs
- * before the panels mount, so their "create a default session" effects see the
- * restored tabs and don't add a stray one on top.
+ * Reopen the tabs recorded in the workspace file, or start with one terminal
+ * on a fresh install.
  */
 function restoreTabs() {
   const saved = useWorkspaceStore.getState().restored;
-  if (!saved) return;
+  const tabs = useTabsStore.getState();
+  if (tabs.tabs.length > 0) return;
 
-  useTerminalStore.setState({ fontSize: saved.fontSize });
-
-  const files = useFileStore.getState();
-  if (Object.keys(files.sessions).length === 0) {
-    for (const tab of saved.files.tabs) files.createSession(tab.id, tab.name, tab.cwd);
-    if (saved.files.activeId) files.setActiveSession(saved.files.activeId);
+  if (saved) {
+    useTerminalStore.setState({ fontSize: saved.fontSize });
+    if (saved.tabs.length > 0) {
+      tabs.restore(saved.tabs, saved.activeId);
+      return;
+    }
   }
-
-  const terminals = useTerminalStore.getState();
-  if (Object.keys(terminals.sessions).length === 0) {
-    for (const tab of saved.terminals.tabs) terminals.createSession(tab.id, tab.name, tab.cwd || undefined);
-    if (saved.terminals.activeId) terminals.setActiveSession(saved.terminals.activeId);
-  }
+  tabs.openTerminal();
 }
 
 /** Mirror tab changes back into the workspace file (the store debounces). */
 function watchTabs(): () => void {
   const { saveTabs } = useWorkspaceStore.getState();
-  let lastFiles = "";
-  let lastTerminals = "";
+  let last = "";
 
-  const unsubFiles = useFileStore.subscribe((state) => {
-    const tabs = Object.values(state.sessions).map((s) => ({ id: s.id, name: s.name, cwd: s.cwd }));
-    const key = JSON.stringify([tabs, state.activeSessionId]);
-    if (key === lastFiles) return;
-    lastFiles = key;
-    saveTabs({ files: { tabs, activeId: state.activeSessionId } });
-  });
+  const push = () => {
+    const { tabs, activeId } = useTabsStore.getState();
+    const payload = { tabs: toWorkspaceTabs(tabs), activeId };
+    const key = JSON.stringify(payload);
+    if (key === last) return;
+    last = key;
+    saveTabs(payload);
+  };
 
-  const unsubTerminals = useTerminalStore.subscribe((state) => {
-    const tabs = Object.values(state.sessions).map((s) => ({ id: s.id, name: s.name, cwd: s.cdCwd }));
-    const key = JSON.stringify([tabs, state.activeSessionId]);
-    if (key === lastTerminals) return;
-    lastTerminals = key;
-    saveTabs({ terminals: { tabs, activeId: state.activeSessionId } });
-  });
-
+  // The tab strip changes on open/close/rename; the content stores change when
+  // a directory or a terminal's cwd moves, which is also worth remembering.
+  const unsubTabs = useTabsStore.subscribe(push);
+  const unsubTerminals = useTerminalStore.subscribe(push);
   return () => {
-    unsubFiles();
+    unsubTabs();
     unsubTerminals();
   };
 }
 
 export default function AppShell() {
-  const activeTab = useUiStore((s) => s.activeTab);
-  const isDesktop = useIsDesktop();
   const socketConnected = useTerminalStore((s) => s.socketConnected);
   const initSocket = useTerminalStore((s) => s.initSocket);
   const authLoaded = useAuthStore((s) => s.loaded);
@@ -94,6 +64,10 @@ export default function AppShell() {
   const refreshAuth = useAuthStore((s) => s.refresh);
   const hydrateWorkspace = useWorkspaceStore((s) => s.hydrate);
   const [workspaceReady, setWorkspaceReady] = useState(false);
+
+  const tabs = useTabsStore((s) => s.tabs);
+  const activeId = useTabsStore((s) => s.activeId);
+  const activeTab = tabs.find((t) => t.id === activeId) ?? null;
 
   useEffect(() => {
     refreshAuth();
@@ -146,41 +120,34 @@ export default function AppShell() {
         aria-hidden={!socketConnected}
       >
         <Header />
+        <TabBar />
 
-        {isDesktop ? (
-          /* Desktop: 3-column resizable panels */
-          <div className="flex flex-1 overflow-hidden min-h-0">
-            <ResizablePanels
-              left={<FilesPage />}
-              right={
-                <div className="flex flex-col h-full min-h-0 min-w-0 w-full">
-                  <TerminalPage />
-                  <InputBox />
-                </div>
-              }
-            />
-          </div>
-        ) : (
-          /* Mobile: single panel with tab switching */
-          <>
-            <div className="flex flex-col flex-1 overflow-hidden min-h-0">
-              <div
-                className="flex-1 flex flex-col min-h-0"
-                style={{ display: activeTab === "terminal" ? "flex" : "none" }}
-              >
-                <TerminalPage />
-                <InputBox />
-              </div>
-              <div
-                className="flex-1 flex flex-col min-h-0"
-                style={{ display: activeTab === "files" ? "flex" : "none" }}
-              >
-                <FilesPage />
-              </div>
+        {/* One pane. Every tab stays mounted and is toggled with CSS, so a
+            terminal keeps its scrollback and socket while you work elsewhere. */}
+        <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+          {tabs.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">
+              No tabs open — use + to start a terminal or an explorer.
             </div>
-            <MobileTabBar />
-          </>
-        )}
+          ) : (
+            tabs.map((tab) => (
+              <div
+                key={tab.id}
+                className="flex-1 flex flex-col min-h-0"
+                style={{ display: tab.id === activeId ? "flex" : "none" }}
+              >
+                {tab.kind === "terminal" && <TerminalPane sessionId={tab.id} />}
+                {tab.kind === "explorer" && <FilesPage sessionId={tab.id} />}
+                {tab.kind === "viewer" && tab.path && <ViewerPane tabId={tab.id} path={tab.path} />}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* The terminal's control surface. Rendered once rather than per tab:
+            it binds to the active session, and mounting one of these per
+            terminal tab would duplicate a lot of state for no benefit. */}
+        {activeTab?.kind === "terminal" && <InputBox />}
       </div>
       {!socketConnected && <ConnectionGate />}
     </div>

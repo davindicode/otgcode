@@ -462,11 +462,26 @@ button:disabled {
    transparent. */
 .relief:disabled,
 .relief-accent:disabled,
-.relief-danger:disabled {
+.relief-danger:disabled,
+.relief-success:disabled {
   background-image: none;
   background-color: var(--t-disabled);
   box-shadow: none;
   color: var(--t-ink-ghost);
+}
+
+/* Confirming actions, in green. */
+.relief-success {
+  background-image: linear-gradient(to bottom, #3fae4a, #2f7d32);
+}
+
+.relief-success:hover:not(:disabled) {
+  background-image: linear-gradient(to bottom, #4cbe57, #358c39);
+}
+
+.relief-success:active:not(:disabled) {
+  background-image: linear-gradient(to bottom, #2f7d32, #3fae4a);
+  box-shadow: var(--t-ctl-press);
 }
 
 /* Floating surfaces only — popups, menus, dialogs. Never on list rows or the

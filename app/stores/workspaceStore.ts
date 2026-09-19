@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { DEFAULT_FONT_SIZE, DEFAULT_PANE_SPLIT, type Theme, type Workspace } from "~/lib/workspace.shared";
+import { DEFAULT_FONT_SIZE, type Theme, type Workspace } from "~/lib/workspace.shared";
 
 /**
  * Mirrors the workspace file on the host. Layout and open tabs live there
@@ -9,16 +9,14 @@ import { DEFAULT_FONT_SIZE, DEFAULT_PANE_SPLIT, type Theme, type Workspace } fro
 interface WorkspaceState {
   loaded: boolean;
   theme: Theme;
-  paneSplit: number;
   fontSize: number;
   restored: Workspace | null;
 
   hydrate: () => Promise<void>;
   setTheme: (theme: Theme) => void;
-  setPaneSplit: (percent: number) => void;
   setFontSize: (size: number) => void;
-  /** Persist the current explorer/terminal tabs. */
-  saveTabs: (patch: Pick<Workspace, "files"> | Pick<Workspace, "terminals">) => void;
+  /** Persist the current tab strip. */
+  saveTabs: (patch: Pick<Workspace, "tabs" | "activeId">) => void;
 }
 
 // Dragging a divider fires continuously; batch writes so the disk sees one.
@@ -62,7 +60,6 @@ if (typeof window !== "undefined") {
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   loaded: false,
   theme: "dark",
-  paneSplit: DEFAULT_PANE_SPLIT,
   fontSize: DEFAULT_FONT_SIZE,
   restored: null,
 
@@ -74,7 +71,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       set({
         loaded: true,
         theme: data.theme,
-        paneSplit: data.paneSplit,
         fontSize: data.fontSize,
         restored: data,
       });
@@ -88,11 +84,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     document.documentElement.classList.toggle("light", theme === "light");
     document.documentElement.classList.toggle("dark", theme === "dark");
     queue({ theme });
-  },
-
-  setPaneSplit: (percent) => {
-    set({ paneSplit: percent });
-    queue({ paneSplit: percent });
   },
 
   setFontSize: (size) => {

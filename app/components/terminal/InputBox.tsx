@@ -552,24 +552,25 @@ export default function InputBox() {
   };
 
   // --- Styles ---
-  const tabBase =
-    "px-2.5 py-0.5 text-[11px] rounded-control border whitespace-nowrap transition-colors shrink-0 select-none touch-manipulation";
-  const tabDisabledAction = `${tabBase} bg-disabled text-ink-ghost border-line/50 cursor-not-allowed`;
-  const tabDisabledApp = `${tabBase} bg-disabled text-ink-ghost border-line/50 cursor-not-allowed`;
-  // Action tabs (cmds, cd, code, sticky) — blue
-  const actionTabOff = `${tabBase} bg-tab-action text-blue-400 hover:text-blue-200 hover:bg-tab-action-on border-blue-800`;
-  const actionTabOn = `${tabBase} bg-tab-action-on text-blue-200 border-blue-500`;
+  const tabBase = "px-2.5 py-0.5 text-[11px] rounded-control whitespace-nowrap shrink-0 select-none touch-manipulation";
+  const tabDisabled = `${tabBase} bg-disabled text-ink-ghost cursor-not-allowed`;
+  const tabDisabledAction = tabDisabled;
+  const tabDisabledApp = tabDisabled;
+  // Action tabs (cmds, cd, code, sticky) — blue. `relief` supplies the raised
+  // body; the tinted fill underneath only shows through on the active one.
+  const actionTabOff = `${tabBase} relief text-blue-300 hover:text-blue-100`;
+  const actionTabOn = `${tabBase} relief bg-tab-action-on text-blue-100 ring-1 ring-inset ring-blue-500/60`;
   // App tabs (nano, vim, tmux) — green
-  const appTabOff = `${tabBase} bg-tab-app text-green-400 hover:text-green-200 hover:bg-tab-app-on border-green-800`;
-  const appTabOn = `${tabBase} bg-tab-app-on text-green-200 border-green-500`;
+  const appTabOff = `${tabBase} relief text-green-300 hover:text-green-100`;
+  const appTabOn = `${tabBase} relief bg-tab-app-on text-green-100 ring-1 ring-inset ring-green-500/60`;
 
-  // Popup action buttons: neutral gray
+  // Popup action buttons — same raised treatment as Send, tinted by role.
   const keyBtn =
-    "px-2 py-0.5 text-[11px] bg-raised text-ink-dim hover:text-ink hover:bg-hover disabled:text-ink-ghost rounded-control border border-line whitespace-nowrap transition-colors select-none touch-manipulation";
+    "px-2 py-0.5 text-[11px] relief text-ink-muted hover:text-ink rounded-control whitespace-nowrap select-none touch-manipulation";
   const exitBtn =
-    "px-2 py-0.5 text-[11px] bg-raised text-red-400 hover:text-red-300 hover:bg-hover disabled:text-ink-ghost rounded-control border border-red-800 whitespace-nowrap transition-colors select-none touch-manipulation";
+    "px-2 py-0.5 text-[11px] relief text-red-300 hover:text-red-100 rounded-control whitespace-nowrap select-none touch-manipulation";
   const saveExitBtn =
-    "px-2 py-0.5 text-[11px] bg-raised text-green-400 hover:text-green-300 hover:bg-hover disabled:text-ink-ghost rounded-control border border-green-800 whitespace-nowrap transition-colors select-none touch-manipulation";
+    "px-2 py-0.5 text-[11px] relief text-green-300 hover:text-green-100 rounded-control whitespace-nowrap select-none touch-manipulation";
 
   // --- Determine which tabs to show ---
   // Editor mode (nano/vim): only editor tab + sticky (+ tmux if in tmux)
@@ -704,7 +705,7 @@ export default function InputBox() {
                   key={dir}
                   onClick={() => handleCdTo(dir)}
                   disabled={!activeSessionId}
-                  className="px-2 py-0.5 text-[11px] bg-tab-action text-purple-400 hover:text-purple-200 hover:bg-hover disabled:text-ink-ghost rounded-control border border-purple-800/50 whitespace-nowrap transition-colors select-none touch-manipulation"
+                  className="px-2 py-0.5 text-[11px] relief text-purple-300 hover:text-purple-100 rounded-control whitespace-nowrap select-none touch-manipulation"
                   title={`cd ${dir}`}
                 >
                   {dir}
@@ -1027,7 +1028,7 @@ export default function InputBox() {
                       }}
                       disabled={!activeSessionId}
                       title={cmd.title}
-                      className="px-2 py-0.5 text-[11px] bg-raised text-purple-400 hover:text-purple-200 hover:bg-hover disabled:text-ink-ghost rounded-control border border-purple-800/60 whitespace-nowrap transition-colors select-none"
+                      className="px-2 py-0.5 text-[11px] relief text-purple-300 hover:text-purple-100 rounded-control whitespace-nowrap select-none"
                     >
                       {cmd.label}
                     </button>
@@ -1053,7 +1054,7 @@ export default function InputBox() {
                       }}
                       disabled={!activeSessionId}
                       title={cmd.title}
-                      className="px-2 py-0.5 text-[11px] bg-raised text-cyan-400 hover:text-cyan-200 hover:bg-hover disabled:text-ink-ghost rounded-control border border-cyan-800/60 whitespace-nowrap transition-colors select-none"
+                      className="px-2 py-0.5 text-[11px] relief text-cyan-300 hover:text-cyan-100 rounded-control whitespace-nowrap select-none"
                     >
                       {cmd.label}
                     </button>
@@ -1108,7 +1109,7 @@ export default function InputBox() {
                 }
               }}
               disabled={!gitCommitMsg.trim() || !activeSessionId}
-              className="px-2 py-0.5 text-[11px] bg-green-700 hover:bg-green-600 disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors shrink-0"
+              className="px-2 py-0.5 text-[11px] relief-accent relief-success text-white rounded-control shrink-0"
             >
               Commit
             </button>

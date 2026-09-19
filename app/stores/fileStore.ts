@@ -14,8 +14,6 @@ export interface FileSession {
   cwd: string;
   entries: FileEntry[];
   showHidden: boolean;
-  selectedFile: string | null;
-  fileContent: string | null;
   loading: boolean;
   error: string | null;
 }
@@ -50,8 +48,6 @@ export const useFileStore = create<FileState>((set, get) => ({
           cwd: restoredCwd || "",
           entries: [],
           showHidden: false,
-          selectedFile: null,
-          fileContent: null,
           loading: false,
           error: null,
         },
