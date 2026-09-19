@@ -100,7 +100,7 @@ function SystemInfoPopup({ onClose }: { onClose: () => void }) {
       </div>
       <div className="space-y-1 border-b border-line px-3 py-2">
         <div className="flex justify-between gap-2 text-[11px]">
-          <span className="text-ink-faint shrink-0">OTG Code</span>
+          <span className="text-ink-faint shrink-0">OTG Code version</span>
           <span className="text-right font-mono text-ink-muted">v{__APP_VERSION__}</span>
         </div>
         <div className="flex justify-between gap-2 text-[11px]">
