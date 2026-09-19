@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import { DEFAULT_FONT_SIZE, type Theme, type Workspace } from "~/lib/workspace.shared";
+import {
+  type CustomCommand,
+  DEFAULT_EDITOR_FONT_SIZE,
+  DEFAULT_FONT_SIZE,
+  type Theme,
+  type Workspace,
+} from "~/lib/workspace.shared";
 
 /**
  * Mirrors the workspace file on the host. Layout and open tabs live there
@@ -10,11 +16,19 @@ interface WorkspaceState {
   loaded: boolean;
   theme: Theme;
   fontSize: number;
+  editorFontSize: number;
+  customCommands: CustomCommand[];
+  hiddenCommands: string[];
   restored: Workspace | null;
 
   hydrate: () => Promise<void>;
   setTheme: (theme: Theme) => void;
   setFontSize: (size: number) => void;
+  setEditorFontSize: (size: number) => void;
+  addCommand: (command: CustomCommand) => void;
+  /** Remove a custom command, or hide a built-in one. */
+  removeCommand: (label: string, isCustom: boolean) => void;
+  restoreCommand: (label: string) => void;
   /** Persist the current tab strip. */
   saveTabs: (patch: Pick<Workspace, "tabs" | "activeId">) => void;
 }
@@ -57,10 +71,13 @@ if (typeof window !== "undefined") {
   });
 }
 
-export const useWorkspaceStore = create<WorkspaceState>((set) => ({
+export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   loaded: false,
   theme: "dark",
   fontSize: DEFAULT_FONT_SIZE,
+  editorFontSize: DEFAULT_EDITOR_FONT_SIZE,
+  customCommands: [],
+  hiddenCommands: [],
   restored: null,
 
   hydrate: async () => {
@@ -72,6 +89,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         loaded: true,
         theme: data.theme,
         fontSize: data.fontSize,
+        editorFontSize: data.editorFontSize,
+        customCommands: data.customCommands,
+        hiddenCommands: data.hiddenCommands,
         restored: data,
       });
     } catch {
@@ -89,6 +109,36 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setFontSize: (size) => {
     set({ fontSize: size });
     queue({ fontSize: size });
+  },
+
+  setEditorFontSize: (size) => {
+    set({ editorFontSize: size });
+    queue({ editorFontSize: size });
+  },
+
+  addCommand: (command) => {
+    const customCommands = [...get().customCommands.filter((c) => c.label !== command.label), command];
+    set({ customCommands });
+    queue({ customCommands });
+  },
+
+  removeCommand: (label, isCustom) => {
+    if (isCustom) {
+      const customCommands = get().customCommands.filter((c) => c.label !== label);
+      set({ customCommands });
+      queue({ customCommands });
+      return;
+    }
+    if (get().hiddenCommands.includes(label)) return;
+    const hiddenCommands = [...get().hiddenCommands, label];
+    set({ hiddenCommands });
+    queue({ hiddenCommands });
+  },
+
+  restoreCommand: (label) => {
+    const hiddenCommands = get().hiddenCommands.filter((l) => l !== label);
+    set({ hiddenCommands });
+    queue({ hiddenCommands });
   },
 
   saveTabs: (patch) => queue(patch),

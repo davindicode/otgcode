@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useTerminalStore } from "~/stores/terminalStore";
 import LocalhostPopup from "./browser/LocalhostPopup";
 import SettingsModal from "./SettingsModal";
 
@@ -46,6 +45,10 @@ function SystemInfoPopup({ onClose }: { onClose: () => void }) {
           </svg>
         </button>
       </div>
+      <div className="flex justify-between gap-2 border-b border-line px-3 py-2 text-[11px]">
+        <span className="text-ink-faint shrink-0">OTG Code</span>
+        <span className="text-ink-muted text-right font-mono">v{__APP_VERSION__}</span>
+      </div>
       {!info ? (
         <div className="flex items-center justify-center py-4">
           <svg className="w-5 h-5 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
@@ -70,23 +73,11 @@ function SystemInfoPopup({ onClose }: { onClose: () => void }) {
 }
 
 export default function Header() {
-  const socketConnected = useTerminalStore((s) => s.socketConnected);
-  const sessions = useTerminalStore((s) => s.sessions);
   const [panel, setPanel] = useState<Panel | null>(null);
 
   // Clicking a trigger opens its panel, or closes it if already open. Only one
   // panel is ever open.
   const toggle = (next: Panel) => setPanel((current) => (current === next ? null : next));
-
-  const hasActiveSessions = Object.values(sessions).some((s) => s.status === "connected" || s.status === "connecting");
-
-  const status = !socketConnected
-    ? "offline"
-    : hasActiveSessions
-      ? "online"
-      : Object.keys(sessions).length > 0
-        ? "reconnecting"
-        : "online";
 
   const triggerClass = (active: boolean) =>
     `p-1 rounded-control transition-colors ${active ? "bg-hover text-ink" : "text-ink-faint hover:text-ink"}`;
@@ -96,7 +87,6 @@ export default function Header() {
       <div className="flex items-center gap-2">
         <img src="/logo-square.png" alt="OTG Code" className="w-6 h-6 rounded-control" />
         <span className="text-ink font-bold text-sm">OTG Code</span>
-        <span className="text-ink-faint text-[10px] font-mono">v{__APP_VERSION__}</span>
       </div>
       <div className="flex items-center gap-2">
         <button
@@ -151,22 +141,6 @@ export default function Header() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         </button>
-        <span
-          className={`w-2 h-2 rounded-full ${
-            status === "online"
-              ? "bg-green-500"
-              : status === "reconnecting"
-                ? "bg-yellow-500 animate-pulse"
-                : "bg-red-500"
-          }`}
-        />
-        <span
-          className={`text-xs ${
-            status === "online" ? "text-green-500" : status === "reconnecting" ? "text-yellow-500" : "text-red-400"
-          }`}
-        >
-          {status}
-        </span>
       </div>
       {panel === "localhost" && <LocalhostPopup onClose={() => setPanel(null)} />}
       {panel === "info" && <SystemInfoPopup onClose={() => setPanel(null)} />}

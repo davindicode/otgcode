@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MAX_FONT_SIZE, MIN_FONT_SIZE } from "~/lib/constants";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { showToast } from "~/stores/toastStore";
+import { useWorkspaceStore } from "~/stores/workspaceStore";
 
 interface QuickKey {
   label: string;
@@ -222,6 +222,10 @@ const GIT_QUICK_CMDS: { label: string; title: string; command: string }[] = [
 ];
 
 // Tab IDs
+// Matches the .drawer transition in app.css.
+const DRAWER_MS = 180;
+
+const TEXT_TAB = "__text__";
 const STICKY_TAB = "__sticky__";
 const TMUX_TAB = "__tmux__";
 const NANO_TAB = "__nano__";
@@ -260,9 +264,105 @@ interface TmuxSession {
   attached: boolean;
 }
 
+function AddCommandDialog({
+  existing,
+  onAdd,
+  onClose,
+}: {
+  existing: string[];
+  onAdd: (label: string, command: string) => void;
+  onClose: () => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [command, setCommand] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const trimmedLabel = label.trim();
+  const trimmedCommand = command.trim();
+  const duplicate = existing.includes(trimmedLabel);
+  const valid = !!trimmedLabel && !!trimmedCommand && !duplicate;
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!valid) return;
+    onAdd(trimmedLabel, trimmedCommand);
+    onClose();
+  };
+
+  const field =
+    "w-full rounded-control border border-line bg-raised px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-ghost focus:border-blue-500 focus:outline-none";
+
+  return createPortal(
+    <div className="fixed inset-0 z-[160] flex items-center justify-center bg-scrim/60 px-4">
+      <form onSubmit={submit} className="glass w-full max-w-xs rounded-panel p-4">
+        <h2 className="text-xs font-medium text-ink">Add command</h2>
+        <p className="mt-0.5 text-[11px] text-ink-faint">Becomes a button in the cmds group. Runs immediately.</p>
+
+        <label className="mt-3 block text-[11px] text-ink-dim" htmlFor="cmd-label">
+          Button label
+        </label>
+        <input
+          id="cmd-label"
+          ref={inputRef}
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="deploy"
+          className={`mt-1 ${field}`}
+        />
+
+        <label className="mt-2.5 block text-[11px] text-ink-dim" htmlFor="cmd-command">
+          Command
+        </label>
+        <input
+          id="cmd-command"
+          value={command}
+          onChange={(e) => setCommand(e.target.value)}
+          placeholder="./deploy.sh --prod"
+          className={`mt-1 font-mono ${field}`}
+        />
+
+        {duplicate && <p className="mt-2 text-[11px] text-red-400">A button called "{trimmedLabel}" already exists</p>}
+
+        <div className="mt-4 flex items-center gap-2">
+          <button
+            type="submit"
+            disabled={!valid}
+            className="relief-accent rounded-control px-2.5 py-1 text-xs font-medium text-white disabled:bg-control disabled:text-ink-faint"
+          >
+            Add
+          </button>
+          <button type="button" onClick={onClose} className="relief rounded-control px-2.5 py-1 text-xs text-ink-muted">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>,
+    document.body,
+  );
+}
+
 export default function InputBox() {
   const [text, setText] = useState("");
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  // What is currently painted. Lags `activeGroup` on close so the drawer can
+  // animate shut instead of vanishing.
+  const [drawerGroup, setDrawerGroup] = useState<string | null>(null);
+  const [editingCommands, setEditingCommands] = useState(false);
+  const [commandDialog, setCommandDialog] = useState(false);
+  const customCommands = useWorkspaceStore((s) => s.customCommands);
+  const hiddenCommands = useWorkspaceStore((s) => s.hiddenCommands);
+  const addCommand = useWorkspaceStore((s) => s.addCommand);
+  const removeCommand = useWorkspaceStore((s) => s.removeCommand);
+  const restoreCommand = useWorkspaceStore((s) => s.restoreCommand);
   const [tmuxSessions, setTmuxSessions] = useState<TmuxSession[]>([]);
   const [tmuxLoading, setTmuxLoading] = useState(false);
   const [toolVersions, setToolVersions] = useState<{
@@ -287,10 +387,17 @@ export default function InputBox() {
   const [gitConfigName, setGitConfigName] = useState("");
   const [gitConfigEmail, setGitConfigEmail] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (activeGroup) {
+      setDrawerGroup(activeGroup);
+      return;
+    }
+    const timer = setTimeout(() => setDrawerGroup(null), DRAWER_MS);
+    return () => clearTimeout(timer);
+  }, [activeGroup]);
   const activeSessionId = useTerminalStore((s) => s.activeSessionId);
   const sendInput = useTerminalStore((s) => s.sendInput);
-  const fontSize = useTerminalStore((s) => s.fontSize);
-  const setFontSize = useTerminalStore((s) => s.setFontSize);
   const setInTmux = useTerminalStore((s) => s.setInTmux);
   const setInEditor = useTerminalStore((s) => s.setInEditor);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
@@ -607,9 +714,25 @@ export default function InputBox() {
 
   // Resolve which key group to show in the popup
   const activeStandardGroup =
-    activeGroup && ![STICKY_TAB, TMUX_TAB, NANO_TAB, VIM_TAB, CODE_TAB, GIT_TAB, CD_TAB].includes(activeGroup)
-      ? TERMINAL_GROUPS.find((g) => g.label === activeGroup)
+    drawerGroup && ![TEXT_TAB, STICKY_TAB, TMUX_TAB, NANO_TAB, VIM_TAB, CODE_TAB, GIT_TAB, CD_TAB].includes(drawerGroup)
+      ? TERMINAL_GROUPS.find((g) => g.label === drawerGroup)
       : null;
+
+  const isCmdsGroup = activeStandardGroup?.label === "cmds";
+  // Built-ins the user removed drop out; their own commands are appended.
+  const visibleCommands: (QuickKey & { custom?: boolean })[] = !activeStandardGroup
+    ? []
+    : isCmdsGroup
+      ? [
+          ...activeStandardGroup.keys.filter((k) => !hiddenCommands.includes(k.label)),
+          ...customCommands.map((c) => ({
+            label: c.label,
+            key: `${c.command}\n`,
+            title: c.command,
+            custom: true,
+          })),
+        ]
+      : activeStandardGroup.keys;
 
   return (
     <div
@@ -619,10 +742,11 @@ export default function InputBox() {
       {/* Tab bar */}
       <div className="border-b border-line/50 overflow-x-auto scrollbar-none" style={{ minWidth: 0 }}>
         <div className="flex items-center gap-1 px-2 py-1 w-max">
+          {tabBtn(TEXT_TAB, "text", "Type a command or message", !activeSessionId)}
           {/* Action tabs (blue) — always in same order, hidden in editor mode */}
           {!isEditorMode && TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !activeSessionId))}
           {!isEditorMode && tabBtn(CD_TAB, "cd", "Change directory", !activeSessionId)}
-          {tabBtn(STICKY_TAB, STICKY_MODES.find((m) => m.id === stickyMode)?.label || "Ctrl+", "Modifier combos")}
+          {tabBtn(STICKY_TAB, "combos", "Modifier key combinations")}
           {!isEditorMode && tabBtn(CODE_TAB, "code", "Coding CLI launchers & keys", !activeSessionId)}
           {!isEditorMode && tabBtn(GIT_TAB, "git", "Git actions", !activeSessionId)}
           {/* App tabs (green) — nano/vim hidden in tmux mode, shown with active indicator in editor mode */}
@@ -652,319 +776,180 @@ export default function InputBox() {
         </div>
       </div>
 
-      {/* Standard key group popup (cmds) */}
-      {activeStandardGroup && (
-        <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-          <div className="flex flex-wrap gap-1">
-            {activeStandardGroup.keys.map((qk) => (
-              <button
-                key={qk.label}
-                {...repeatProps(qk.key)}
-                disabled={!activeSessionId}
-                title={qk.title}
-                className={keyBtn}
-              >
-                {qk.label}
-              </button>
-            ))}
-          </div>
-        </div>
+      {commandDialog && (
+        <AddCommandDialog
+          existing={visibleCommands.map((c) => c.label)}
+          onAdd={(label, command) => addCommand({ label, command })}
+          onClose={() => setCommandDialog(false)}
+        />
       )}
 
-      {/* cd directory picker */}
-      {activeGroup === CD_TAB && (
-        <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-[11px] text-ink-faint">cd</span>
-            <span
-              className="text-[10px] text-ink-ghost overflow-hidden text-ellipsis whitespace-nowrap flex-1"
-              title={cdCwd}
-            >
-              {cdCwd}
-            </span>
-          </div>
-          {cdLoading ? (
-            <span className="text-[11px] text-ink-faint">Loading...</span>
-          ) : (
-            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-              <button
-                onClick={() => handleCdTo("..")}
-                disabled={!activeSessionId}
-                className={`${keyBtn} text-yellow-400 hover:text-yellow-300`}
-                title="Go up one directory"
-              >
-                ..
-              </button>
-              <button
-                onClick={handleCdHome}
-                disabled={!activeSessionId}
-                className={`${keyBtn} text-blue-400 hover:text-blue-300`}
-                title="Go to home directory"
-              >
-                ~
-              </button>
-              {cdDirs.map((dir) => (
-                <button
-                  key={dir}
-                  onClick={() => handleCdTo(dir)}
-                  disabled={!activeSessionId}
-                  className="px-2 py-0.5 text-[11px] relief text-purple-300 hover:text-purple-100 rounded-control whitespace-nowrap select-none touch-manipulation"
-                  title={`cd ${dir}`}
-                >
-                  {dir}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {/* One animating container for every drawer: grid-template-rows 0fr->1fr
+          transitions to the content's own height, which differs per drawer. */}
+      <div className="drawer" data-open={activeGroup ? "true" : "false"}>
+        <div className="drawer-inner">
+          {/* Standard key group popup (cmds) */}
+          {activeStandardGroup && (
+            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
+              <div className="flex flex-wrap items-center gap-1">
+                {visibleCommands.map((qk) => (
+                  <span key={qk.label} className="relative inline-flex">
+                    <button
+                      {...(editingCommands ? {} : repeatProps(qk.key))}
+                      disabled={!activeSessionId && !editingCommands}
+                      title={editingCommands ? `Remove "${qk.label}"` : qk.title}
+                      onClick={editingCommands ? () => removeCommand(qk.label, !!qk.custom) : undefined}
+                      className={`${keyBtn} ${editingCommands ? "pr-5 opacity-80" : ""}`}
+                    >
+                      {qk.label}
+                      {editingCommands && (
+                        <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[11px] leading-none text-red-400">
+                          ×
+                        </span>
+                      )}
+                    </button>
+                  </span>
+                ))}
 
-      {/* Sticky modifier popup */}
-      {activeGroup === STICKY_TAB && (
-        <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-          <div className="flex items-center gap-1 mb-1.5">
-            {STICKY_MODES.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setStickyMode(m.id)}
-                className={`px-2 py-0.5 text-[10px] rounded-control border transition-colors select-none ${
-                  stickyMode === m.id
-                    ? "relief-accent text-white border-blue-500"
-                    : "bg-raised text-ink-faint hover:text-ink border-line"
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {"0123456789".split("").map((ch) => (
-              <button
-                key={ch}
-                {...repeatProps(getStickyKey(ch, stickyMode))}
-                disabled={!activeSessionId}
-                title={`${STICKY_MODES.find((m) => m.id === stickyMode)?.label}${ch}`}
-                className={keyBtn}
-              >
-                {ch}
-              </button>
-            ))}
-            {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((ch) => (
-              <button
-                key={ch}
-                {...repeatProps(getStickyKey(ch, stickyMode))}
-                disabled={!activeSessionId}
-                title={`${STICKY_MODES.find((m) => m.id === stickyMode)?.label}${ch}`}
-                className={keyBtn}
-              >
-                {ch}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+                {isCmdsGroup && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setCommandDialog(true)}
+                      title="Add a command button"
+                      className={`${keyBtn} text-blue-300 hover:text-blue-100`}
+                    >
+                      + add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingCommands((v) => !v)}
+                      title={editingCommands ? "Done removing" : "Remove command buttons"}
+                      className={`${keyBtn} ${editingCommands ? "text-green-300" : "text-ink-faint"}`}
+                    >
+                      {editingCommands ? "done" : "edit"}
+                    </button>
+                  </>
+                )}
+              </div>
 
-      {/* Nano popup: commands when inside, file opener when outside */}
-      {activeGroup === NANO_TAB && inEditor === "nano" && (
-        <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-          <div className="flex flex-wrap gap-1">
-            {NANO_KEYS.map((qk) => (
-              <button
-                key={qk.label}
-                {...repeatProps(qk.key)}
-                disabled={!activeSessionId}
-                title={qk.title}
-                className={keyBtn}
-              >
-                {qk.label}
-              </button>
-            ))}
-            <button onClick={handleExitNano} disabled={!activeSessionId} title="Exit nano (Ctrl+X)" className={exitBtn}>
-              exit
-            </button>
-          </div>
-        </div>
-      )}
-      {activeGroup === NANO_TAB && inEditor !== "nano" && (
-        <div className="border-b border-line/50 bg-panel px-3 py-2">
-          {!toolVersions.nano ? (
-            <span className="text-[11px] text-yellow-400">
-              nano is not installed. Install it via your package manager.
-            </span>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-ink-faint">
-                nano{toolVersions.nano ? ` v${toolVersions.nano}` : ""}
-              </span>
-              <input
-                value={editorFileName}
-                onChange={(e) => setEditorFileName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("nano")}
-                placeholder="filename or path..."
-                className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <button
-                onClick={() => handleOpenEditor("nano")}
-                disabled={!editorFileName.trim() || !activeSessionId}
-                className="px-2 py-1 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
-              >
-                Open
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Vim popup: commands when inside, file opener when outside */}
-      {activeGroup === VIM_TAB && inEditor === "vim" && (
-        <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-          <div className="flex flex-wrap gap-1">
-            {VIM_KEYS.map((qk) => (
-              <button
-                key={qk.label}
-                {...repeatProps(qk.key)}
-                disabled={!activeSessionId}
-                title={qk.title}
-                className={keyBtn}
-              >
-                {qk.label}
-              </button>
-            ))}
-            <button
-              onClick={handleSaveExitVim}
-              disabled={!activeSessionId}
-              title="Save and exit (:wq)"
-              className={saveExitBtn}
-            >
-              save+exit
-            </button>
-            <button onClick={handleExitVim} disabled={!activeSessionId} title="Force quit (:q!)" className={exitBtn}>
-              quit
-            </button>
-          </div>
-        </div>
-      )}
-      {activeGroup === VIM_TAB && inEditor !== "vim" && (
-        <div className="border-b border-line/50 bg-panel px-3 py-2">
-          {!toolVersions.vim ? (
-            <span className="text-[11px] text-yellow-400">
-              vim is not installed. Install it via your package manager.
-            </span>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-ink-faint">vim v{toolVersions.vim}</span>
-              <input
-                value={editorFileName}
-                onChange={(e) => setEditorFileName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("vim")}
-                placeholder="filename or path..."
-                className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <button
-                onClick={() => handleOpenEditor("vim")}
-                disabled={!editorFileName.trim() || !activeSessionId}
-                className="px-2 py-1 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
-              >
-                Open
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tmux popup: commands when inside, sessions when outside */}
-      {activeGroup === TMUX_TAB && inTmux && (
-        <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-          <div className="flex flex-wrap gap-1">
-            {TMUX_KEYS.map((qk) => (
-              <button
-                key={qk.label}
-                {...repeatProps(qk.key)}
-                disabled={!activeSessionId}
-                title={qk.title}
-                className={keyBtn}
-              >
-                {qk.label}
-              </button>
-            ))}
-            <button onClick={handleTmuxDetach} disabled={!activeSessionId} title="Detach from tmux" className={exitBtn}>
-              detach
-            </button>
-          </div>
-        </div>
-      )}
-      {activeGroup === TMUX_TAB && !inTmux && (
-        <div className="border-b border-line/50 bg-panel px-3 py-2">
-          {!toolVersions.tmux ? (
-            <span className="text-[11px] text-yellow-400">
-              tmux is not installed. Install it via your package manager.
-            </span>
-          ) : (
-            <>
-              <span className="text-[10px] text-ink-ghost float-right">v{toolVersions.tmux}</span>
-              {tmuxLoading ? (
-                <span className="text-[11px] text-ink-faint">Loading...</span>
-              ) : tmuxSessions.length === 0 ? (
-                <span className="text-[11px] text-ink-faint">No tmux sessions running</span>
-              ) : (
-                <div className="flex flex-col gap-1 mb-2">
-                  {tmuxSessions.map((s) => (
-                    <div key={s.name} className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleTmuxAttach(s.name)}
-                        className="flex-1 text-left px-2 py-1 text-[11px] bg-raised text-ink-muted hover:text-ink hover:bg-hover rounded-control border border-line transition-colors"
-                      >
-                        <span className="font-medium">{s.name}</span>
-                        <span className="text-ink-faint ml-2">{s.windows}w</span>
-                        {s.attached && <span className="text-green-500 ml-1">(attached)</span>}
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (!activeSessionId) return;
-                          sendInput(activeSessionId, `tmux kill-session -t ${s.name}\n`);
-                          setTimeout(fetchTmuxSessions, 500);
-                        }}
-                        className="p-1 text-ink-faint hover:text-red-400 transition-colors"
-                        title={`Kill session ${s.name}`}
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
+              {isCmdsGroup && editingCommands && hiddenCommands.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1 border-t border-line/50 pt-1.5">
+                  <span className="text-[10px] text-ink-ghost">removed:</span>
+                  {hiddenCommands.map((label) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => restoreCommand(label)}
+                      title={`Restore "${label}"`}
+                      className={`${keyBtn} text-[10px] opacity-70`}
+                    >
+                      + {label}
+                    </button>
                   ))}
                 </div>
               )}
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  value={tmuxNewName}
-                  onChange={(e) => setTmuxNewName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleTmuxNew()}
-                  placeholder="New session name..."
-                  className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <button
-                  onClick={handleTmuxNew}
-                  disabled={!tmuxNewName.trim() || !activeSessionId}
-                  className="px-2 py-1 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
-                >
-                  Create
-                </button>
-              </div>
-            </>
+            </div>
           )}
-        </div>
-      )}
 
-      {/* Code tab: common keys + selected vendor panel */}
-      {activeGroup === CODE_TAB &&
-        (() => {
-          const vendor = CLI_VENDORS[codeVendorIdx] || CLI_VENDORS[0];
-          return (
-            <div className="border-b border-line/50 bg-panel px-2 py-1.5 max-h-64 overflow-y-auto">
-              {/* Common keys (no header) */}
-              <div className="flex flex-wrap gap-1 mb-1.5">
-                {CODE_COMMON_KEYS.map((qk) => (
+          {/* cd directory picker */}
+          {drawerGroup === CD_TAB && (
+            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-[11px] text-ink-faint">cd</span>
+                <span
+                  className="text-[10px] text-ink-ghost overflow-hidden text-ellipsis whitespace-nowrap flex-1"
+                  title={cdCwd}
+                >
+                  {cdCwd}
+                </span>
+              </div>
+              {cdLoading ? (
+                <span className="text-[11px] text-ink-faint">Loading...</span>
+              ) : (
+                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                  <button
+                    onClick={() => handleCdTo("..")}
+                    disabled={!activeSessionId}
+                    className={`${keyBtn} text-yellow-400 hover:text-yellow-300`}
+                    title="Go up one directory"
+                  >
+                    ..
+                  </button>
+                  <button
+                    onClick={handleCdHome}
+                    disabled={!activeSessionId}
+                    className={`${keyBtn} text-blue-400 hover:text-blue-300`}
+                    title="Go to home directory"
+                  >
+                    ~
+                  </button>
+                  {cdDirs.map((dir) => (
+                    <button
+                      key={dir}
+                      onClick={() => handleCdTo(dir)}
+                      disabled={!activeSessionId}
+                      className="px-2 py-0.5 text-[11px] relief text-purple-300 hover:text-purple-100 rounded-control whitespace-nowrap select-none touch-manipulation"
+                      title={`cd ${dir}`}
+                    >
+                      {dir}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sticky modifier popup */}
+          {drawerGroup === STICKY_TAB && (
+            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
+              <div className="flex items-center gap-1 mb-1.5">
+                {STICKY_MODES.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setStickyMode(m.id)}
+                    className={`px-2 py-0.5 text-[10px] rounded-control border transition-colors select-none ${
+                      stickyMode === m.id
+                        ? "relief-accent text-white border-blue-500"
+                        : "bg-raised text-ink-faint hover:text-ink border-line"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {"0123456789".split("").map((ch) => (
+                  <button
+                    key={ch}
+                    {...repeatProps(getStickyKey(ch, stickyMode))}
+                    disabled={!activeSessionId}
+                    title={`${STICKY_MODES.find((m) => m.id === stickyMode)?.label}${ch}`}
+                    className={keyBtn}
+                  >
+                    {ch}
+                  </button>
+                ))}
+                {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((ch) => (
+                  <button
+                    key={ch}
+                    {...repeatProps(getStickyKey(ch, stickyMode))}
+                    disabled={!activeSessionId}
+                    title={`${STICKY_MODES.find((m) => m.id === stickyMode)?.label}${ch}`}
+                    className={keyBtn}
+                  >
+                    {ch}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Nano popup: commands when inside, file opener when outside */}
+          {drawerGroup === NANO_TAB && inEditor === "nano" && (
+            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
+              <div className="flex flex-wrap gap-1">
+                {NANO_KEYS.map((qk) => (
                   <button
                     key={qk.label}
                     {...repeatProps(qk.key)}
@@ -975,260 +960,457 @@ export default function InputBox() {
                     {qk.label}
                   </button>
                 ))}
-              </div>
-              {/* Selected vendor: toggle selector left, buttons right */}
-              <div className="flex items-start gap-1.5 border-t border-line/50 pt-1.5">
                 <button
-                  ref={codeVendorBtnRef}
-                  onClick={() => setCodeVendorOpen((v) => !v)}
-                  className="text-[10px] text-ink-dim hover:text-ink font-medium flex items-center gap-0.5 pt-0.5 select-none shrink-0"
+                  onClick={handleExitNano}
+                  disabled={!activeSessionId}
+                  title="Exit nano (Ctrl+X)"
+                  className={exitBtn}
                 >
-                  <svg
-                    className="w-2.5 h-2.5 transition-transform"
-                    style={{ transform: codeVendorOpen ? "rotate(90deg)" : "rotate(0deg)" }}
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M6 4l8 6-8 6V4z" />
-                  </svg>
-                  {vendor.name}
+                  exit
                 </button>
-                {codeVendorOpen &&
-                  createPortal(
-                    <div
-                      ref={codeVendorMenuRef}
-                      className="fixed bg-raised border border-line-strong rounded-control shadow-lg min-w-[80px] py-0.5"
-                      style={{
-                        zIndex: 9999,
-                        ...(() => {
-                          const r = codeVendorBtnRef.current?.getBoundingClientRect();
-                          return r ? { left: r.left, bottom: window.innerHeight - r.top + 4 } : {};
-                        })(),
-                      }}
-                    >
-                      {CLI_VENDORS.map((v, i) => (
-                        <button
-                          key={v.name}
-                          onClick={() => {
-                            setCodeVendorIdx(i);
-                            setCodeVendorOpen(false);
-                          }}
-                          className={`block w-full text-left px-3 py-1 text-[11px] hover:bg-hover transition-colors ${i === codeVendorIdx ? "text-blue-400" : "text-ink-muted"}`}
-                        >
-                          {v.name}
-                        </button>
-                      ))}
-                    </div>,
-                    document.body,
-                  )}
-                <div className="flex flex-wrap gap-1 min-w-0">
-                  {/* Launch buttons (purple) */}
-                  {vendor.launch.map((cmd) => (
-                    <button
-                      key={`${vendor.name}-${cmd.label}`}
-                      onClick={() => {
-                        if (activeSessionId) sendInput(activeSessionId, cmd.command);
-                      }}
-                      disabled={!activeSessionId}
-                      title={cmd.title}
-                      className="px-2 py-0.5 text-[11px] relief text-purple-300 hover:text-purple-100 rounded-control whitespace-nowrap select-none"
-                    >
-                      {cmd.label}
-                    </button>
-                  ))}
-                  {/* Vendor-specific keys */}
-                  {vendor.keys.map((qk) => (
-                    <button
-                      key={`${vendor.name}-${qk.label}`}
-                      {...repeatProps(qk.key)}
-                      disabled={!activeSessionId}
-                      title={qk.title}
-                      className={keyBtn}
-                    >
-                      {qk.label}
-                    </button>
-                  ))}
-                  {/* Slash commands (cyan) */}
-                  {vendor.slashCmds.map((cmd) => (
-                    <button
-                      key={`${vendor.name}-${cmd.label}`}
-                      onClick={() => {
-                        if (activeSessionId) sendInput(activeSessionId, cmd.command);
-                      }}
-                      disabled={!activeSessionId}
-                      title={cmd.title}
-                      className="px-2 py-0.5 text-[11px] relief text-cyan-300 hover:text-cyan-100 rounded-control whitespace-nowrap select-none"
-                    >
-                      {cmd.label}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
-          );
-        })()}
+          )}
+          {drawerGroup === NANO_TAB && inEditor !== "nano" && (
+            <div className="border-b border-line/50 bg-panel px-3 py-2">
+              {!toolVersions.nano ? (
+                <span className="text-[11px] text-yellow-400">
+                  nano is not installed. Install it via your package manager.
+                </span>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-ink-faint">
+                    nano{toolVersions.nano ? ` v${toolVersions.nano}` : ""}
+                  </span>
+                  <input
+                    value={editorFileName}
+                    onChange={(e) => setEditorFileName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("nano")}
+                    placeholder="filename or path..."
+                    className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={() => handleOpenEditor("nano")}
+                    disabled={!editorFileName.trim() || !activeSessionId}
+                    className="px-2 py-1 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
+                  >
+                    Open
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
-      {/* Git tab: quick actions + commit + config */}
-      {activeGroup === GIT_TAB && (
-        <div className="border-b border-line/50 bg-panel px-2 py-1.5 max-h-48 overflow-y-auto">
-          {/* Git quick actions */}
-          <div className="flex flex-wrap gap-1 mb-1.5">
-            {GIT_QUICK_CMDS.map((cmd) => (
-              <button
-                key={cmd.label}
-                onClick={() => {
-                  if (activeSessionId) sendInput(activeSessionId, cmd.command);
-                }}
-                disabled={!activeSessionId}
-                title={cmd.title}
-                className={keyBtn}
-              >
-                {cmd.label}
-              </button>
-            ))}
-          </div>
-          {/* Git commit with message input */}
-          <div className="flex items-center gap-1.5 mb-1.5 border-t border-line/50 pt-1.5">
-            <span className="text-[10px] text-ink-ghost shrink-0">commit</span>
-            <input
-              value={gitCommitMsg}
-              onChange={(e) => setGitCommitMsg(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && gitCommitMsg.trim() && activeSessionId) {
-                  const escaped = gitCommitMsg.replace(/'/g, "'\\''");
-                  sendInput(activeSessionId, `git commit -m '${escaped}'\n`);
-                  setGitCommitMsg("");
-                }
-              }}
-              placeholder="commit message..."
-              className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
-            />
-            <button
-              onClick={() => {
-                if (activeSessionId && gitCommitMsg.trim()) {
-                  const escaped = gitCommitMsg.replace(/'/g, "'\\''");
-                  sendInput(activeSessionId, `git commit -m '${escaped}'\n`);
-                  setGitCommitMsg("");
-                }
-              }}
-              disabled={!gitCommitMsg.trim() || !activeSessionId}
-              className="px-2 py-0.5 text-[11px] relief-accent relief-success text-white rounded-control shrink-0"
-            >
-              Commit
-            </button>
-          </div>
-          {/* Git config (name + email) */}
-          <div className="flex items-center gap-1.5 border-t border-line/50 pt-1.5">
-            <span className="text-[10px] text-ink-ghost shrink-0">config</span>
-            <input
-              value={gitConfigName}
-              onChange={(e) => setGitConfigName(e.target.value)}
-              placeholder="user.name"
-              className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
-            />
-            <input
-              value={gitConfigEmail}
-              onChange={(e) => setGitConfigEmail(e.target.value)}
-              placeholder="user.email"
-              className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
-            />
-            <button
-              onClick={() => {
-                if (!activeSessionId) return;
-                if (gitConfigName.trim())
-                  sendInput(activeSessionId, `git config --global user.name '${gitConfigName.trim()}'\n`);
-                if (gitConfigEmail.trim())
-                  sendInput(activeSessionId, `git config --global user.email '${gitConfigEmail.trim()}'\n`);
-              }}
-              disabled={!activeSessionId || (!gitConfigName.trim() && !gitConfigEmail.trim())}
-              className="px-2 py-0.5 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors shrink-0"
-            >
-              Set
-            </button>
-          </div>
-        </div>
-      )}
+          {/* Vim popup: commands when inside, file opener when outside */}
+          {drawerGroup === VIM_TAB && inEditor === "vim" && (
+            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
+              <div className="flex flex-wrap gap-1">
+                {VIM_KEYS.map((qk) => (
+                  <button
+                    key={qk.label}
+                    {...repeatProps(qk.key)}
+                    disabled={!activeSessionId}
+                    title={qk.title}
+                    className={keyBtn}
+                  >
+                    {qk.label}
+                  </button>
+                ))}
+                <button
+                  onClick={handleSaveExitVim}
+                  disabled={!activeSessionId}
+                  title="Save and exit (:wq)"
+                  className={saveExitBtn}
+                >
+                  save+exit
+                </button>
+                <button
+                  onClick={handleExitVim}
+                  disabled={!activeSessionId}
+                  title="Force quit (:q!)"
+                  className={exitBtn}
+                >
+                  quit
+                </button>
+              </div>
+            </div>
+          )}
+          {drawerGroup === VIM_TAB && inEditor !== "vim" && (
+            <div className="border-b border-line/50 bg-panel px-3 py-2">
+              {!toolVersions.vim ? (
+                <span className="text-[11px] text-yellow-400">
+                  vim is not installed. Install it via your package manager.
+                </span>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-ink-faint">vim v{toolVersions.vim}</span>
+                  <input
+                    value={editorFileName}
+                    onChange={(e) => setEditorFileName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("vim")}
+                    placeholder="filename or path..."
+                    className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={() => handleOpenEditor("vim")}
+                    disabled={!editorFileName.trim() || !activeSessionId}
+                    className="px-2 py-1 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
+                  >
+                    Open
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
-      {/* Text input */}
-      <div className="flex gap-2 px-2 pt-2 pb-1">
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={handleInput}
-          placeholder="Type anything... (Enter for newline)"
-          rows={1}
-          className="flex-1 bg-raised text-ink border border-line-strong rounded-panel px-3 py-2 text-[16px] leading-5 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
-          style={{ maxHeight: 120 }}
-        />
-        <button
-          onClick={handleSend}
-          disabled={!text || !activeSessionId}
-          className="px-4 py-2 relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-panel text-sm font-medium transition-colors"
-        >
-          Send
-        </button>
-      </div>
+          {/* Tmux popup: commands when inside, sessions when outside */}
+          {drawerGroup === TMUX_TAB && inTmux && (
+            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
+              <div className="flex flex-wrap gap-1">
+                {TMUX_KEYS.map((qk) => (
+                  <button
+                    key={qk.label}
+                    {...repeatProps(qk.key)}
+                    disabled={!activeSessionId}
+                    title={qk.title}
+                    className={keyBtn}
+                  >
+                    {qk.label}
+                  </button>
+                ))}
+                <button
+                  onClick={handleTmuxDetach}
+                  disabled={!activeSessionId}
+                  title="Detach from tmux"
+                  className={exitBtn}
+                >
+                  detach
+                </button>
+              </div>
+            </div>
+          )}
+          {drawerGroup === TMUX_TAB && !inTmux && (
+            <div className="border-b border-line/50 bg-panel px-3 py-2">
+              {!toolVersions.tmux ? (
+                <span className="text-[11px] text-yellow-400">
+                  tmux is not installed. Install it via your package manager.
+                </span>
+              ) : (
+                <>
+                  <span className="text-[10px] text-ink-ghost float-right">v{toolVersions.tmux}</span>
+                  {tmuxLoading ? (
+                    <span className="text-[11px] text-ink-faint">Loading...</span>
+                  ) : tmuxSessions.length === 0 ? (
+                    <span className="text-[11px] text-ink-faint">No tmux sessions running</span>
+                  ) : (
+                    <div className="flex flex-col gap-1 mb-2">
+                      {tmuxSessions.map((s) => (
+                        <div key={s.name} className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleTmuxAttach(s.name)}
+                            className="flex-1 text-left px-2 py-1 text-[11px] bg-raised text-ink-muted hover:text-ink hover:bg-hover rounded-control border border-line transition-colors"
+                          >
+                            <span className="font-medium">{s.name}</span>
+                            <span className="text-ink-faint ml-2">{s.windows}w</span>
+                            {s.attached && <span className="text-green-500 ml-1">(attached)</span>}
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (!activeSessionId) return;
+                              sendInput(activeSessionId, `tmux kill-session -t ${s.name}\n`);
+                              setTimeout(fetchTmuxSessions, 500);
+                            }}
+                            className="p-1 text-ink-faint hover:text-red-400 transition-colors"
+                            title={`Kill session ${s.name}`}
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      value={tmuxNewName}
+                      onChange={(e) => setTmuxNewName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleTmuxNew()}
+                      placeholder="New session name..."
+                      className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={handleTmuxNew}
+                      disabled={!tmuxNewName.trim() || !activeSessionId}
+                      className="px-2 py-1 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
+                    >
+                      Create
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
-      {/* Always-visible nav keys */}
-      <div className="flex items-center gap-1 px-2 pb-1.5 overflow-x-auto scrollbar-none">
-        {NAV_KEYS.map((qk) => (
-          <button
-            key={qk.label}
-            {...repeatProps(qk.key)}
-            disabled={!activeSessionId}
-            title={qk.title}
-            className={`${keyBtn} text-[10px] px-1.5`}
-          >
-            {qk.label}
-          </button>
-        ))}
-        {NAV_TAIL.map((qk) => (
-          <button
-            key={qk.label}
-            {...repeatProps(qk.key)}
-            disabled={!activeSessionId}
-            title={qk.title}
-            className={`${keyBtn} text-[10px] px-1.5`}
-          >
-            {qk.label}
-          </button>
-        ))}
-        {NAV_ARROWS.map((qk) => (
-          <button
-            key={qk.label}
-            {...repeatProps(qk.key)}
-            disabled={!activeSessionId}
-            title={qk.title}
-            className={`${keyBtn} text-[10px] px-1.5`}
-          >
-            {qk.label}
-          </button>
-        ))}
+          {/* Code tab: common keys + selected vendor panel */}
+          {drawerGroup === CODE_TAB &&
+            (() => {
+              const vendor = CLI_VENDORS[codeVendorIdx] || CLI_VENDORS[0];
+              return (
+                <div className="border-b border-line/50 bg-panel px-2 py-1.5 max-h-64 overflow-y-auto">
+                  {/* Common keys (no header) */}
+                  <div className="flex flex-wrap gap-1 mb-1.5">
+                    {CODE_COMMON_KEYS.map((qk) => (
+                      <button
+                        key={qk.label}
+                        {...repeatProps(qk.key)}
+                        disabled={!activeSessionId}
+                        title={qk.title}
+                        className={keyBtn}
+                      >
+                        {qk.label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Selected vendor: toggle selector left, buttons right */}
+                  <div className="flex items-start gap-1.5 border-t border-line/50 pt-1.5">
+                    <button
+                      ref={codeVendorBtnRef}
+                      onClick={() => setCodeVendorOpen((v) => !v)}
+                      className="text-[10px] text-ink-dim hover:text-ink font-medium flex items-center gap-0.5 pt-0.5 select-none shrink-0"
+                    >
+                      <svg
+                        className="w-2.5 h-2.5 transition-transform"
+                        style={{ transform: codeVendorOpen ? "rotate(90deg)" : "rotate(0deg)" }}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M6 4l8 6-8 6V4z" />
+                      </svg>
+                      {vendor.name}
+                    </button>
+                    {codeVendorOpen &&
+                      createPortal(
+                        <div
+                          ref={codeVendorMenuRef}
+                          className="fixed bg-raised border border-line-strong rounded-control shadow-lg min-w-[80px] py-0.5"
+                          style={{
+                            zIndex: 9999,
+                            ...(() => {
+                              const r = codeVendorBtnRef.current?.getBoundingClientRect();
+                              return r ? { left: r.left, bottom: window.innerHeight - r.top + 4 } : {};
+                            })(),
+                          }}
+                        >
+                          {CLI_VENDORS.map((v, i) => (
+                            <button
+                              key={v.name}
+                              onClick={() => {
+                                setCodeVendorIdx(i);
+                                setCodeVendorOpen(false);
+                              }}
+                              className={`block w-full text-left px-3 py-1 text-[11px] hover:bg-hover transition-colors ${i === codeVendorIdx ? "text-blue-400" : "text-ink-muted"}`}
+                            >
+                              {v.name}
+                            </button>
+                          ))}
+                        </div>,
+                        document.body,
+                      )}
+                    <div className="flex flex-wrap gap-1 min-w-0">
+                      {/* Launch buttons (purple) */}
+                      {vendor.launch.map((cmd) => (
+                        <button
+                          key={`${vendor.name}-${cmd.label}`}
+                          onClick={() => {
+                            if (activeSessionId) sendInput(activeSessionId, cmd.command);
+                          }}
+                          disabled={!activeSessionId}
+                          title={cmd.title}
+                          className="px-2 py-0.5 text-[11px] relief text-purple-300 hover:text-purple-100 rounded-control whitespace-nowrap select-none"
+                        >
+                          {cmd.label}
+                        </button>
+                      ))}
+                      {/* Vendor-specific keys */}
+                      {vendor.keys.map((qk) => (
+                        <button
+                          key={`${vendor.name}-${qk.label}`}
+                          {...repeatProps(qk.key)}
+                          disabled={!activeSessionId}
+                          title={qk.title}
+                          className={keyBtn}
+                        >
+                          {qk.label}
+                        </button>
+                      ))}
+                      {/* Slash commands (cyan) */}
+                      {vendor.slashCmds.map((cmd) => (
+                        <button
+                          key={`${vendor.name}-${cmd.label}`}
+                          onClick={() => {
+                            if (activeSessionId) sendInput(activeSessionId, cmd.command);
+                          }}
+                          disabled={!activeSessionId}
+                          title={cmd.title}
+                          className="px-2 py-0.5 text-[11px] relief text-cyan-300 hover:text-cyan-100 rounded-control whitespace-nowrap select-none"
+                        >
+                          {cmd.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
-        {/* Terminal text size — kept here rather than only in Settings, since
-            it is adjusted mid-session far more often than it is configured. */}
-        <div className="ml-auto flex shrink-0 items-center gap-1 pl-2">
-          <button
-            type="button"
-            onClick={() => setFontSize(Math.max(MIN_FONT_SIZE, fontSize - 1))}
-            disabled={fontSize <= MIN_FONT_SIZE}
-            title="Smaller text"
-            aria-label="Smaller terminal text"
-            className={`${keyBtn} text-[10px] px-1.5`}
-          >
-            A-
-          </button>
-          <span className="w-4 text-center text-[10px] tabular-nums text-ink-faint">{fontSize}</span>
-          <button
-            type="button"
-            onClick={() => setFontSize(Math.min(MAX_FONT_SIZE, fontSize + 1))}
-            disabled={fontSize >= MAX_FONT_SIZE}
-            title="Larger text"
-            aria-label="Larger terminal text"
-            className={`${keyBtn} text-[10px] px-1.5`}
-          >
-            A+
-          </button>
+          {/* Git tab: quick actions + commit + config */}
+          {drawerGroup === GIT_TAB && (
+            <div className="border-b border-line/50 bg-panel px-2 py-1.5 max-h-48 overflow-y-auto">
+              {/* Git quick actions */}
+              <div className="flex flex-wrap gap-1 mb-1.5">
+                {GIT_QUICK_CMDS.map((cmd) => (
+                  <button
+                    key={cmd.label}
+                    onClick={() => {
+                      if (activeSessionId) sendInput(activeSessionId, cmd.command);
+                    }}
+                    disabled={!activeSessionId}
+                    title={cmd.title}
+                    className={keyBtn}
+                  >
+                    {cmd.label}
+                  </button>
+                ))}
+              </div>
+              {/* Git commit with message input */}
+              <div className="flex items-center gap-1.5 mb-1.5 border-t border-line/50 pt-1.5">
+                <span className="text-[10px] text-ink-ghost shrink-0">commit</span>
+                <input
+                  value={gitCommitMsg}
+                  onChange={(e) => setGitCommitMsg(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && gitCommitMsg.trim() && activeSessionId) {
+                      const escaped = gitCommitMsg.replace(/'/g, "'\\''");
+                      sendInput(activeSessionId, `git commit -m '${escaped}'\n`);
+                      setGitCommitMsg("");
+                    }
+                  }}
+                  placeholder="commit message..."
+                  className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+                />
+                <button
+                  onClick={() => {
+                    if (activeSessionId && gitCommitMsg.trim()) {
+                      const escaped = gitCommitMsg.replace(/'/g, "'\\''");
+                      sendInput(activeSessionId, `git commit -m '${escaped}'\n`);
+                      setGitCommitMsg("");
+                    }
+                  }}
+                  disabled={!gitCommitMsg.trim() || !activeSessionId}
+                  className="px-2 py-0.5 text-[11px] relief-accent relief-success text-white rounded-control shrink-0"
+                >
+                  Commit
+                </button>
+              </div>
+              {/* Git config (name + email) */}
+              <div className="flex items-center gap-1.5 border-t border-line/50 pt-1.5">
+                <span className="text-[10px] text-ink-ghost shrink-0">config</span>
+                <input
+                  value={gitConfigName}
+                  onChange={(e) => setGitConfigName(e.target.value)}
+                  placeholder="user.name"
+                  className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+                />
+                <input
+                  value={gitConfigEmail}
+                  onChange={(e) => setGitConfigEmail(e.target.value)}
+                  placeholder="user.email"
+                  className="flex-1 bg-raised text-ink border border-line rounded-control px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+                />
+                <button
+                  onClick={() => {
+                    if (!activeSessionId) return;
+                    if (gitConfigName.trim())
+                      sendInput(activeSessionId, `git config --global user.name '${gitConfigName.trim()}'\n`);
+                    if (gitConfigEmail.trim())
+                      sendInput(activeSessionId, `git config --global user.email '${gitConfigEmail.trim()}'\n`);
+                  }}
+                  disabled={!activeSessionId || (!gitConfigName.trim() && !gitConfigEmail.trim())}
+                  className="px-2 py-0.5 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors shrink-0"
+                >
+                  Set
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Text input — now the "text" tab's drawer rather than a pinned row, so
+          an unselected input area collapses to just the tab strip. */}
+          {drawerGroup === TEXT_TAB && (
+            <>
+              <div className="flex gap-2 px-2 pt-2 pb-1">
+                <textarea
+                  ref={textareaRef}
+                  value={text}
+                  onChange={handleInput}
+                  placeholder="Type anything... (Enter for newline)"
+                  rows={1}
+                  className="flex-1 bg-raised text-ink border border-line-strong rounded-panel px-3 py-2 text-[16px] leading-5 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  style={{ maxHeight: 120 }}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!text || !activeSessionId}
+                  className="px-4 py-2 relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-panel text-sm font-medium transition-colors"
+                >
+                  Send
+                </button>
+              </div>
+
+              {/* Nav keys travel with the text input. */}
+              <div className="flex items-center gap-1 px-2 pb-1.5 overflow-x-auto scrollbar-none">
+                {NAV_KEYS.map((qk) => (
+                  <button
+                    key={qk.label}
+                    {...repeatProps(qk.key)}
+                    disabled={!activeSessionId}
+                    title={qk.title}
+                    className={`${keyBtn} text-[10px] px-1.5`}
+                  >
+                    {qk.label}
+                  </button>
+                ))}
+                {NAV_TAIL.map((qk) => (
+                  <button
+                    key={qk.label}
+                    {...repeatProps(qk.key)}
+                    disabled={!activeSessionId}
+                    title={qk.title}
+                    className={`${keyBtn} text-[10px] px-1.5`}
+                  >
+                    {qk.label}
+                  </button>
+                ))}
+                {NAV_ARROWS.map((qk) => (
+                  <button
+                    key={qk.label}
+                    {...repeatProps(qk.key)}
+                    disabled={!activeSessionId}
+                    title={qk.title}
+                    className={`${keyBtn} text-[10px] px-1.5`}
+                  >
+                    {qk.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

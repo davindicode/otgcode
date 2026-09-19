@@ -20,12 +20,39 @@ function Section({ title, description, children }: { title: string; description:
 const inputClass =
   "w-full rounded-control border border-line bg-app px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-ghost focus:border-blue-500 focus:outline-none disabled:opacity-50";
 
+function FontRow({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
+  const step = (delta: number) => onChange(Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, value + delta)));
+  const button = (delta: number, symbol: string, aria: string) => (
+    <button
+      type="button"
+      onClick={() => step(delta)}
+      disabled={delta < 0 ? value <= MIN_FONT_SIZE : value >= MAX_FONT_SIZE}
+      aria-label={aria}
+      className="relief rounded-control px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
+    >
+      {symbol}
+    </button>
+  );
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-[11px] text-ink-dim">{label}</span>
+      <div className="flex items-center gap-1">
+        {button(-1, "\u2212", `Decrease ${label}`)}
+        <span className="w-7 text-center text-xs tabular-nums text-ink">{value}</span>
+        {button(1, "+", `Increase ${label}`)}
+      </div>
+    </div>
+  );
+}
+
 /** Display preferences. Saved to the workspace file the moment they change. */
 function Appearance() {
   const theme = useWorkspaceStore((s) => s.theme);
   const setTheme = useWorkspaceStore((s) => s.setTheme);
   const fontSize = useTerminalStore((s) => s.fontSize);
   const setFontSize = useTerminalStore((s) => s.setFontSize);
+  const editorFontSize = useWorkspaceStore((s) => s.editorFontSize);
+  const setEditorFontSize = useWorkspaceStore((s) => s.setEditorFontSize);
 
   const themeButton = (value: "dark" | "light", label: string, icon: React.ReactNode) => (
     <button
@@ -68,30 +95,8 @@ function Appearance() {
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[11px] text-ink-dim">Terminal font size</span>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setFontSize(Math.max(MIN_FONT_SIZE, fontSize - 1))}
-            disabled={fontSize <= MIN_FONT_SIZE}
-            aria-label="Decrease font size"
-            className="rounded-control border border-line px-2 py-0.5 text-xs text-ink-muted transition-colors hover:text-ink disabled:text-ink-ghost"
-          >
-            −
-          </button>
-          <span className="w-7 text-center text-xs tabular-nums text-ink">{fontSize}</span>
-          <button
-            type="button"
-            onClick={() => setFontSize(Math.min(MAX_FONT_SIZE, fontSize + 1))}
-            disabled={fontSize >= MAX_FONT_SIZE}
-            aria-label="Increase font size"
-            className="rounded-control border border-line px-2 py-0.5 text-xs text-ink-muted transition-colors hover:text-ink disabled:text-ink-ghost"
-          >
-            +
-          </button>
-        </div>
-      </div>
+      <FontRow label="Terminal font size" value={fontSize} onChange={setFontSize} />
+      <FontRow label="Editor font size" value={editorFontSize} onChange={setEditorFontSize} />
     </div>
   );
 }

@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Custom commands.** The cmds group has an "add" button that opens a small
+  dialog for a label and a command, and an "edit" toggle that turns every
+  button into a remove target. Removed built-ins can be restored from the same
+  view. Both lists are saved to the workspace file.
+
 ### Changed
+- **The terminal input is a tab group, not a pinned row.** "text" joins cmds,
+  cd, combos and the rest; with no group selected the input area collapses to
+  just the tab strip, giving the terminal the full pane.
+- Input drawers slide open and closed instead of snapping, animating to each
+  drawer's own height.
+- The "Ctrl+" tab is now **combos** — it sends any modifier combination, not
+  only Ctrl.
+- **Font sizes are global settings.** The per-terminal and per-editor controls
+  are gone; terminal and editor sizes each have one control in Settings and
+  apply everywhere. Editor size is now remembered rather than resetting to a
+  default on every file open.
+- The header dropped its online/offline pill — losing the connection already
+  raises the full-screen connecting gate — and its version number, which moved
+  into the System Info popup.
 - **One pane, one tab strip.** The split pane, the per-panel tab rows and the
   mobile tab bar are gone. Every tab — terminal, explorer, or an open file —
   lives in a single VS Code-style strip at the top, and `+` asks which kind to

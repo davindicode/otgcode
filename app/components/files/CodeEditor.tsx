@@ -193,7 +193,7 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
   const [value, setValue] = useState(content);
   const [dirty, setDirty] = useState(false);
   const [mode, setMode] = useState<"edit" | "plain" | "preview">(canPreview ? "preview" : "edit");
-  const [editorFontSize, setEditorFontSize] = useState(6);
+  const editorFontSize = useWorkspaceStore((s) => s.editorFontSize);
   const monacoTheme = useWorkspaceStore((s) => (s.theme === "light" ? "light" : "vs-dark"));
   const isHtml = ext === "html" || ext === "htm";
   const [htmlZoom, setHtmlZoom] = useState(100);
@@ -324,21 +324,7 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
               </button>
             </div>
           ) : (
-            <div className="flex items-center border border-line rounded-control overflow-hidden">
-              <button
-                onClick={() => setEditorFontSize((s) => Math.max(6, s - 1))}
-                className="px-1.5 py-0.5 text-ink-dim hover:text-ink hover:bg-control transition-colors leading-none"
-              >
-                <span className="text-[9px] font-bold">a</span>
-              </button>
-              <span className="text-[10px] text-ink-faint w-5 text-center tabular-nums">{editorFontSize}</span>
-              <button
-                onClick={() => setEditorFontSize((s) => Math.min(32, s + 1))}
-                className="px-1.5 py-0.5 text-ink-dim hover:text-ink hover:bg-control transition-colors leading-none"
-              >
-                <span className="text-[14px] font-bold">A</span>
-              </button>
-            </div>
+            <span />
           )}
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}

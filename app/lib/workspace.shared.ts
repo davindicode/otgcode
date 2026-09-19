@@ -20,24 +20,46 @@ export interface WorkspaceTab {
   path: string;
 }
 
+/** A command button the user added to the cmds group. */
+export interface CustomCommand {
+  label: string;
+  command: string;
+}
+
 export interface Workspace {
   theme: Theme;
   /** Terminal font size in px. */
   fontSize: number;
+  /** Code editor font size in px. */
+  editorFontSize: number;
   tabs: WorkspaceTab[];
   activeId: string | null;
+  /** Commands the user added to the cmds group. */
+  customCommands: CustomCommand[];
+  /** Labels of built-in commands the user removed from the cmds group. */
+  hiddenCommands: string[];
 }
 
 export const MIN_FONT_SIZE = 6;
 export const MAX_FONT_SIZE = 24;
 export const DEFAULT_FONT_SIZE = 8;
+export const DEFAULT_EDITOR_FONT_SIZE = 13;
+const MAX_CUSTOM_COMMANDS = 40;
 
 const MAX_TABS = 32;
 const MAX_STRING = 4096;
 const KINDS: TabKind[] = ["terminal", "explorer", "viewer"];
 
 export function defaultWorkspace(): Workspace {
-  return { theme: "dark", fontSize: DEFAULT_FONT_SIZE, tabs: [], activeId: null };
+  return {
+    theme: "dark",
+    fontSize: DEFAULT_FONT_SIZE,
+    editorFontSize: DEFAULT_EDITOR_FONT_SIZE,
+    tabs: [],
+    activeId: null,
+    customCommands: [],
+    hiddenCommands: [],
+  };
 }
 
 function str(value: unknown): string {
@@ -63,6 +85,32 @@ function tabs(value: unknown): WorkspaceTab[] {
   return out;
 }
 
+function commands(value: unknown): CustomCommand[] {
+  if (!Array.isArray(value)) return [];
+  const out: CustomCommand[] = [];
+  const seen = new Set<string>();
+  for (const raw of value.slice(0, MAX_CUSTOM_COMMANDS)) {
+    if (!raw || typeof raw !== "object") continue;
+    const entry = raw as Record<string, unknown>;
+    const label = str(entry.label).trim();
+    const command = str(entry.command);
+    if (!label || !command || seen.has(label)) continue;
+    seen.add(label);
+    out.push({ label, command });
+  }
+  return out;
+}
+
+function labels(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const raw of value.slice(0, MAX_CUSTOM_COMMANDS)) {
+    const label = str(raw).trim();
+    if (label && !out.includes(label)) out.push(label);
+  }
+  return out;
+}
+
 /**
  * Coerce whatever is on disk (or came from the browser) into a valid
  * Workspace. Unknown keys are dropped and every value is clamped, so a stale
@@ -74,7 +122,10 @@ export function sanitize(input: unknown, base: Workspace = defaultWorkspace()): 
 
   // Only real numbers count: Number(null) is 0 and Number(true) is 1, which
   // would silently clamp junk to the minimum instead of keeping the old value.
-  const font = typeof raw.fontSize === "number" && Number.isFinite(raw.fontSize) ? raw.fontSize : null;
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const clamp = (v: number) => Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Math.round(v)));
+  const font = num(raw.fontSize);
+  const editorFont = num(raw.editorFontSize);
   const nextTabs = raw.tabs === undefined ? base.tabs : tabs(raw.tabs);
 
   const activeId =
@@ -88,8 +139,11 @@ export function sanitize(input: unknown, base: Workspace = defaultWorkspace()): 
 
   return {
     theme: raw.theme === "light" || raw.theme === "dark" ? raw.theme : base.theme,
-    fontSize: font === null ? base.fontSize : Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Math.round(font))),
+    fontSize: font === null ? base.fontSize : clamp(font),
+    editorFontSize: editorFont === null ? base.editorFontSize : clamp(editorFont),
     tabs: nextTabs,
     activeId,
+    customCommands: raw.customCommands === undefined ? base.customCommands : commands(raw.customCommands),
+    hiddenCommands: raw.hiddenCommands === undefined ? base.hiddenCommands : labels(raw.hiddenCommands),
   };
 }

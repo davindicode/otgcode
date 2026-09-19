@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_EDITOR_FONT_SIZE,
   DEFAULT_FONT_SIZE,
   defaultWorkspace,
   MAX_FONT_SIZE,
@@ -101,5 +102,42 @@ describe("sanitize", () => {
     const cleared = sanitize({ tabs: [], activeId: null }, base);
     expect(cleared.tabs).toEqual([]);
     expect(cleared.activeId).toBeNull();
+  });
+
+  it("clamps the editor font size independently of the terminal's", () => {
+    const result = sanitize({ fontSize: 10, editorFontSize: 18 });
+    expect(result.fontSize).toBe(10);
+    expect(result.editorFontSize).toBe(18);
+    expect(sanitize({ editorFontSize: 99 }).editorFontSize).toBe(MAX_FONT_SIZE);
+    expect(sanitize({ editorFontSize: "big" }).editorFontSize).toBe(DEFAULT_EDITOR_FONT_SIZE);
+  });
+
+  it("keeps well-formed custom commands and drops the rest", () => {
+    const result = sanitize({
+      customCommands: [
+        { label: "deploy", command: "./deploy.sh" },
+        { label: "deploy", command: "duplicate label" },
+        { label: "", command: "no label" },
+        { label: "no command", command: "" },
+        "not an object",
+      ],
+    });
+    expect(result.customCommands).toEqual([{ label: "deploy", command: "./deploy.sh" }]);
+  });
+
+  it("dedupes hidden command labels and ignores non-strings", () => {
+    expect(sanitize({ hiddenCommands: ["ls", "ls", "", 7, "top"] }).hiddenCommands).toEqual(["ls", "top"]);
+  });
+
+  it("caps custom commands so the file can't grow without bound", () => {
+    const many = Array.from({ length: 200 }, (_, i) => ({ label: `c${i}`, command: "x" }));
+    expect(sanitize({ customCommands: many }).customCommands).toHaveLength(40);
+  });
+
+  it("leaves commands untouched when the patch omits them", () => {
+    const base = sanitize({ customCommands: [{ label: "deploy", command: "./deploy.sh" }], hiddenCommands: ["ls"] });
+    const merged = sanitize({ fontSize: 12 }, base);
+    expect(merged.customCommands).toEqual([{ label: "deploy", command: "./deploy.sh" }]);
+    expect(merged.hiddenCommands).toEqual(["ls"]);
   });
 });
