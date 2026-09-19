@@ -107,7 +107,7 @@ export default function TerminalPanel({ sessionId }: { sessionId: string }) {
   }, [sessionId]);
 
   return (
-    <div className="absolute inset-0 bg-raised">
+    <div className="absolute inset-0 bg-terminal">
       <div ref={terminalRef} className="h-full w-full" />
     </div>
   );

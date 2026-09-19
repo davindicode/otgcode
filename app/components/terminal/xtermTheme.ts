@@ -4,9 +4,6 @@ import type { Theme } from "~/lib/workspace.shared";
 // The dark set is the original VS Code-ish palette. The light set keeps the
 // same hues but darkens them to stay legible on a pale background — ANSI
 // colours tuned for a dark terminal wash out badly otherwise.
-// These two backgrounds must stay identical to --t-raised in app.css for the
-// matching theme: the terminal container uses that token, and any pixel the
-// canvas doesn't paint falls through to it.
 const DARK: ITheme = {
   background: "#1a1a2e",
   foreground: "#e0e0e0",
@@ -32,29 +29,45 @@ const DARK: ITheme = {
 };
 
 const LIGHT: ITheme = {
-  background: "#fbfcfe",
+  background: "#edf0f6",
   foreground: "#24262f",
   cursor: "#24262f",
-  cursorAccent: "#fbfcfe",
+  cursorAccent: "#edf0f6",
   selectionBackground: "#b6d7f5",
   black: "#24262f",
   red: "#c72e2e",
   green: "#2f7d32",
-  yellow: "#9a6d00",
+  yellow: "#966a00",
   blue: "#1667c4",
   magenta: "#9c27b0",
   cyan: "#00796b",
   white: "#5c6070",
-  brightBlack: "#767d92",
-  brightRed: "#e03131",
-  brightGreen: "#37913b",
-  brightYellow: "#b07d00",
-  brightBlue: "#1c7ed6",
+  brightBlack: "#6a7083",
+  brightRed: "#d72f2f",
+  brightGreen: "#318235",
+  brightYellow: "#936800",
+  brightBlue: "#1973c4",
   brightMagenta: "#b338c7",
-  brightCyan: "#0b8f80",
+  brightCyan: "#098073",
   brightWhite: "#14141f",
 };
 
-export function xtermTheme(theme: Theme): ITheme {
-  return theme === "light" ? LIGHT : DARK;
+/**
+ * The canvas background is read from --t-terminal rather than duplicated here:
+ * the container paints the same token, and any pixel the canvas doesn't cover
+ * falls through to it. Two hard-coded copies drifted apart once already and
+ * showed as bands at the edges of the terminal.
+ */
+function terminalBackground(fallback: string): string {
+  if (typeof window === "undefined") return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue("--t-terminal").trim();
+  return value || fallback;
 }
+
+export function xtermTheme(theme: Theme): ITheme {
+  const base = theme === "light" ? LIGHT : DARK;
+  const background = terminalBackground(base.background ?? fallback(theme));
+  return { ...base, background, cursorAccent: background };
+}
+
+const fallback = (theme: Theme) => (theme === "light" ? "#edf0f6" : "#0b0b16");

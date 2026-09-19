@@ -17,7 +17,10 @@
 
   --t-app: #0d0d1a;         /* window background */
   --t-panel: #12122a;       /* input drawers */
-  --t-surface: #16162a;     /* toolbars, headers, cards */
+  --t-surface: #16162a;     /* toolbars, tab strip, cards */
+  --t-header: #20203a;      /* the app header, one step above the tab strip */
+  --t-header-active: #33335e; /* selected header icon */
+  --t-terminal: #0b0b16;    /* terminal canvas — recedes behind the chrome */
   --t-raised: #1a1a2e;      /* inputs, code areas, terminal */
   --t-popover: #1e1e3a;     /* menus, dialogs, toasts */
   --t-hover: #2a2a4a;       /* hovered / active control */
@@ -98,7 +101,10 @@ html.light {
      control read as raised. Dark mode does the same thing the other way up. */
   --t-app: #edf0f6;         /* content ground — panes, lists, viewers */
   --t-panel: #d5dbe7;       /* input drawers */
-  --t-surface: #cdd4e1;     /* chrome: header, tab strip, toolbars */
+  --t-surface: #cdd4e1;     /* chrome: tab strip, toolbars */
+  --t-header: #bcc5d6;      /* the app header, one step above the tab strip */
+  --t-header-active: #a5b1c9; /* selected header icon */
+  --t-terminal: #edf0f6;    /* terminal canvas — the same paper as the explorer */
   --t-raised: #fbfcfe;      /* inputs, code, terminal */
   --t-popover: #f9fafd;
   --t-hover: #bfc7d8;
@@ -168,6 +174,9 @@ html.light {
   --color-app: var(--t-app);
   --color-panel: var(--t-panel);
   --color-surface: var(--t-surface);
+  --color-header: var(--t-header);
+  --color-header-active: var(--t-header-active);
+  --color-terminal: var(--t-terminal);
   --color-raised: var(--t-raised);
   --color-popover: var(--t-popover);
   --color-hover: var(--t-hover);

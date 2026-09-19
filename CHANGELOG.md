@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   view. Both lists are saved to the workspace file.
 
 ### Changed
+- The header sits a step apart from the tab strip below it — lighter in dark
+  mode, darker in light — so the two bars no longer read as one slab.
+- **Content recedes, chrome advances, in both themes.** The terminal was
+  lighter than the bars around it in dark mode, the opposite of light mode;
+  it is now the darkest surface there and shares the explorer's paper in
+  light, which was also toned down from near-white. Light-theme ANSI colours
+  were re-checked against the new ground and seven were deepened to keep their
+  contrast margin.
 - **Light theme reworked.** It now inverts the dark layering deliberately:
   content is bright paper and the chrome around it (header, tab strip,
   toolbars) is grey-blue, which is what lets a near-white control read as

@@ -148,7 +148,7 @@ export default function Header() {
     `p-1 rounded-control transition-colors ${active ? "bg-hover text-ink" : "text-ink-faint hover:text-ink"}`;
 
   return (
-    <header className="bar-edge flex items-center justify-between px-3 py-1.5 bg-surface border-b border-line shrink-0 relative">
+    <header className="bar-edge flex items-center justify-between px-3 py-1.5 bg-header border-b border-line shrink-0 relative">
       <div className="flex items-center gap-2">
         <img src="/logo-square.png" alt="OTG Code" className="w-6 h-6 rounded-control" />
         <span className="text-ink font-bold text-sm">OTG Code</span>
