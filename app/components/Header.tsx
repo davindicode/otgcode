@@ -11,6 +11,14 @@ type Panel = "info" | "settings" | "localhost";
 // mousedown and immediately reopen it on click.
 const TRIGGER_ATTR = "data-header-panel-trigger";
 
+// Round-trip thresholds for a browser talking to this server, usually over a
+// Cloudflare tunnel: under 100ms feels immediate, past 300ms typing lags.
+function latencyClass(ms: number): string {
+  if (ms < 100) return "rtt-good";
+  if (ms < 300) return "rtt-ok";
+  return "rtt-poor";
+}
+
 /**
  * Round-trip time to the server. Median of a few samples so one slow request
  * doesn't dominate, and re-measured every few seconds while the popup is open.
@@ -96,8 +104,12 @@ function SystemInfoPopup({ onClose }: { onClose: () => void }) {
           <span className="text-right font-mono text-ink-muted">v{__APP_VERSION__}</span>
         </div>
         <div className="flex justify-between gap-2 text-[11px]">
-          <span className="text-ink-faint shrink-0">latency</span>
-          <span className="text-right font-mono text-ink-muted tabular-nums">
+          <span className="text-ink-faint shrink-0">connection latency</span>
+          <span
+            className={`text-right font-mono tabular-nums ${
+              latency === null ? "text-ink-muted" : latencyClass(latency)
+            }`}
+          >
             {latency === null ? "—" : `${latency} ms`}
           </span>
         </div>

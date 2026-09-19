@@ -13,8 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and checks the tunnel actually serves the app. Only the tunnel URL is
   highlighted; the local addresses are dimmed as reference detail, so the one
   address worth copying is unmistakable.
-- System Info shows round-trip latency to the server, alongside the app
-  version.
+- System Info shows **connection latency** to the server alongside the app
+  version, coloured by quality — green under 100ms, amber to 300ms, red beyond
+  — with deeper shades in the light theme so each state stays legible.
 - **Custom commands.** The cmds group has an "add" button that opens a small
   dialog for a label and a command, and an "edit" toggle that turns every
   button into a remove target. Removed built-ins can be restored from the same

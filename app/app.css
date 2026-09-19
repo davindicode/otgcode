@@ -561,6 +561,29 @@ button:disabled {
   }
 }
 
+/* Connection quality. Defined here rather than as utility classes so the
+   light theme can use deeper shades — a green that reads on a dark popover is
+   washed out on a bright one. */
+.rtt-good {
+  color: #4ade80;
+}
+.rtt-ok {
+  color: #fbbf24;
+}
+.rtt-poor {
+  color: #f87171;
+}
+
+html.light .rtt-good {
+  color: #15803d;
+}
+html.light .rtt-ok {
+  color: #b45309;
+}
+html.light .rtt-poor {
+  color: #b91c1c;
+}
+
 /* Modal backdrop: frosted rather than a flat wash, so an overlay reads as
    glass sitting above the app rather than a dimming sheet. */
 .scrim {
