@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isDirectViewerFile } from "~/lib/fileTypes";
 import { useTabsStore } from "~/stores/tabsStore";
 import { useToastStore } from "~/stores/toastStore";
-import FileViewer, { isDirectViewerFile } from "./files/FileViewer";
+import FileViewer from "./files/FileViewer";
 
 type Load = { status: "loading" } | { status: "ready"; content: string | null } | { status: "error"; message: string };
 

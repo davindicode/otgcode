@@ -16,4 +16,5 @@ export default [
   route("api/system-info", "routes/api/system-info.ts"),
   route("api/terminal/cwd", "routes/api/terminal.cwd.ts"),
   route("api/workspace", "routes/api/workspace.ts"),
+  route("api/ping", "routes/api/ping.ts"),
 ] satisfies RouteConfig;

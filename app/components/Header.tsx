@@ -11,8 +11,53 @@ type Panel = "info" | "settings" | "localhost";
 // mousedown and immediately reopen it on click.
 const TRIGGER_ATTR = "data-header-panel-trigger";
 
+/**
+ * Round-trip time to the server. Median of a few samples so one slow request
+ * doesn't dominate, and re-measured every few seconds while the popup is open.
+ */
+function useLatency(): number | null {
+  const [ms, setMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const sample = async (): Promise<number | null> => {
+      const start = performance.now();
+      try {
+        const res = await fetch("/api/ping", { cache: "no-store" });
+        if (!res.ok) return null;
+        return performance.now() - start;
+      } catch {
+        return null;
+      }
+    };
+
+    const measure = async () => {
+      const samples: number[] = [];
+      for (let i = 0; i < 3; i++) {
+        const value = await sample();
+        if (cancelled) return;
+        if (value !== null) samples.push(value);
+      }
+      if (cancelled || samples.length === 0) return;
+      samples.sort((a, b) => a - b);
+      setMs(Math.round(samples[Math.floor(samples.length / 2)]));
+    };
+
+    measure();
+    const timer = window.setInterval(measure, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  return ms;
+}
+
 function SystemInfoPopup({ onClose }: { onClose: () => void }) {
   const [info, setInfo] = useState<Record<string, string | null> | null>(null);
+  const latency = useLatency();
   const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,9 +90,17 @@ function SystemInfoPopup({ onClose }: { onClose: () => void }) {
           </svg>
         </button>
       </div>
-      <div className="flex justify-between gap-2 border-b border-line px-3 py-2 text-[11px]">
-        <span className="text-ink-faint shrink-0">OTG Code</span>
-        <span className="text-ink-muted text-right font-mono">v{__APP_VERSION__}</span>
+      <div className="space-y-1 border-b border-line px-3 py-2">
+        <div className="flex justify-between gap-2 text-[11px]">
+          <span className="text-ink-faint shrink-0">OTG Code</span>
+          <span className="text-right font-mono text-ink-muted">v{__APP_VERSION__}</span>
+        </div>
+        <div className="flex justify-between gap-2 text-[11px]">
+          <span className="text-ink-faint shrink-0">latency</span>
+          <span className="text-right font-mono text-ink-muted tabular-nums">
+            {latency === null ? "—" : `${latency} ms`}
+          </span>
+        </div>
       </div>
       {!info ? (
         <div className="flex items-center justify-center py-4">

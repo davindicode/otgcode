@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
+import { fileKind, getExt } from "~/lib/fileTypes";
 import CopyPathButton from "./CopyPathButton";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -7,22 +8,6 @@ import CodeEditor from "./CodeEditor";
 import ImageViewer from "./ImageViewer";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-
-const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "svg", "webp", "ico", "bmp"]);
-const VIDEO_EXTS = new Set(["mp4", "webm", "ogg", "mov", "mkv", "avi"]);
-const AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "flac", "aac", "m4a"]);
-
-function getExt(path: string): string {
-  return path.split(".").pop()?.toLowerCase() || "";
-}
-
-// True for files rendered by a viewer that streams from the download URL
-// (image/pdf/video/audio) and therefore needs no text-content fetch. Lets the
-// explorer open them instantly instead of reading the whole file as UTF-8.
-export function isDirectViewerFile(path: string): boolean {
-  const ext = getExt(path);
-  return IMAGE_EXTS.has(ext) || ext === "pdf" || VIDEO_EXTS.has(ext) || AUDIO_EXTS.has(ext);
-}
 
 interface FileViewerProps {
   path: string;
@@ -248,21 +233,21 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
 }
 
 export default function FileViewer({ path, content, onSave, onClose }: FileViewerProps) {
-  const ext = getExt(path);
+  const kind = fileKind(path);
 
-  if (IMAGE_EXTS.has(ext)) {
+  if (kind === "image") {
     return <ImageViewer path={path} onClose={onClose} />;
   }
 
-  if (ext === "pdf") {
+  if (kind === "pdf") {
     return <PdfViewer path={path} onClose={onClose} />;
   }
 
-  if (VIDEO_EXTS.has(ext)) {
+  if (kind === "video") {
     return <MediaViewer path={path} type="video" onClose={onClose} />;
   }
 
-  if (AUDIO_EXTS.has(ext)) {
+  if (kind === "audio") {
     return <MediaViewer path={path} type="audio" onClose={onClose} />;
   }
 
@@ -274,7 +259,7 @@ export default function FileViewer({ path, content, onSave, onClose }: FileViewe
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 flex items-center justify-center text-ink-faint text-sm">
-        Cannot preview this file type (.{ext || "unknown"})
+        Cannot preview this file type (.{getExt(path) || "unknown"})
       </div>
       <div className="bar-edge flex items-center justify-between px-3 py-2 bg-surface border-t border-line shrink-0">
         <span

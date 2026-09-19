@@ -3,6 +3,7 @@ import { existsSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { isPasswordEnabled, localUsername } from "./auth.js";
+import { dim, green, link, probe, TICK, WARN, yellow } from "./cli.js";
 import { type Progress, startProgress } from "./progress.js";
 
 // Main OTG Code tunnel
@@ -49,6 +50,26 @@ export function tunnelPrivacyWarning(username: string, passwordEnabled: boolean)
     lines.push("     Add an access password in Settings (cog, top right) for a second layer.");
   }
   return lines.join("\n");
+}
+
+/**
+ * Confirm the tunnel serves this app, so a broken one is obvious immediately
+ * rather than after the user has tried it on another device.
+ */
+async function reportReachability(url: string): Promise<void> {
+  const check = startProgress("Checking the tunnel");
+  const { ok, detail } = await probe(url);
+  check.stop();
+
+  if (ok) {
+    console.log(`  ${green(TICK)} Tunnel reachable from this machine ${dim(`(${detail})`)}`);
+    console.log(dim("     If a phone or laptop can't open it, that's DNS on that device — set it to 1.1.1.1."));
+    return;
+  }
+  // A fresh hostname resolves intermittently for a while, so this is far more
+  // often a slow resolver than a broken tunnel. Don't cry wolf.
+  console.log(`  ${yellow(WARN)} Couldn't confirm the tunnel yet ${dim(`(${detail})`)}`);
+  console.log(dim("     Usually DNS catching up with a new hostname — try the URL anyway, or set DNS to 1.1.1.1."));
 }
 
 function printTunnelPrivacyWarning(): void {
@@ -164,8 +185,9 @@ async function runTunnelAttempts(port: number, progress: Progress): Promise<stri
     const url = await spawnTunnelOnce(port, progress);
     if (url) {
       progress.stop();
-      console.log(`\n  Tunnel URL: ${url}`);
+      console.log(`\n  Tunnel URL: ${link(url)}\n`);
       printTunnelPrivacyWarning();
+      await reportReachability(url);
       return url;
     }
 

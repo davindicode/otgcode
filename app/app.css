@@ -242,6 +242,11 @@ body {
   padding: 4px;
 }
 
+.xterm-viewport,
+.xterm-screen {
+  background-color: transparent !important;
+}
+
 .xterm-viewport {
   overflow-y: scroll !important;
 }

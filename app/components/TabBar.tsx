@@ -1,6 +1,6 @@
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type FileKind, fileKind } from "~/lib/fileTypes";
 import { type Tab, useTabsStore } from "~/stores/tabsStore";
-import { useTerminalStore } from "~/stores/terminalStore";
 import RenamableTab from "./RenamableTab";
 
 const TerminalIcon = () => (
@@ -35,28 +35,84 @@ const ViewerIcon = () => (
   </svg>
 );
 
-/** A terminal tab's dot doubles as its connection state. */
-function TerminalStatusDot({ id }: { id: string }) {
-  const status = useTerminalStore((s) => s.sessions[id]?.status);
-  return (
-    <span
-      className={`w-2 h-2 rounded-full shrink-0 ${
-        status === "connected"
-          ? "bg-green-500"
-          : status === "connecting"
-            ? "bg-yellow-500 animate-pulse"
-            : status === "error"
-              ? "bg-red-500"
-              : "bg-gray-500"
-      }`}
+const ImageIcon = () => (
+  <svg
+    className="w-3.5 h-3.5 shrink-0 text-emerald-400"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    strokeWidth={1.8}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
     />
-  );
-}
+  </svg>
+);
+
+const VideoIcon = () => (
+  <svg
+    className="w-3.5 h-3.5 shrink-0 text-sky-400"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    strokeWidth={1.8}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h8.25a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H4.5A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"
+    />
+  </svg>
+);
+
+const AudioIcon = () => (
+  <svg
+    className="w-3.5 h-3.5 shrink-0 text-fuchsia-400"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    strokeWidth={1.8}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z"
+    />
+  </svg>
+);
+
+const PdfIcon = () => (
+  <svg
+    className="w-3.5 h-3.5 shrink-0 text-red-400"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    strokeWidth={1.8}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25M9 16.5v.75m3-3v3M15 12v5.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+    />
+  </svg>
+);
+
+const KIND_ICONS: Record<FileKind, () => React.ReactElement> = {
+  image: ImageIcon,
+  video: VideoIcon,
+  audio: AudioIcon,
+  pdf: PdfIcon,
+  text: ViewerIcon,
+};
 
 function tabIcon(tab: Tab) {
-  if (tab.kind === "terminal") return <TerminalStatusDot id={tab.id} />;
+  if (tab.kind === "terminal") return <TerminalIcon />;
   if (tab.kind === "explorer") return <ExplorerIcon />;
-  return <ViewerIcon />;
+  // A viewer tab shows what it holds, so the strip reads at a glance.
+  const Icon = KIND_ICONS[fileKind(tab.path ?? "")];
+  return <Icon />;
 }
 
 /** The + menu. Only the two tab types a user can create from scratch appear —

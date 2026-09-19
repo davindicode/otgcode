@@ -22,7 +22,14 @@ export default function TerminalPanel({ sessionId }: { sessionId: string }) {
   // into the live instance rather than waiting for a remount.
   useEffect(() => {
     const term = useTerminalStore.getState().sessions[sessionId]?.terminal;
-    if (term) term.options.theme = xtermTheme(theme);
+    if (!term) return;
+    term.options.theme = xtermTheme(theme);
+    // options.theme repaints the rows, but the viewport element keeps the
+    // inline background it was constructed with — that leftover is the band
+    // that shows above and below the rows after a theme switch.
+    const viewport = term.element?.querySelector<HTMLElement>(".xterm-viewport");
+    if (viewport) viewport.style.backgroundColor = "";
+    term.refresh(0, term.rows - 1);
   }, [theme, sessionId]);
 
   useEffect(() => {

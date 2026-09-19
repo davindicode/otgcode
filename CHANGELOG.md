@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Startup prints the LAN addresses the server is reachable on next to the
+  tunnel URL — on the same network that skips DNS and Cloudflare entirely —
+  checks the tunnel actually serves the app, and underlines both URLs so the
+  thing to copy stands out.
+- System Info shows round-trip latency to the server, alongside the app
+  version.
 - **Custom commands.** The cmds group has an "add" button that opens a small
   dialog for a label and a command, and an "edit" toggle that turns every
   button into a remove target. Removed built-ins can be restored from the same
@@ -79,6 +85,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ASCII spinner frames when the locale doesn't advertise UTF-8.
 
 ### Fixed
+- Terminal tabs show a terminal icon instead of a connection dot, and file
+  tabs show an icon for what they hold (image, video, audio, PDF, text). The
+  dot restated what the connecting gate already says, and left the terminal as
+  the only tab kind without an icon.
+- The terminal no longer shows dark bands above and below its rows after a
+  theme switch: the xterm viewport kept the background it was built with, and
+  the light theme's terminal background did not match its container.
+- `getExt` returned the whole path for a file with no extension, which then
+  appeared as the file's "type" in the unsupported-file message.
 - The Settings modal's Appearance section (theme and terminal font size) was
   written but never rendered — the component existed as dead code, so there
   was no way to switch theme from the UI.
