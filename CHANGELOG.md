@@ -15,9 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so an explorer stays a file browser instead of turning into an editor;
   reopening a file that's already open just focuses its tab.
 - **Controls live at the bottom for every tab type.** The explorer's toolbar
-  moved from a header into the bottom bar, where the terminal's input box
-  already sat, so the control surface is always in the same place and changes
-  with the active tab.
+  and every viewer's toolbar (code editor, image, PDF, video/audio) moved from
+  a header into the bottom bar, where the terminal's input box already sat, so
+  the control surface is always in the same place and changes with the active
+  tab. Content now also precedes controls in the DOM.
+- Terminal text size moved with the rest of the terminal's controls into the
+  input area, alongside Settings → Appearance.
 - Every control in the terminal input area now uses the same raised treatment
   as the Send button, instead of flat fills with coloured borders.
 
@@ -32,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ASCII spinner frames when the locale doesn't advertise UTF-8.
 
 ### Fixed
+- The Settings modal's Appearance section (theme and terminal font size) was
+  written but never rendered — the component existed as dead code, so there
+  was no way to switch theme from the UI.
+- Tabs kept their close button only when more than one was open; every tab now
+  has one.
+- The new-tab menu is positioned against the viewport and clamped inside it,
+  flipping above the button when there is no room below. It previously
+  anchored inside the horizontally scrolling tab strip, which clipped it.
 - Header lost its top padding in the material pass, sitting flush against the
   top edge. The safe-area inset was applied to the header as a `padding-top`,
   and because the custom classes are unlayered they override Tailwind's

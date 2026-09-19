@@ -325,7 +325,14 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      <div className="divide-y divide-gray-700/60">
+      <div className="divide-y divide-line/60">
+        <Section
+          title="Appearance"
+          description="Theme and terminal text size. Saved on the host, so they follow you across refreshes and devices."
+        >
+          <Appearance />
+        </Section>
+
         <Section
           title="Access password"
           description="Require a password before the terminal, files and browser panels load. Off by default."

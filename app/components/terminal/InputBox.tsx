@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { MAX_FONT_SIZE, MIN_FONT_SIZE } from "~/lib/constants";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { showToast } from "~/stores/toastStore";
 
@@ -288,6 +289,8 @@ export default function InputBox() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const activeSessionId = useTerminalStore((s) => s.activeSessionId);
   const sendInput = useTerminalStore((s) => s.sendInput);
+  const fontSize = useTerminalStore((s) => s.fontSize);
+  const setFontSize = useTerminalStore((s) => s.setFontSize);
   const setInTmux = useTerminalStore((s) => s.setInTmux);
   const setInEditor = useTerminalStore((s) => s.setInEditor);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
@@ -1201,6 +1204,32 @@ export default function InputBox() {
             {qk.label}
           </button>
         ))}
+
+        {/* Terminal text size — kept here rather than only in Settings, since
+            it is adjusted mid-session far more often than it is configured. */}
+        <div className="ml-auto flex shrink-0 items-center gap-1 pl-2">
+          <button
+            type="button"
+            onClick={() => setFontSize(Math.max(MIN_FONT_SIZE, fontSize - 1))}
+            disabled={fontSize <= MIN_FONT_SIZE}
+            title="Smaller text"
+            aria-label="Smaller terminal text"
+            className={`${keyBtn} text-[10px] px-1.5`}
+          >
+            A-
+          </button>
+          <span className="w-4 text-center text-[10px] tabular-nums text-ink-faint">{fontSize}</span>
+          <button
+            type="button"
+            onClick={() => setFontSize(Math.min(MAX_FONT_SIZE, fontSize + 1))}
+            disabled={fontSize >= MAX_FONT_SIZE}
+            title="Larger text"
+            aria-label="Larger terminal text"
+            className={`${keyBtn} text-[10px] px-1.5`}
+          >
+            A+
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -213,7 +213,57 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-surface border-b border-line shrink-0">
+
+      {/* Content */}
+      <div className="flex-1 min-h-0">
+        {mode === "preview" && canPreview ? (
+          ext === "ipynb" ? (
+            <NotebookPreview content={value} fontSize={editorFontSize} />
+          ) : ext === "html" || ext === "htm" ? (
+            <HtmlPreview content={value} zoom={htmlZoom} />
+          ) : (
+            <MarkdownPreview content={value} fontSize={editorFontSize} path={path} />
+          )
+        ) : mode === "plain" ? (
+          // Native textarea: mobile gets real selection handles + OS "Select All",
+          // which Monaco's custom-rendered editor does not support on touch.
+          <textarea
+            readOnly
+            value={value}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            className="w-full h-full resize-none bg-app text-ink-muted font-mono p-3 outline-none border-0 selection:bg-blue-600/40"
+            style={{ fontSize: `${editorFontSize}px`, lineHeight: 1.6 }}
+          />
+        ) : (
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center h-full text-ink-faint text-sm">Loading editor...</div>
+            }
+          >
+            <MonacoEditor
+              height="100%"
+              language={getLanguage(path)}
+              value={value}
+              onChange={handleChange}
+              theme={monacoTheme}
+              options={{
+                minimap: { enabled: false },
+                fontSize: editorFontSize,
+                wordWrap: "on",
+                lineNumbers: "on",
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                selectionHighlight: true,
+                occurrencesHighlight: "singleFile",
+                dragAndDrop: true,
+              }}
+            />
+          </Suspense>
+        )}
+      </div>
+      <div className="bar-edge flex items-center gap-2 px-3 py-1.5 bg-surface border-t border-line shrink-0">
         <span
           className="text-sm text-ink-muted whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
           title={path}
@@ -326,56 +376,6 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
             </svg>
           </button>
         </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-h-0">
-        {mode === "preview" && canPreview ? (
-          ext === "ipynb" ? (
-            <NotebookPreview content={value} fontSize={editorFontSize} />
-          ) : ext === "html" || ext === "htm" ? (
-            <HtmlPreview content={value} zoom={htmlZoom} />
-          ) : (
-            <MarkdownPreview content={value} fontSize={editorFontSize} path={path} />
-          )
-        ) : mode === "plain" ? (
-          // Native textarea: mobile gets real selection handles + OS "Select All",
-          // which Monaco's custom-rendered editor does not support on touch.
-          <textarea
-            readOnly
-            value={value}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            className="w-full h-full resize-none bg-app text-ink-muted font-mono p-3 outline-none border-0 selection:bg-blue-600/40"
-            style={{ fontSize: `${editorFontSize}px`, lineHeight: 1.6 }}
-          />
-        ) : (
-          <Suspense
-            fallback={
-              <div className="flex items-center justify-center h-full text-ink-faint text-sm">Loading editor...</div>
-            }
-          >
-            <MonacoEditor
-              height="100%"
-              language={getLanguage(path)}
-              value={value}
-              onChange={handleChange}
-              theme={monacoTheme}
-              options={{
-                minimap: { enabled: false },
-                fontSize: editorFontSize,
-                wordWrap: "on",
-                lineNumbers: "on",
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                selectionHighlight: true,
-                occurrencesHighlight: "singleFile",
-                dragAndDrop: true,
-              }}
-            />
-          </Suspense>
-        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Tab, useTabsStore } from "~/stores/tabsStore";
 import { useTerminalStore } from "~/stores/terminalStore";
 import RenamableTab from "./RenamableTab";
@@ -61,8 +61,39 @@ function tabIcon(tab: Tab) {
 
 /** The + menu. Only the two tab types a user can create from scratch appear —
  *  viewer tabs are spawned by opening a file in an explorer. */
-function NewTabMenu({ onPick, onClose }: { onPick: (kind: "terminal" | "explorer") => void; onClose: () => void }) {
+function NewTabMenu({
+  anchor,
+  onPick,
+  onClose,
+}: {
+  anchor: RefObject<HTMLButtonElement | null>;
+  onPick: (kind: "terminal" | "explorer") => void;
+  onClose: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  // The + sits in a horizontally scrolling strip, so an absolutely positioned
+  // menu would be clipped by it and can end up anywhere across the width.
+  // Position it against the viewport instead and clamp it inside, flipping
+  // above the button when there isn't room below.
+  useLayoutEffect(() => {
+    const button = anchor.current;
+    const menu = ref.current;
+    if (!button || !menu) return;
+    const place = () => {
+      const rect = button.getBoundingClientRect();
+      const { offsetWidth: w, offsetHeight: h } = menu;
+      const pad = 8;
+      const left = Math.max(pad, Math.min(rect.left, window.innerWidth - w - pad));
+      const below = rect.bottom + 4;
+      const top = below + h + pad <= window.innerHeight ? below : Math.max(pad, rect.top - h - 4);
+      setPos({ left, top });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [anchor]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -100,7 +131,8 @@ function NewTabMenu({ onPick, onClose }: { onPick: (kind: "terminal" | "explorer
       ref={ref}
       role="menu"
       aria-label="New tab"
-      className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden glass rounded-panel py-1"
+      style={{ left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? "visible" : "hidden" }}
+      className="fixed z-50 w-56 overflow-hidden glass rounded-panel py-1"
     >
       {item("terminal", "Terminal tab", "A new shell session", <TerminalIcon />)}
       {item("explorer", "Explorer tab", "Browse files and folders", <ExplorerIcon />)}
@@ -121,6 +153,7 @@ export default function TabBar() {
   const openTerminal = useTabsStore((s) => s.openTerminal);
   const openExplorer = useTabsStore((s) => s.openExplorer);
   const [menuOpen, setMenuOpen] = useState(false);
+  const plusRef = useRef<HTMLButtonElement>(null);
 
   const pick = (kind: "terminal" | "explorer") => {
     setMenuOpen(false);
@@ -142,15 +175,12 @@ export default function TabBar() {
             onRename={(name) => rename(tab.id, name)}
             onClick={() => setActive(tab.id)}
             onClose={() => close(tab.id)}
-            showClose={tabs.length > 1}
             title={tab.kind === "viewer" ? tab.path : undefined}
             icon={tabIcon(tab)}
           />
         ))}
-      </div>
-
-      <div className="relative shrink-0">
         <button
+          ref={plusRef}
           type="button"
           data-new-tab-trigger=""
           onClick={() => setMenuOpen((v) => !v)}
@@ -158,7 +188,7 @@ export default function TabBar() {
           aria-expanded={menuOpen}
           aria-label="New tab"
           title="New tab"
-          className={`p-2 rounded-control transition-colors ${
+          className={`shrink-0 m-1 p-1.5 rounded-control transition-colors ${
             menuOpen ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
           }`}
         >
@@ -166,8 +196,8 @@ export default function TabBar() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
         </button>
-        {menuOpen && <NewTabMenu onPick={pick} onClose={() => setMenuOpen(false)} />}
       </div>
+      {menuOpen && <NewTabMenu anchor={plusRef} onPick={pick} onClose={() => setMenuOpen(false)} />}
     </div>
   );
 }
