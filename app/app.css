@@ -40,6 +40,10 @@
   --t-tab-action-on: #1a2a3e;
   --t-tab-app: #1a2e1e;     /* green-tinted app tabs */
   --t-tab-app-on: #1a3e2a;
+  --t-tab-action-ink: #93c5fd;
+  --t-tab-action-ink-on: #d8ecff;
+  --t-tab-app-ink: #86efac;
+  --t-tab-app-ink-on: #d8ffe6;
 
   --t-scrim: #090912;       /* modal / offline overlay veil */
   --t-accent: #569cd6;      /* focus rings, links, dividers */
@@ -87,31 +91,38 @@ html.light {
   /* A grey-blue paper ground, not near-white: cards sit lighter on top of it,
      which is what gives the light theme depth instead of glare. Keeps the
      dark theme's blue cast so the two read as one family. */
-  --t-app: #e7e9ef;
-  --t-panel: #dee1e9;
-  --t-surface: #f3f4f8;
-  --t-raised: #fafbfd;
-  --t-popover: #fbfbfd;
-  --t-hover: #dbdee8;
-  --t-disabled: #e3e5ec;
+  /* Light mode inverts the dark layering on purpose: content is the bright
+     paper and the chrome around it is grey, which is what lets a near-white
+     control read as raised. Dark mode does the same thing the other way up. */
+  --t-app: #edf0f6;         /* content ground — panes, lists, viewers */
+  --t-panel: #d5dbe7;       /* input drawers */
+  --t-surface: #cdd4e1;     /* chrome: header, tab strip, toolbars */
+  --t-raised: #fbfcfe;      /* inputs, code, terminal */
+  --t-popover: #f9fafd;
+  --t-hover: #bfc7d8;
+  --t-disabled: #dde1ea;
 
-  --t-line: #c9ced9;
-  --t-line-soft: #dcdfe8;
-  --t-line-strong: #b2b8c6;
+  --t-line: #b3bccd;
+  --t-line-soft: #c6cdda;
+  --t-line-strong: #98a2b8;
 
-  --t-ink: #1b1e26;
-  --t-ink-muted: #3b4150;
-  --t-ink-dim: #5b6274;
-  --t-ink-faint: #7c8394;
-  --t-ink-ghost: #a8aeba;
+  --t-ink: #171a22;
+  --t-ink-muted: #343a49;
+  --t-ink-dim: #525970;
+  --t-ink-faint: #6b7287;
+  --t-ink-ghost: #868ea3;
 
-  --t-control: #dee1e9;
-  --t-control-hover: #d0d4df;
+  --t-control: #d8dde8;
+  --t-control-hover: #cad0de;
 
   --t-tab-action: #e8eefb;
-  --t-tab-action-on: #d3e2f8;
+  --t-tab-action-on: #cfe0fb;
   --t-tab-app: #e9f5ea;
-  --t-tab-app-on: #d3ecd8;
+  --t-tab-app-on: #cfead6;
+  --t-tab-action-ink: #1d4ed8;
+  --t-tab-action-ink-on: #1035a6;
+  --t-tab-app-ink: #15803d;
+  --t-tab-app-ink-on: #0b5f2b;
 
   --t-scrim: #5a6176;
   --t-accent: #2563eb;
@@ -121,11 +132,11 @@ html.light {
   /* Light theme: the highlight moves to plain white and the shadow carries
      more of the work, since there is less contrast to borrow from. */
   --t-ctl-from: #ffffff;
-  --t-ctl-to: #e0e4ec;
+  --t-ctl-to: #eef1f7;
   --t-ctl-from-hover: #ffffff;
-  --t-ctl-to-hover: #d6dae5;
+  --t-ctl-to-hover: #e6eaf3;
   --t-ctl-edge: rgba(255, 255, 255, 0.9);
-  --t-ctl-lift: 0 1px 2px rgba(23, 27, 40, 0.14), 0 0 0 1px rgba(23, 27, 40, 0.05);
+  --t-ctl-lift: 0 1px 2px rgba(23, 27, 40, 0.18), 0 0 0 1px rgba(23, 27, 40, 0.07);
   --t-ctl-press: inset 0 2px 3px rgba(23, 27, 40, 0.16);
 
   --t-acc-from: #4f92f8;
@@ -175,6 +186,10 @@ html.light {
   --color-tab-action-on: var(--t-tab-action-on);
   --color-tab-app: var(--t-tab-app);
   --color-tab-app-on: var(--t-tab-app-on);
+  --color-tab-action-ink: var(--t-tab-action-ink);
+  --color-tab-action-ink-on: var(--t-tab-action-ink-on);
+  --color-tab-app-ink: var(--t-tab-app-ink);
+  --color-tab-app-ink-on: var(--t-tab-app-ink-on);
 
   --color-accent: var(--t-accent);
   --color-scrim: var(--t-scrim);
@@ -545,7 +560,15 @@ button:disabled {
 /* (4) An active group tab lights its own label rather than bleaching it to
    white, which would collide with the white button text inside the drawer. */
 .glow {
-  text-shadow: 0 0 10px currentColor;
+  font-weight: 600;
+  text-shadow: 0 0 5px currentColor, 0 0 14px currentColor;
+}
+
+/* On a bright control a coloured glow mostly disappears, so the light theme
+   leans on weight and a deeper ink instead of a halo it can't render. */
+html.light .glow {
+  font-weight: 700;
+  text-shadow: 0 0 6px color-mix(in oklab, currentColor 45%, transparent);
 }
 
 /* Collapsible input drawers.

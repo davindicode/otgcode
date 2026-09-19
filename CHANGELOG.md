@@ -14,16 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   view. Both lists are saved to the workspace file.
 
 ### Changed
-- **Light theme reworked.** The ground is a grey-blue paper rather than
-  near-white, with cards sitting lighter on top of it, so the theme has depth
-  instead of glare and keeps the dark theme's blue cast.
+- **Light theme reworked.** It now inverts the dark layering deliberately:
+  content is bright paper and the chrome around it (header, tab strip,
+  toolbars) is grey-blue, which is what lets a near-white control read as
+  raised. Controls previously sat at 1.02x the contrast of the bar they were
+  on, against 1.38x in dark mode, so they effectively disappeared; that gap is
+  now 1.32x and the two themes feel consistent.
 - Modal backdrops are frosted glass rather than a flat dim wash — the
   connecting gate, confirm dialogs and the add-command dialog all share one
   scrim.
 - Tab strip picks up the same raised treatment as the rest of the controls:
   the + is a proper button and the active tab reads as lifted.
 - An active input group tab now lights its own label instead of bleaching it
-  to white, which collided with the white button text inside the drawer.
+  to white, which collided with the white button text inside the drawer. The
+  selected state is a real glow plus a heavier weight and a thicker ring, and
+  group-tab label colours are theme-aware — a blue that reads on a dark
+  control is washed out on a bright one.
 - The cmds group's add/edit controls moved onto their own row beneath the
   commands, so they no longer read as two more commands; edit highlights while
   active.

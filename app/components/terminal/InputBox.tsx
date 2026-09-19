@@ -668,11 +668,11 @@ export default function InputBox() {
   const tabDisabledApp = tabDisabled;
   // Action tabs (cmds, cd, code, sticky) — blue. `relief` supplies the raised
   // body; the tinted fill underneath only shows through on the active one.
-  const actionTabOff = `${tabBase} relief text-blue-300 hover:text-blue-200`;
-  const actionTabOn = `${tabBase} relief glow bg-tab-action-on text-blue-300 ring-1 ring-inset ring-blue-400/50`;
+  const actionTabOff = `${tabBase} relief text-tab-action-ink`;
+  const actionTabOn = `${tabBase} relief glow bg-tab-action-on text-tab-action-ink-on ring-2 ring-inset ring-blue-400/70`;
   // App tabs (nano, vim, tmux) — green
-  const appTabOff = `${tabBase} relief text-green-300 hover:text-green-200`;
-  const appTabOn = `${tabBase} relief glow bg-tab-app-on text-green-300 ring-1 ring-inset ring-green-400/50`;
+  const appTabOff = `${tabBase} relief text-tab-app-ink`;
+  const appTabOn = `${tabBase} relief glow bg-tab-app-on text-tab-app-ink-on ring-2 ring-inset ring-green-400/70`;
 
   // Popup action buttons — same raised treatment as Send, tinted by role.
   const keyBtn =
@@ -830,7 +830,7 @@ export default function InputBox() {
                     title={editingCommands ? "Stop removing" : "Remove command buttons"}
                     className={`${actionBtn} ${
                       editingCommands
-                        ? "glow text-amber-300 ring-1 ring-inset ring-amber-400/50"
+                        ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70"
                         : "text-ink-faint hover:text-ink-muted"
                     }`}
                   >

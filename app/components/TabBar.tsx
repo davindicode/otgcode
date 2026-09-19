@@ -162,7 +162,7 @@ export default function TabBar() {
   };
 
   return (
-    <div className="bar-edge relative flex items-center border-b border-line bg-app shrink-0">
+    <div className="bar-edge relative flex items-center border-b border-line bg-surface shrink-0">
       <div className="flex items-center overflow-x-auto scrollbar-none flex-1 min-w-0">
         {tabs.map((tab) => (
           <RenamableTab
