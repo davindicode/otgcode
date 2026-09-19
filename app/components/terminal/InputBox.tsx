@@ -664,13 +664,15 @@ export default function InputBox() {
   // --- Styles ---
   const tabBase = "px-2.5 py-0.5 text-[11px] rounded-control whitespace-nowrap shrink-0 select-none touch-manipulation";
   const tabDisabled = `${tabBase} bg-disabled text-ink-ghost cursor-not-allowed`;
-  const tabDisabledAction = tabDisabled;
-  const tabDisabledApp = tabDisabled;
   // Action tabs (cmds, cd, code, sticky) — blue. `relief` supplies the raised
   // body; the tinted fill underneath only shows through on the active one.
+  // Native terminal tabs (text, cmds, cd, combos) — blue
   const actionTabOff = `${tabBase} relief text-tab-action-ink`;
   const actionTabOn = `${tabBase} relief glow bg-tab-action-on text-tab-action-ink-on ring-2 ring-inset ring-blue-400/70`;
-  // App tabs (nano, vim, tmux) — green
+  // CLI tool tabs (code, git) — purple
+  const cliTabOff = `${tabBase} relief text-tab-cli-ink`;
+  const cliTabOn = `${tabBase} relief glow bg-tab-cli-on text-tab-cli-ink-on ring-2 ring-inset ring-purple-400/70`;
+  // Program tabs (nano, vim, tmux) — green
   const appTabOff = `${tabBase} relief text-tab-app-ink`;
   const appTabOn = `${tabBase} relief glow bg-tab-app-on text-tab-app-ink-on ring-2 ring-inset ring-green-400/70`;
 
@@ -689,25 +691,25 @@ export default function InputBox() {
   // Plain terminal: all action tabs + all app tabs
   const isEditorMode = inEditor !== null;
 
-  const tabBtn = (id: string, label: string, title: string, disabled?: boolean, kind: "action" | "app" = "action") => (
+  const SECTORS = {
+    native: { on: actionTabOn, off: actionTabOff },
+    cli: { on: cliTabOn, off: cliTabOff },
+    app: { on: appTabOn, off: appTabOff },
+  } as const;
+
+  const tabBtn = (
+    id: string,
+    label: string,
+    title: string,
+    disabled?: boolean,
+    sector: keyof typeof SECTORS = "native",
+  ) => (
     <button
       key={id}
       onClick={() => !disabled && toggleGroup(id)}
       disabled={disabled}
       title={title}
-      className={
-        disabled
-          ? kind === "app"
-            ? tabDisabledApp
-            : tabDisabledAction
-          : activeGroup === id
-            ? kind === "app"
-              ? appTabOn
-              : actionTabOn
-            : kind === "app"
-              ? appTabOff
-              : actionTabOff
-      }
+      className={disabled ? tabDisabled : activeGroup === id ? SECTORS[sector].on : SECTORS[sector].off}
     >
       {label}
     </button>
@@ -744,13 +746,13 @@ export default function InputBox() {
       <div className="border-b border-line/50 overflow-x-auto scrollbar-none" style={{ minWidth: 0 }}>
         <div className="flex items-center gap-1 px-2 py-1 w-max">
           {tabBtn(TEXT_TAB, "text", "Type a command or message", !activeSessionId)}
-          {/* Action tabs (blue) — always in same order, hidden in editor mode */}
+          {/* Native terminal tabs (blue) — always in same order, hidden in editor mode */}
           {!isEditorMode && TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !activeSessionId))}
           {!isEditorMode && tabBtn(CD_TAB, "cd", "Change directory", !activeSessionId)}
           {tabBtn(STICKY_TAB, "combos", "Modifier key combinations")}
-          {!isEditorMode && tabBtn(CODE_TAB, "code", "Coding CLI launchers & keys", !activeSessionId)}
-          {!isEditorMode && tabBtn(GIT_TAB, "git", "Git actions", !activeSessionId)}
-          {/* App tabs (green) — nano/vim hidden in tmux mode, shown with active indicator in editor mode */}
+          {!isEditorMode && tabBtn(CODE_TAB, "code", "Coding CLI launchers & keys", !activeSessionId, "cli")}
+          {!isEditorMode && tabBtn(GIT_TAB, "git", "Git actions", !activeSessionId, "cli")}
+          {/* Program tabs (green) — nano/vim hidden in tmux mode, shown with active indicator in editor mode */}
           {!inTmux &&
             tabBtn(
               NANO_TAB,

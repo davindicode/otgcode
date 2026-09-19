@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scrim.
 - Tab strip picks up the same raised treatment as the rest of the controls:
   the + is a proper button and the active tab reads as lifted.
+- Input group tabs are coloured by sector, so the strip reads at a glance:
+  blue for what the terminal does natively (text, cmds, cd, combos), purple
+  for the CLI tools launched from it (code, git), green for the full-screen
+  programs (nano, vim, tmux).
 - An active input group tab now lights its own label instead of bleaching it
   to white, which collided with the white button text inside the drawer. The
   selected state is a real glow plus a heavier weight and a thicker ring, and

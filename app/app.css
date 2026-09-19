@@ -38,10 +38,14 @@
 
   --t-tab-action: #1a1e2e;  /* blue-tinted terminal action tabs */
   --t-tab-action-on: #1a2a3e;
-  --t-tab-app: #1a2e1e;     /* green-tinted app tabs */
+  --t-tab-cli: #241a33;     /* purple-tinted CLI-tool tabs */
+  --t-tab-cli-on: #35204d;
+  --t-tab-app: #1a2e1e;     /* green-tinted program tabs */
   --t-tab-app-on: #1a3e2a;
   --t-tab-action-ink: #93c5fd;
   --t-tab-action-ink-on: #d8ecff;
+  --t-tab-cli-ink: #d0abfa;
+  --t-tab-cli-ink-on: #eeddff;
   --t-tab-app-ink: #86efac;
   --t-tab-app-ink-on: #d8ffe6;
 
@@ -117,10 +121,14 @@ html.light {
 
   --t-tab-action: #e8eefb;
   --t-tab-action-on: #cfe0fb;
+  --t-tab-cli: #f1eafb;
+  --t-tab-cli-on: #e2d2f8;
   --t-tab-app: #e9f5ea;
   --t-tab-app-on: #cfead6;
   --t-tab-action-ink: #1d4ed8;
   --t-tab-action-ink-on: #1035a6;
+  --t-tab-cli-ink: #6d28d9;
+  --t-tab-cli-ink-on: #4c1d95;
   --t-tab-app-ink: #15803d;
   --t-tab-app-ink-on: #0b5f2b;
 
@@ -186,8 +194,12 @@ html.light {
   --color-tab-action-on: var(--t-tab-action-on);
   --color-tab-app: var(--t-tab-app);
   --color-tab-app-on: var(--t-tab-app-on);
+  --color-tab-cli: var(--t-tab-cli);
+  --color-tab-cli-on: var(--t-tab-cli-on);
   --color-tab-action-ink: var(--t-tab-action-ink);
   --color-tab-action-ink-on: var(--t-tab-action-ink-on);
+  --color-tab-cli-ink: var(--t-tab-cli-ink);
+  --color-tab-cli-ink-on: var(--t-tab-cli-ink-on);
   --color-tab-app-ink: var(--t-tab-app-ink);
   --color-tab-app-ink-on: var(--t-tab-app-ink-on);
 
