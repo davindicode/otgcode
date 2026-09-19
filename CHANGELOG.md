@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   raised. Controls previously sat at 1.02x the contrast of the bar they were
   on, against 1.38x in dark mode, so they effectively disappeared; that gap is
   now 1.32x and the two themes feel consistent.
+- Toasts dropped their icon — the message already says what it is — and sit a
+  step off the app behind them: lighter in the dark theme, darker in the light
+  one.
 - Modal backdrops are frosted glass rather than a flat dim wash — the
   connecting gate, confirm dialogs and the add-command dialog all share one
   scrim.

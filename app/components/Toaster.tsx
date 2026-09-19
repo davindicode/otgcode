@@ -29,26 +29,11 @@ function ToastItem({ toast }: { toast: Toast }) {
     <button
       type="button"
       onClick={close}
-      className={`pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-panel text-xs max-w-[90vw] ${
-        isError ? "glass glass-danger text-red-100" : "glass text-ink"
+      className={`pointer-events-auto max-w-[90vw] rounded-panel px-3.5 py-2 text-xs ${
+        isError ? "glass glass-danger text-red-100" : "glass toast text-ink"
       } ${leaving ? "animate-toast-out" : "animate-toast-in"}`}
       title="Dismiss"
     >
-      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-        {isError ? (
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-          />
-        ) : (
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        )}
-      </svg>
       <span className="truncate">{toast.message}</span>
     </button>
   );

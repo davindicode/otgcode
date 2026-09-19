@@ -81,6 +81,7 @@
   /* Glass — overlays only, where translucency establishes layering over the
      content behind them. */
   --t-glass-bg: rgba(24, 24, 44, 0.74);
+  --t-toast-bg: rgba(52, 52, 86, 0.86);
   --t-glass-border: rgba(255, 255, 255, 0.1);
   --t-glass-edge: rgba(255, 255, 255, 0.07);
   --t-glass-blur: 18px;
@@ -161,6 +162,7 @@ html.light {
   --t-danger-to-hover: #dc3838;
 
   --t-glass-bg: rgba(248, 249, 252, 0.72);
+  --t-toast-bg: rgba(178, 188, 208, 0.9);
   --t-glass-border: rgba(23, 27, 40, 0.1);
   --t-glass-edge: rgba(255, 255, 255, 0.8);
   --t-glass-blur: 18px;
@@ -508,6 +510,13 @@ button:disabled {
   .glass {
     background-color: var(--t-popover);
   }
+}
+
+/* Toasts keep the frosted surface but sit a step off the ground beneath
+   them — lighter in the dark theme, darker in the light one — so a message
+   reads as arriving on top of the app rather than as part of it. */
+.toast {
+  background-color: var(--t-toast-bg);
 }
 
 /* Error toasts: the same glass, tinted red. */
