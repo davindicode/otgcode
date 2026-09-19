@@ -10,8 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Startup prints the LAN addresses the server is reachable on next to the
   tunnel URL — on the same network that skips DNS and Cloudflare entirely —
-  checks the tunnel actually serves the app, and underlines both URLs so the
-  thing to copy stands out.
+  and checks the tunnel actually serves the app. Only the tunnel URL is
+  highlighted; the local addresses are dimmed as reference detail, so the one
+  address worth copying is unmistakable.
 - System Info shows round-trip latency to the server, alongside the app
   version.
 - **Custom commands.** The cmds group has an "add" button that opens a small

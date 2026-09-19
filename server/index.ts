@@ -10,7 +10,7 @@ import { basename, dirname, join, resolve } from "path";
 import { Server as SocketIOServer } from "socket.io";
 import { isPasswordEnabled } from "./auth.js";
 import { authGate, gateSocketIO, mountAuthRoutes } from "./auth-routes.js";
-import { dim, link, localAddresses } from "./cli.js";
+import { dim, localAddresses } from "./cli.js";
 import { mountProxy } from "./proxy.js";
 import { registerSocketHandlers } from "./socket-handlers.js";
 import { startTunnel } from "./tunnel.js";
@@ -310,11 +310,11 @@ async function main() {
 
   await new Promise<void>((ready) => {
     httpServer.listen(PORT, () => {
-      console.log(`\n  OTG Code running on ${link(`http://localhost:${PORT}`)}`);
+      console.log(`\n  ${dim(`OTG Code running on http://localhost:${PORT}`)}`);
       // On the same network this skips DNS and Cloudflare entirely, which is
       // both faster and immune to a fresh tunnel hostname's resolver lag.
       for (const address of localAddresses(PORT)) {
-        console.log(`  On this network:   ${link(address)}`);
+        console.log(dim(`  On this network:    ${address}`));
       }
       console.log(
         isPasswordEnabled()
