@@ -72,49 +72,14 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <div
-        ref={containerRef}
-        className={`flex-1 overflow-auto bg-app select-none ${grabbing ? "cursor-grabbing" : "cursor-grab"}`}
-        onMouseDown={handleMouseDown}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div
-          className="flex items-center justify-center p-4"
-          style={{
-            minWidth: naturalSize
-              ? Math.max(naturalSize.w * zoom + 32, containerRef.current?.clientWidth ?? 0)
-              : "100%",
-            minHeight: naturalSize
-              ? Math.max(naturalSize.h * zoom + 32, containerRef.current?.clientHeight ?? 0)
-              : "100%",
-          }}
-        >
-          <img
-            src={src}
-            alt={path}
-            className="max-w-none"
-            draggable={false}
-            onLoad={handleImageLoad}
-            style={
-              naturalSize
-                ? {
-                    width: naturalSize.w * zoom,
-                    height: naturalSize.h * zoom,
-                  }
-                : undefined
-            }
-          />
+      <div className="bar-edge flex items-center px-3 py-2 bg-surface border-b border-line shrink-0">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="min-w-0 truncate text-sm text-ink-muted select-none" title={path}>
+            {path}
+          </span>
+          <CopyPathButton path={path} />
         </div>
-      </div>
-      <div className="bar-edge flex items-center justify-between px-3 py-2 bg-surface border-t border-line shrink-0">
-        <span
-          className="text-sm text-ink-muted whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
-          title={path}
-        >
-          {path}
-        </span>
-        <CopyPathButton path={path} />
+        <div className="min-w-2 flex-1" />
         <div className="flex items-center gap-2 shrink-0">
           {isGif && (
             <button
@@ -162,6 +127,41 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+        </div>
+      </div>
+      <div
+        ref={containerRef}
+        className={`flex-1 overflow-auto bg-app select-none ${grabbing ? "cursor-grabbing" : "cursor-grab"}`}
+        onMouseDown={handleMouseDown}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div
+          className="flex items-center justify-center p-4"
+          style={{
+            minWidth: naturalSize
+              ? Math.max(naturalSize.w * zoom + 32, containerRef.current?.clientWidth ?? 0)
+              : "100%",
+            minHeight: naturalSize
+              ? Math.max(naturalSize.h * zoom + 32, containerRef.current?.clientHeight ?? 0)
+              : "100%",
+          }}
+        >
+          <img
+            src={src}
+            alt={path}
+            className="max-w-none"
+            draggable={false}
+            onLoad={handleImageLoad}
+            style={
+              naturalSize
+                ? {
+                    width: naturalSize.w * zoom,
+                    height: naturalSize.h * zoom,
+                  }
+                : undefined
+            }
+          />
         </div>
       </div>
     </div>

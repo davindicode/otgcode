@@ -86,11 +86,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   create. Opening a file from an explorer spawns its own tab and focuses it,
   so an explorer stays a file browser instead of turning into an editor;
   reopening a file that's already open just focuses its tab.
-- **Controls live at the bottom for every tab type.** The explorer's toolbar
-  and every viewer's toolbar (code editor, image, PDF, video/audio) moved from
-  a header into the bottom bar, where the terminal's input box already sat, so
-  the control surface is always in the same place and changes with the active
-  tab. Content now also precedes controls in the DOM.
+- **Controls sit where the pane's subject does.** The explorer keeps its
+  breadcrumbs at the top and its actions in the bottom bar with the terminal's
+  input; viewer and editor tabs put their file path and the few controls that
+  go with it in one bar directly under the tab strip, where the explorer shows
+  its path.
+- A file's copy-path button now sits immediately beside the path rather than
+  at the far right of the bar, so it reads as copying that path rather than as
+  another toolbar action.
 - Terminal text size moved with the rest of the terminal's controls into the
   input area, alongside Settings → Appearance.
 - Every control in the terminal input area now uses the same raised treatment

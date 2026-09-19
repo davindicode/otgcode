@@ -43,30 +43,14 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-app p-4 overflow-auto">
-        {type === "video" ? (
-          <video {...mediaProps} playsInline className="max-w-full max-h-full rounded-control" />
-        ) : (
-          <audio {...mediaProps} className="w-full max-w-md" />
-        )}
-        {mediaError && (
-          <div className="max-w-lg rounded-panel border border-red-500/30 bg-red-950/20 px-4 py-3 text-center">
-            <p className="text-sm text-red-300">{mediaError}</p>
-            <p className="mt-1 text-xs text-ink-dim">
-              MP4 is a container; a file that plays in a desktop app may still use a codec unavailable in this browser.
-              You can download the file and play it locally.
-            </p>
-          </div>
-        )}
-      </div>
-      <div className="bar-edge flex items-center justify-between px-3 py-2 bg-surface border-t border-line shrink-0">
-        <span
-          className="text-sm text-ink-muted whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
-          title={path}
-        >
-          {path}
-        </span>
-        <CopyPathButton path={path} />
+      <div className="bar-edge flex items-center px-3 py-2 bg-surface border-b border-line shrink-0">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="min-w-0 truncate text-sm text-ink-muted select-none" title={path}>
+            {path}
+          </span>
+          <CopyPathButton path={path} />
+        </div>
+        <div className="min-w-2 flex-1" />
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setLoop((l) => !l)}
@@ -101,6 +85,22 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
             </svg>
           </button>
         </div>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-app p-4 overflow-auto">
+        {type === "video" ? (
+          <video {...mediaProps} playsInline className="max-w-full max-h-full rounded-control" />
+        ) : (
+          <audio {...mediaProps} className="w-full max-w-md" />
+        )}
+        {mediaError && (
+          <div className="max-w-lg rounded-panel border border-red-500/30 bg-red-950/20 px-4 py-3 text-center">
+            <p className="text-sm text-red-300">{mediaError}</p>
+            <p className="mt-1 text-xs text-ink-dim">
+              MP4 is a container; a file that plays in a desktop app may still use a codec unavailable in this browser.
+              You can download the file and play it locally.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -169,28 +169,14 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div ref={containerRef} className="flex-1 min-h-0 overflow-auto bg-app">
-        <Document
-          file={pdfUrl}
-          onLoadSuccess={onDocumentLoadSuccess}
-          loading={<div className="flex items-center justify-center h-full text-ink-faint text-sm">Loading PDF...</div>}
-          error={<div className="flex items-center justify-center h-full text-red-400 text-sm">Failed to load PDF</div>}
-        >
-          <div className="flex flex-col items-center gap-2 p-4">
-            {Array.from({ length: numPages }, (_, i) => (
-              <LazyPdfPage key={i + 1} pageNumber={i + 1} scale={scale} root={containerRef} />
-            ))}
-          </div>
-        </Document>
-      </div>
-      <div className="bar-edge flex items-center justify-between px-3 py-2 bg-surface border-t border-line shrink-0">
-        <span
-          className="text-sm text-ink-muted whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
-          title={path}
-        >
-          {path}
-        </span>
-        <CopyPathButton path={path} />
+      <div className="bar-edge flex items-center px-3 py-2 bg-surface border-b border-line shrink-0">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="min-w-0 truncate text-sm text-ink-muted select-none" title={path}>
+            {path}
+          </span>
+          <CopyPathButton path={path} />
+        </div>
+        <div className="min-w-2 flex-1" />
         <div className="flex items-center gap-2 shrink-0">
           {numPages > 0 && <span className="text-[10px] text-ink-faint">{numPages} pg</span>}
           <div className="flex items-center gap-1 border border-line rounded-control overflow-hidden">
@@ -228,6 +214,20 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
           </button>
         </div>
       </div>
+      <div ref={containerRef} className="flex-1 min-h-0 overflow-auto bg-app">
+        <Document
+          file={pdfUrl}
+          onLoadSuccess={onDocumentLoadSuccess}
+          loading={<div className="flex items-center justify-center h-full text-ink-faint text-sm">Loading PDF...</div>}
+          error={<div className="flex items-center justify-center h-full text-red-400 text-sm">Failed to load PDF</div>}
+        >
+          <div className="flex flex-col items-center gap-2 p-4">
+            {Array.from({ length: numPages }, (_, i) => (
+              <LazyPdfPage key={i + 1} pageNumber={i + 1} scale={scale} root={containerRef} />
+            ))}
+          </div>
+        </Document>
+      </div>
     </div>
   );
 }
@@ -258,17 +258,14 @@ export default function FileViewer({ path, content, onSave, onClose }: FileViewe
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 flex items-center justify-center text-ink-faint text-sm">
-        Cannot preview this file type (.{getExt(path) || "unknown"})
-      </div>
-      <div className="bar-edge flex items-center justify-between px-3 py-2 bg-surface border-t border-line shrink-0">
-        <span
-          className="text-sm text-ink-muted whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
-          title={path}
-        >
-          {path}
-        </span>
-        <CopyPathButton path={path} />
+      <div className="bar-edge flex items-center px-3 py-2 bg-surface border-b border-line shrink-0">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="min-w-0 truncate text-sm text-ink-muted select-none" title={path}>
+            {path}
+          </span>
+          <CopyPathButton path={path} />
+        </div>
+        <div className="min-w-2 flex-1" />
         <div className="flex items-center gap-2 shrink-0">
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
@@ -290,6 +287,9 @@ export default function FileViewer({ path, content, onSave, onClose }: FileViewe
             </svg>
           </button>
         </div>
+      </div>
+      <div className="flex-1 flex items-center justify-center text-ink-faint text-sm">
+        Cannot preview this file type (.{getExt(path) || "unknown"})
       </div>
     </div>
   );
