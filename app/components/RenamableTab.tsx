@@ -58,10 +58,10 @@ export default function RenamableTab({
         setEditing(true);
       }}
       title={title}
-      className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-sm border-r border-line-soft shrink-0 transition-colors ${
+      className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-control px-3 py-1.5 text-sm my-1 ml-1 ${
         isActive
-          ? "tab-active bg-surface text-ink border-b-2 border-b-blue-500"
-          : "text-ink-dim hover:text-ink hover:bg-surface/50"
+          ? "relief text-ink ring-1 ring-inset ring-blue-500/45"
+          : "text-ink-dim transition-colors hover:bg-surface/60 hover:text-ink"
       }`}
     >
       {icon}

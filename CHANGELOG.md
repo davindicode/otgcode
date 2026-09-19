@@ -14,6 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   view. Both lists are saved to the workspace file.
 
 ### Changed
+- **Light theme reworked.** The ground is a grey-blue paper rather than
+  near-white, with cards sitting lighter on top of it, so the theme has depth
+  instead of glare and keeps the dark theme's blue cast.
+- Modal backdrops are frosted glass rather than a flat dim wash — the
+  connecting gate, confirm dialogs and the add-command dialog all share one
+  scrim.
+- Tab strip picks up the same raised treatment as the rest of the controls:
+  the + is a proper button and the active tab reads as lifted.
+- An active input group tab now lights its own label instead of bleaching it
+  to white, which collided with the white button text inside the drawer.
+- The cmds group's add/edit controls moved onto their own row beneath the
+  commands, so they no longer read as two more commands; edit highlights while
+  active.
+- Input drawers open and close more slowly (280ms) on a softer curve.
 - **The terminal input is a tab group, not a pinned row.** "text" joins cmds,
   cd, combos and the rest; with no group selected the input area collapses to
   just the tab strip, giving the terminal the full pane.

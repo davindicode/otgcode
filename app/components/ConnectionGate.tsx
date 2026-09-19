@@ -12,7 +12,7 @@ export default function ConnectionGate() {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-scrim/70 backdrop-blur-[2px]"
+      className="scrim fixed inset-0 z-[200] flex items-center justify-center"
       role="status"
       aria-live="polite"
       aria-label="Connecting to the server"

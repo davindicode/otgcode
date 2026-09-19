@@ -223,7 +223,7 @@ const GIT_QUICK_CMDS: { label: string; title: string; command: string }[] = [
 
 // Tab IDs
 // Matches the .drawer transition in app.css.
-const DRAWER_MS = 180;
+const DRAWER_MS = 280;
 
 const TEXT_TAB = "__text__";
 const STICKY_TAB = "__sticky__";
@@ -302,7 +302,7 @@ function AddCommandDialog({
     "w-full rounded-control border border-line bg-raised px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-ghost focus:border-blue-500 focus:outline-none";
 
   return createPortal(
-    <div className="fixed inset-0 z-[160] flex items-center justify-center bg-scrim/60 px-4">
+    <div className="scrim fixed inset-0 z-[160] flex items-center justify-center px-4">
       <form onSubmit={submit} className="glass w-full max-w-xs rounded-panel p-4">
         <h2 className="text-xs font-medium text-ink">Add command</h2>
         <p className="mt-0.5 text-[11px] text-ink-faint">Becomes a button in the cmds group. Runs immediately.</p>
@@ -668,15 +668,16 @@ export default function InputBox() {
   const tabDisabledApp = tabDisabled;
   // Action tabs (cmds, cd, code, sticky) — blue. `relief` supplies the raised
   // body; the tinted fill underneath only shows through on the active one.
-  const actionTabOff = `${tabBase} relief text-blue-300 hover:text-blue-100`;
-  const actionTabOn = `${tabBase} relief bg-tab-action-on text-blue-100 ring-1 ring-inset ring-blue-500/60`;
+  const actionTabOff = `${tabBase} relief text-blue-300 hover:text-blue-200`;
+  const actionTabOn = `${tabBase} relief glow bg-tab-action-on text-blue-300 ring-1 ring-inset ring-blue-400/50`;
   // App tabs (nano, vim, tmux) — green
-  const appTabOff = `${tabBase} relief text-green-300 hover:text-green-100`;
-  const appTabOn = `${tabBase} relief bg-tab-app-on text-green-100 ring-1 ring-inset ring-green-500/60`;
+  const appTabOff = `${tabBase} relief text-green-300 hover:text-green-200`;
+  const appTabOn = `${tabBase} relief glow bg-tab-app-on text-green-300 ring-1 ring-inset ring-green-400/50`;
 
   // Popup action buttons — same raised treatment as Send, tinted by role.
   const keyBtn =
     "px-2 py-0.5 text-[11px] relief text-ink-muted hover:text-ink rounded-control whitespace-nowrap select-none touch-manipulation";
+  const actionBtn = "px-2.5 py-1 text-[11px] relief rounded-control whitespace-nowrap select-none touch-manipulation";
   const exitBtn =
     "px-2 py-0.5 text-[11px] relief text-red-300 hover:text-red-100 rounded-control whitespace-nowrap select-none touch-manipulation";
   const saveExitBtn =
@@ -810,31 +811,37 @@ export default function InputBox() {
                     </button>
                   </span>
                 ))}
-
-                {isCmdsGroup && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setCommandDialog(true)}
-                      title="Add a command button"
-                      className={`${keyBtn} text-blue-300 hover:text-blue-100`}
-                    >
-                      + add
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingCommands((v) => !v)}
-                      title={editingCommands ? "Done removing" : "Remove command buttons"}
-                      className={`${keyBtn} ${editingCommands ? "text-green-300" : "text-ink-faint"}`}
-                    >
-                      {editingCommands ? "done" : "edit"}
-                    </button>
-                  </>
-                )}
               </div>
 
+              {isCmdsGroup && (
+                <div className="mt-1.5 flex items-center gap-1.5 border-t border-line/50 pt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setCommandDialog(true)}
+                    title="Add a command button"
+                    className={`${actionBtn} text-blue-300 hover:text-blue-200`}
+                  >
+                    + add command
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingCommands((v) => !v)}
+                    aria-pressed={editingCommands}
+                    title={editingCommands ? "Stop removing" : "Remove command buttons"}
+                    className={`${actionBtn} ${
+                      editingCommands
+                        ? "glow text-amber-300 ring-1 ring-inset ring-amber-400/50"
+                        : "text-ink-faint hover:text-ink-muted"
+                    }`}
+                  >
+                    {editingCommands ? "done" : "edit"}
+                  </button>
+                  {editingCommands && <span className="text-[10px] text-ink-ghost">tap a command to remove it</span>}
+                </div>
+              )}
+
               {isCmdsGroup && editingCommands && hiddenCommands.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-1 border-t border-line/50 pt-1.5">
+                <div className="mt-1.5 flex flex-wrap items-center gap-1">
                   <span className="text-[10px] text-ink-ghost">removed:</span>
                   {hiddenCommands.map((label) => (
                     <button

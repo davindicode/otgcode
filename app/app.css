@@ -84,43 +84,46 @@
 html.light {
   color-scheme: light;
 
-  --t-app: #f4f5fa;
-  --t-panel: #eaecf4;
-  --t-surface: #ffffff;
-  --t-raised: #f7f8fc;
-  --t-popover: #ffffff;
-  --t-hover: #e3e6f1;
-  --t-disabled: #eef0f5;
+  /* A grey-blue paper ground, not near-white: cards sit lighter on top of it,
+     which is what gives the light theme depth instead of glare. Keeps the
+     dark theme's blue cast so the two read as one family. */
+  --t-app: #e7e9ef;
+  --t-panel: #dee1e9;
+  --t-surface: #f3f4f8;
+  --t-raised: #fafbfd;
+  --t-popover: #fbfbfd;
+  --t-hover: #dbdee8;
+  --t-disabled: #e3e5ec;
 
-  --t-line: #d5d9e4;
-  --t-line-soft: #e6e9f1;
-  --t-line-strong: #c3c8d6;
+  --t-line: #c9ced9;
+  --t-line-soft: #dcdfe8;
+  --t-line-strong: #b2b8c6;
 
-  --t-ink: #14141f;
-  --t-ink-muted: #33374a;
-  --t-ink-dim: #565c70;
-  --t-ink-faint: #767d92;
-  --t-ink-ghost: #a2a8b8;
+  --t-ink: #1b1e26;
+  --t-ink-muted: #3b4150;
+  --t-ink-dim: #5b6274;
+  --t-ink-faint: #7c8394;
+  --t-ink-ghost: #a8aeba;
 
-  --t-control: #e2e5ee;
-  --t-control-hover: #d2d6e3;
+  --t-control: #dee1e9;
+  --t-control-hover: #d0d4df;
 
   --t-tab-action: #e8eefb;
   --t-tab-action-on: #d3e2f8;
   --t-tab-app: #e9f5ea;
   --t-tab-app-on: #d3ecd8;
 
-  --t-scrim: #6c7288;
+  --t-scrim: #5a6176;
   --t-accent: #2563eb;
-  --t-scrollbar: #c3c8d6;
-  --t-scrollbar-hover: #a2a8b8;
+  --t-scrollbar: #bcc2cf;
+  --t-scrollbar-hover: #9aa1b0;
 
   /* Light theme: the highlight moves to plain white and the shadow carries
      more of the work, since there is less contrast to borrow from. */
   --t-ctl-from: #ffffff;
-  --t-ctl-to: #e8ebf3;
+  --t-ctl-to: #e0e4ec;
   --t-ctl-from-hover: #ffffff;
-  --t-ctl-to-hover: #dde1ec;
+  --t-ctl-to-hover: #d6dae5;
   --t-ctl-edge: rgba(255, 255, 255, 0.9);
   --t-ctl-lift: 0 1px 2px rgba(23, 27, 40, 0.14), 0 0 0 1px rgba(23, 27, 40, 0.05);
   --t-ctl-press: inset 0 2px 3px rgba(23, 27, 40, 0.16);
@@ -136,7 +139,7 @@ html.light {
   --t-danger-from-hover: #f46767;
   --t-danger-to-hover: #dc3838;
 
-  --t-glass-bg: rgba(255, 255, 255, 0.76);
+  --t-glass-bg: rgba(248, 249, 252, 0.72);
   --t-glass-border: rgba(23, 27, 40, 0.1);
   --t-glass-edge: rgba(255, 255, 255, 0.8);
   --t-glass-blur: 18px;
@@ -489,14 +492,13 @@ button:disabled {
 .glass {
   background-color: var(--t-glass-bg);
   backdrop-filter: blur(var(--t-glass-blur)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--t-glass-blur)) saturate(140%);
   border: 1px solid var(--t-glass-border);
   box-shadow: inset 0 1px 0 var(--t-glass-edge), var(--t-glass-shadow);
 }
 
 /* Browsers without backdrop-filter get an opaque panel rather than an
    unreadable translucent one. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+@supports not (backdrop-filter: blur(1px)) {
   .glass {
     background-color: var(--t-popover);
   }
@@ -527,6 +529,25 @@ button:disabled {
   }
 }
 
+/* Modal backdrop: frosted rather than a flat wash, so an overlay reads as
+   glass sitting above the app rather than a dimming sheet. */
+.scrim {
+  background-color: color-mix(in oklab, var(--t-scrim) 55%, transparent);
+  backdrop-filter: blur(7px) saturate(120%);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .scrim {
+    background-color: color-mix(in oklab, var(--t-scrim) 78%, transparent);
+  }
+}
+
+/* (4) An active group tab lights its own label rather than bleaching it to
+   white, which would collide with the white button text inside the drawer. */
+.glow {
+  text-shadow: 0 0 10px currentColor;
+}
+
 /* Collapsible input drawers.
 
    grid-template-rows 0fr -> 1fr animates to the content's own height, which
@@ -535,7 +556,7 @@ button:disabled {
 .drawer {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition: grid-template-rows 280ms cubic-bezier(0.32, 0.72, 0.28, 1);
 }
 
 .drawer[data-open="true"] {

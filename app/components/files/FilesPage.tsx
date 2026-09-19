@@ -699,10 +699,7 @@ function FileSessionView({ session }: { session: FileSession }) {
 
       {/* Dialogs */}
       {dialog && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={() => setDialog(null)}
-        >
+        <div className="scrim fixed inset-0 z-50 flex items-center justify-center" onClick={() => setDialog(null)}>
           <div className="glass rounded-panel p-4 mx-4 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             {dialog.type === "newFolder" && (
               <>

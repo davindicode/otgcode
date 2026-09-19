@@ -188,8 +188,8 @@ export default function TabBar() {
           aria-expanded={menuOpen}
           aria-label="New tab"
           title="New tab"
-          className={`shrink-0 m-1 p-1.5 rounded-control transition-colors ${
-            menuOpen ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
+          className={`relief shrink-0 m-1.5 p-1.5 rounded-control ${
+            menuOpen ? "text-ink" : "text-ink-dim hover:text-ink"
           }`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
