@@ -1,5 +1,6 @@
 import { marked } from "marked";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isSaveShortcut } from "~/lib/keys";
 import { rewriteLocalAssets } from "~/lib/markdown";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
 import CopyPathButton from "./CopyPathButton";
@@ -187,31 +188,115 @@ function NotebookPreview({ content, fontSize }: { content: string; fontSize: num
   );
 }
 
+const MODES = ["edit", "plain", "preview"] as const;
+type Mode = (typeof MODES)[number];
+
+const MODE_LABELS: Record<Mode, string> = { edit: "Edit", plain: "Plain", preview: "Preview" };
+const MODE_HINTS: Record<Mode, string> = {
+  edit: "Full code editor",
+  plain: "Easier select & copy",
+  preview: "Rendered output",
+};
+
+/**
+ * The slice of Monaco's editor we actually use. Structural rather than an
+ * import so the type doesn't drag the whole editor package into scope.
+ */
+interface MonacoHandle {
+  trigger: (source: string, handlerId: string, payload: unknown) => void;
+  focus: () => void;
+  getModel: () => { canUndo: () => boolean; canRedo: () => boolean } | null;
+  addCommand: (keybinding: number, handler: () => void) => void;
+}
+
 export default function CodeEditor({ path, content, onSave, onClose }: CodeEditorProps) {
   const ext = getExt(path);
   const canPreview = PREVIEWABLE.has(ext);
   const [value, setValue] = useState(content);
   const [dirty, setDirty] = useState(false);
-  const [mode, setMode] = useState<"edit" | "plain" | "preview">(canPreview ? "preview" : "edit");
+  const [mode, setMode] = useState<Mode>(canPreview ? "preview" : "edit");
+  const [modeMenu, setModeMenu] = useState(false);
+  const modeMenuRef = useRef<HTMLDivElement>(null);
+  const monacoRef = useRef<MonacoHandle | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
   const editorFontSize = useWorkspaceStore((s) => s.editorFontSize);
   const monacoTheme = useWorkspaceStore((s) => (s.theme === "light" ? "light" : "vs-dark"));
   const isHtml = ext === "html" || ext === "htm";
   const [htmlZoom, setHtmlZoom] = useState(100);
 
+  // Asks Monaco rather than shadowing it with a second stack: two histories
+  // over one editor would disagree the moment someone pressed Ctrl+Z.
+  const refreshHistory = useCallback(() => {
+    const model = monacoRef.current?.getModel();
+    setCanUndo(!!model?.canUndo());
+    setCanRedo(!!model?.canRedo());
+  }, []);
+
   const handleChange = (v: string | undefined) => {
-    if (v !== undefined) {
-      setValue(v);
-      setDirty(v !== content);
-    }
+    if (v === undefined) return;
+    setValue(v);
+    setDirty(v !== content);
+    refreshHistory();
   };
+
+  const history = (direction: "undo" | "redo") => {
+    monacoRef.current?.trigger("toolbar", direction, null);
+    monacoRef.current?.focus();
+    // Monaco applies the edit synchronously but settles its stack after.
+    queueMicrotask(refreshHistory);
+  };
+
+  useEffect(refreshHistory, [refreshHistory]);
+
+  useEffect(() => {
+    if (!modeMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setModeMenu(false);
+    };
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest("[data-mode-trigger]")) return;
+      if (modeMenuRef.current && !modeMenuRef.current.contains(target as Node)) setModeMenu(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [modeMenu]);
+
+  // Monaco binds its command once at mount, so it would otherwise save
+  // whatever `value` was at that moment. Keep the live one in a ref.
+  const saveRef = useRef<() => void>(() => {});
 
   const handleSave = () => {
     onSave(value);
     setDirty(false);
   };
 
+  saveRef.current = () => {
+    if (dirty) handleSave();
+  };
+
+  /**
+   * Ctrl/Cmd+S saves the file instead of opening the browser's "save page"
+   * dialog. Bound on this pane rather than the document: every tab stays
+   * mounted, so a document listener would fire in editors the user isn't
+   * looking at. Keystrokes bubble from the focused editor, and an unfocused
+   * pane can't receive them.
+   */
+  const handlePaneKeyDown = (e: React.KeyboardEvent) => {
+    if (!isSaveShortcut(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    saveRef.current();
+  };
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" onKeyDown={handlePaneKeyDown}>
       <div className="bar-edge flex items-center gap-2 px-3 py-1.5 bg-surface border-b border-line shrink-0">
         <div className="flex min-w-0 items-center gap-1">
           <span className="min-w-0 truncate text-sm text-ink-muted select-none" title={path}>
@@ -221,33 +306,93 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
         </div>
         <div className="min-w-2 flex-1" />
         <div className="flex items-center gap-1.5 shrink-0">
-          <div className="flex items-center bg-app rounded-control overflow-hidden border border-line">
-            <button
-              onClick={() => setMode("edit")}
-              className={`px-2 py-0.5 text-xs transition-colors ${
-                mode === "edit" ? "relief-accent text-white" : "text-ink-dim hover:text-ink"
-              }`}
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => setMode("plain")}
-              title="Plain text — easier selection & copy on mobile"
-              className={`px-2 py-0.5 text-xs transition-colors ${
-                mode === "plain" ? "relief-accent text-white" : "text-ink-dim hover:text-ink"
-              }`}
-            >
-              Plain
-            </button>
-            {canPreview && (
+          {/* Undo/redo: the keyboard has them, so a phone should too — the
+              same reasoning as the save button beside Ctrl+S. */}
+          {mode === "edit" && (
+            <div className="flex items-center gap-1">
               <button
-                onClick={() => setMode("preview")}
-                className={`px-2 py-0.5 text-xs transition-colors ${
-                  mode === "preview" ? "relief-accent text-white" : "text-ink-dim hover:text-ink"
-                }`}
+                type="button"
+                onClick={() => history("undo")}
+                disabled={!canUndo}
+                title="Undo (Ctrl+Z)"
+                aria-label="Undo"
+                className="relief rounded-control p-1 text-ink-muted hover:text-ink"
               >
-                Preview
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 14L4 9l5-5" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 9h10a6 6 0 010 12h-3" />
+                </svg>
               </button>
+              <button
+                type="button"
+                onClick={() => history("redo")}
+                disabled={!canRedo}
+                title="Redo (Ctrl+Y)"
+                aria-label="Redo"
+                className="relief rounded-control p-1 text-ink-muted hover:text-ink"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 14l5-5-5-5" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 9H10a6 6 0 000 12h3" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* One dropdown instead of up to three side-by-side buttons: the bar
+              also carries the path, and this is a pick-one choice. */}
+          <div className="relative">
+            <button
+              type="button"
+              data-mode-trigger=""
+              onClick={() => setModeMenu((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={modeMenu}
+              className={`relief flex items-center gap-1 rounded-control px-2 py-0.5 text-xs ${
+                modeMenu ? "text-ink" : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              {MODE_LABELS[mode]}
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {modeMenu && (
+              <div
+                ref={modeMenuRef}
+                role="menu"
+                className="glass absolute right-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-panel py-1"
+              >
+                {MODES.filter((m) => m !== "preview" || canPreview).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      setMode(m);
+                      setModeMenu(false);
+                    }}
+                    className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs transition-colors hover:bg-hover ${
+                      mode === m ? "text-ink" : "text-ink-muted"
+                    }`}
+                  >
+                    <span>
+                      {MODE_LABELS[m]}
+                      <span className="block text-[10px] text-ink-faint">{MODE_HINTS[m]}</span>
+                    </span>
+                    {mode === m && (
+                      <svg
+                        className="h-3.5 w-3.5 shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
           {/* Font size / Zoom controls */}
@@ -347,6 +492,11 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
               language={getLanguage(path)}
               value={value}
               onChange={handleChange}
+              onMount={(editor, monaco) => {
+                monacoRef.current = editor as unknown as MonacoHandle;
+                editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveRef.current());
+                refreshHistory();
+              }}
               theme={monacoTheme}
               options={{
                 minimap: { enabled: false },

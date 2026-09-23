@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Ctrl/Cmd+S saves the file** in the code editor instead of opening the
+  browser's save-page dialog.
+- **Undo/redo buttons** in the editor toolbar, so the shortcuts are reachable
+  on a phone. They grey out when there is nothing to undo or redo.
+- The editor's Edit/Plain/Preview switch is a dropdown rather than up to three
+  side-by-side buttons, freeing width in a bar that also carries the file path.
 - Startup prints the LAN addresses the server is reachable on next to the
   tunnel URL — on the same network that skips DNS and Cloudflare entirely —
   and checks the tunnel actually serves the app. Only the tunnel URL is
