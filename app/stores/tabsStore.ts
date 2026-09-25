@@ -22,6 +22,8 @@ export interface Tab {
   title: string;
   /** Viewer tabs only: absolute path of the file being shown. */
   path?: string;
+  /** Viewer tabs only: the explorer tab this file was opened from. */
+  openedFrom?: string;
 }
 
 interface TabsState {
@@ -31,7 +33,7 @@ interface TabsState {
   openTerminal: (opts?: { id?: string; title?: string; cwd?: string }) => string;
   openExplorer: (opts?: { id?: string; title?: string; cwd?: string }) => string;
   /** Opens the file, or focuses its tab if it is already open. */
-  openViewer: (path: string) => string;
+  openViewer: (path: string, fromTabId?: string) => string;
   close: (id: string) => void;
   setActive: (id: string) => void;
   rename: (id: string, title: string) => void;
@@ -41,6 +43,21 @@ interface TabsState {
 
 let counter = 0;
 const nextId = (kind: TabKind) => `${kind}-${Date.now()}-${++counter}`;
+
+/**
+ * Where a newly opened file belongs: directly after the explorer it came from,
+ * and after any files already opened from that same explorer — so a file sits
+ * beside its explorer and siblings stay in the order they were opened. Falls
+ * back to the end of the strip when the origin is unknown or already closed.
+ */
+export function insertIndexFor(tabs: Tab[], fromTabId?: string): number {
+  if (!fromTabId) return tabs.length;
+  const origin = tabs.findIndex((t) => t.id === fromTabId);
+  if (origin === -1) return tabs.length;
+  let at = origin + 1;
+  while (at < tabs.length && tabs[at].kind === "viewer" && tabs[at].openedFrom === fromTabId) at++;
+  return at;
+}
 
 function nextTitle(tabs: Tab[], kind: TabKind, label: string): string {
   const used = tabs.filter((t) => t.kind === kind).length;
@@ -67,7 +84,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return tabId;
   },
 
-  openViewer: (path) => {
+  openViewer: (path, fromTabId) => {
     // Reopening a file that's already in a tab just focuses it, rather than
     // stacking duplicates of the same document.
     const existing = get().tabs.find((t) => t.kind === "viewer" && t.path === path);
@@ -76,10 +93,11 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       return existing.id;
     }
     const tabId = nextId("viewer");
-    set((s) => ({
-      tabs: [...s.tabs, { id: tabId, kind: "viewer", title: basename(path), path }],
-      activeId: tabId,
-    }));
+    const tab: Tab = { id: tabId, kind: "viewer", title: basename(path), path, openedFrom: fromTabId };
+    set((s) => {
+      const at = insertIndexFor(s.tabs, fromTabId);
+      return { tabs: [...s.tabs.slice(0, at), tab, ...s.tabs.slice(at)], activeId: tabId };
+    });
     return tabId;
   },
 
@@ -93,8 +111,11 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (tab.kind === "explorer") useFileStore.getState().closeSession(id);
 
     const remaining = tabs.filter((t) => t.id !== id);
-    // Focus the neighbour rather than dumping the user on an unrelated tab.
-    const nextActive = activeId === id ? (remaining[index]?.id ?? remaining[index - 1]?.id ?? null) : activeId;
+    // Closing a file returns you to the explorer you opened it from; failing
+    // that, the neighbour, rather than dumping you on an unrelated tab.
+    const origin = tab.openedFrom && remaining.some((t) => t.id === tab.openedFrom) ? tab.openedFrom : null;
+    const nextActive =
+      activeId === id ? (origin ?? remaining[index]?.id ?? remaining[index - 1]?.id ?? null) : activeId;
 
     set({ tabs: remaining, activeId: nextActive });
     if (nextActive && nextActive !== activeId) syncContentFocus(nextActive, remaining);
@@ -124,7 +145,13 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         useFileStore.getState().createSession(tab.id, tab.title, tab.cwd);
         tabs.push({ id: tab.id, kind: "explorer", title: tab.title });
       } else if (tab.kind === "viewer" && tab.path) {
-        tabs.push({ id: tab.id, kind: "viewer", title: tab.title || basename(tab.path), path: tab.path });
+        tabs.push({
+          id: tab.id,
+          kind: "viewer",
+          title: tab.title || basename(tab.path),
+          path: tab.path,
+          openedFrom: tab.openedFrom || undefined,
+        });
       }
     }
     const active = activeId && tabs.some((t) => t.id === activeId) ? activeId : (tabs[0]?.id ?? null);
@@ -152,6 +179,7 @@ export function toWorkspaceTabs(tabs: Tab[]): WorkspaceTab[] {
     id: tab.id,
     kind: tab.kind,
     title: tab.title,
+    openedFrom: tab.openedFrom ?? "",
     cwd:
       tab.kind === "explorer"
         ? (files[tab.id]?.cwd ?? "")

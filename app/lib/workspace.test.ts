@@ -15,6 +15,7 @@ const tab = (over: Partial<WorkspaceTab> = {}): WorkspaceTab => ({
   title: "Terminal 1",
   cwd: "/home/me",
   path: "",
+  openedFrom: "",
   ...over,
 });
 
@@ -139,5 +140,16 @@ describe("sanitize", () => {
     const merged = sanitize({ fontSize: 12 }, base);
     expect(merged.customCommands).toEqual([{ label: "deploy", command: "./deploy.sh" }]);
     expect(merged.hiddenCommands).toEqual(["ls"]);
+  });
+
+  it("keeps the explorer a file was opened from, so grouping survives a reload", () => {
+    const result = sanitize({
+      tabs: [
+        tab({ id: "e1", kind: "explorer", title: "Explorer 1", cwd: "/tmp" }),
+        tab({ id: "v1", kind: "viewer", title: "main.ts", path: "/tmp/main.ts", openedFrom: "e1" }),
+      ],
+      activeId: "v1",
+    });
+    expect(result.tabs[1].openedFrom).toBe("e1");
   });
 });

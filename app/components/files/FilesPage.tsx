@@ -192,7 +192,7 @@ function FileSessionView({ session }: { session: FileSession }) {
     }
     // Files open as their own tab. The explorer never becomes an editor, so
     // you keep your place in the tree while reading something.
-    openViewer(fullPath(entry.name));
+    openViewer(fullPath(entry.name), session.id);
   };
 
   const handleNavigate = async (path: string) => {

@@ -18,6 +18,8 @@ export interface WorkspaceTab {
   cwd: string;
   /** Viewer: the file it was showing. */
   path: string;
+  /** Viewer: the explorer tab it was opened from, so grouping survives a reload. */
+  openedFrom: string;
 }
 
 /** A command button the user added to the cmds group. */
@@ -80,7 +82,7 @@ function tabs(value: unknown): WorkspaceTab[] {
     const path = str(tab.path);
     if (kind === "viewer" && !path) continue;
     seen.add(id);
-    out.push({ id, kind, title: str(tab.title), cwd: str(tab.cwd), path });
+    out.push({ id, kind, title: str(tab.title), cwd: str(tab.cwd), path, openedFrom: str(tab.openedFrom) });
   }
   return out;
 }

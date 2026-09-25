@@ -89,6 +89,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The header dropped its online/offline pill — losing the connection already
   raises the full-screen connecting gate — and its version number, which moved
   into the System Info popup.
+- Opening a file puts its tab directly after the explorer it came from, and
+  after any files already opened from that explorer, so a file sits beside its
+  explorer and siblings stay in the order they were opened. Closing the file
+  returns to that explorer rather than to whichever tab happens to be next.
 - **One pane, one tab strip.** The split pane, the per-panel tab rows and the
   mobile tab bar are gone. Every tab — terminal, explorer, or an open file —
   lives in a single VS Code-style strip at the top, and `+` asks which kind to
