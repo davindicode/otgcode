@@ -5,6 +5,7 @@ import {
   clearedSessionCookie,
   createLoginThrottle,
   hashPassword,
+  isConfigured,
   isPasswordEnabled,
   isRequestAuthenticated,
   issueToken,
@@ -73,6 +74,7 @@ export function mountAuthRoutes(app: Express): void {
 
   router.get("/status", (req, res) => {
     res.json({
+      configured: isConfigured(),
       enabled: isPasswordEnabled(),
       authenticated: isRequestAuthenticated(req.headers.cookie),
       user: localUsername(),
@@ -148,6 +150,9 @@ export function mountAuthRoutes(app: Express): void {
   router.post("/password/disable", async (req, res) => {
     const config = loadConfig();
     if (!config.passwordEnabled || !config.passwordHash) {
+      // Persist the decision itself: without a file on disk the first-run
+      // setup screen would come back every time.
+      saveConfig({ ...config, passwordEnabled: false, passwordHash: null });
       res.json({ ok: true, enabled: false });
       return;
     }

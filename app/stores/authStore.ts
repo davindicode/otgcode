@@ -4,6 +4,8 @@ import { hasSocket } from "~/lib/socket";
 interface AuthState {
   /** False until the first /api/auth/status response lands. */
   loaded: boolean;
+  /** False until a password choice has been saved on the host (first run). */
+  configured: boolean;
   /** An access password is configured on the server. */
   enabled: boolean;
   authenticated: boolean;
@@ -21,6 +23,8 @@ interface AuthState {
   logout: () => Promise<void>;
   setPassword: (newPassword: string, currentPassword?: string) => Promise<string | null>;
   disablePassword: (currentPassword: string) => Promise<string | null>;
+  /** Record "no password" on a fresh install, where there is none to confirm. */
+  declinePassword: () => Promise<string | null>;
   lock: () => void;
 }
 
@@ -41,6 +45,7 @@ async function post(path: string, body: unknown): Promise<string | null> {
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   loaded: false,
+  configured: true,
   enabled: false,
   authenticated: true,
   user: "",
@@ -49,9 +54,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   refresh: async () => {
     try {
       const res = await fetch("/api/auth/status");
-      const data = (await res.json()) as { enabled: boolean; authenticated: boolean; user?: string };
+      const data = (await res.json()) as {
+        configured: boolean;
+        enabled: boolean;
+        authenticated: boolean;
+        user?: string;
+      };
       set({
         loaded: true,
+        configured: data.configured,
         enabled: data.enabled,
         authenticated: data.authenticated,
         user: data.user || "",
@@ -59,7 +70,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // Treat an unreachable status endpoint as "not gated" rather than
       // stranding the user on a lock screen they can't get past.
-      set({ loaded: true, enabled: false, authenticated: true });
+      set({ loaded: true, configured: true, enabled: false, authenticated: true });
     }
   },
 
@@ -80,14 +91,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setPassword: async (newPassword, currentPassword) => {
     const error = await post("/api/auth/password", { newPassword, currentPassword });
     if (error) return error;
-    set({ enabled: true, authenticated: true });
+    set({ configured: true, enabled: true, authenticated: true });
     return null;
   },
 
   disablePassword: async (currentPassword) => {
     const error = await post("/api/auth/password/disable", { currentPassword });
     if (error) return error;
-    set({ enabled: false, authenticated: true });
+    set({ configured: true, enabled: false, authenticated: true });
+    return null;
+  },
+
+  declinePassword: async () => {
+    const error = await post("/api/auth/password/disable", {});
+    if (error) return error;
+    set({ configured: true, enabled: false, authenticated: true });
     return null;
   },
 

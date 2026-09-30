@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "~/stores/authStore";
+import PasswordField from "./PasswordField";
 
 /**
  * Full-screen lock shown before anything else when an access password is set.
@@ -54,19 +55,20 @@ export default function PasswordGate() {
           </div>
         </div>
 
-        <input
-          ref={inputRef}
-          type="password"
-          value={password}
-          onChange={(e) => {
-            setPassword(e.target.value);
-            setError(null);
-          }}
-          autoComplete="current-password"
-          placeholder="Password"
-          disabled={busy}
-          className="field mt-5 w-full px-3 py-2 text-sm"
-        />
+        <div className="mt-5">
+          <PasswordField
+            inputRef={inputRef}
+            value={password}
+            onChange={(v) => {
+              setPassword(v);
+              setError(null);
+            }}
+            autoComplete="current-password"
+            placeholder="Password"
+            disabled={busy}
+            className="px-3 py-2 text-sm"
+          />
+        </div>
 
         {error && (
           <p role="alert" className="mt-2 text-[11px] text-red-400">

@@ -7,6 +7,7 @@ import ConnectionGate from "./ConnectionGate";
 import FilesPage from "./files/FilesPage";
 import Header from "./Header";
 import PasswordGate from "./PasswordGate";
+import PasswordSetup from "./PasswordSetup";
 import TabBar from "./TabBar";
 import Toaster from "./Toaster";
 import InputBox from "./terminal/InputBox";
@@ -61,6 +62,7 @@ export default function AppShell() {
   const initSocket = useTerminalStore((s) => s.initSocket);
   const authLoaded = useAuthStore((s) => s.loaded);
   const locked = useAuthStore((s) => s.enabled && !s.authenticated);
+  const configured = useAuthStore((s) => s.configured);
   const refreshAuth = useAuthStore((s) => s.refresh);
   const hydrateWorkspace = useWorkspaceStore((s) => s.hydrate);
   const [workspaceReady, setWorkspaceReady] = useState(false);
@@ -108,6 +110,7 @@ export default function AppShell() {
   }
 
   if (locked) return <PasswordGate />;
+  if (!configured) return <PasswordSetup />;
 
   return (
     <div className="app-shell bg-app text-ink">

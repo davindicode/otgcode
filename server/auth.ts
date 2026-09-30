@@ -69,6 +69,11 @@ export function saveConfig(next: AuthConfig): void {
   cached = next;
 }
 
+/** False on a fresh install: no choice about the password has been saved yet. */
+export function isConfigured(): boolean {
+  return existsSync(CONFIG_FILE);
+}
+
 export function isPasswordEnabled(): boolean {
   const config = loadConfig();
   return config.passwordEnabled && !!config.passwordHash;

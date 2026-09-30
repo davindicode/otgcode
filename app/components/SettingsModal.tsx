@@ -4,6 +4,8 @@ import { useAuthStore } from "~/stores/authStore";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { useToastStore } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
+import PasswordField from "./PasswordField";
+import PasswordSetup from "./PasswordSetup";
 
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -16,8 +18,6 @@ function Section({ title, description, children }: { title: string; description:
     </div>
   );
 }
-
-const inputClass = "field w-full px-2.5 py-1.5 text-xs";
 
 function FontRow({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
   const step = (delta: number) => onChange(Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, value + delta)));
@@ -109,7 +109,8 @@ function AccessPassword() {
   const showToast = useToastStore((s) => s.show);
 
   // `null` = collapsed, showing just the toggle.
-  const [form, setForm] = useState<"set" | "change" | "disable" | null>(null);
+  const [form, setForm] = useState<"change" | "disable" | null>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -152,13 +153,13 @@ function AccessPassword() {
     }
 
     setBusy(true);
-    const message = await setPassword(next, form === "change" ? current : undefined);
+    const message = await setPassword(next, current);
     setBusy(false);
     if (message) {
       setError(message);
       return;
     }
-    showToast(form === "change" ? "Access password changed" : "Access password enabled", "info");
+    showToast("Access password changed", "info");
     reset();
   };
 
@@ -175,7 +176,7 @@ function AccessPassword() {
         {form === null && (
           <button
             type="button"
-            onClick={() => setForm(enabled ? "disable" : "set")}
+            onClick={() => (enabled ? setForm("disable") : setSetupOpen(true))}
             className={`shrink-0 rounded-control px-2 py-1 text-xs font-medium transition-colors ${
               enabled
                 ? "border border-line text-ink-muted hover:text-ink"
@@ -200,44 +201,38 @@ function AccessPassword() {
       {form !== null && (
         <form onSubmit={submit} className="mt-3 space-y-2">
           {(form === "change" || form === "disable") && (
-            <input
-              type="password"
+            <PasswordField
               value={current}
-              onChange={(e) => {
-                setCurrent(e.target.value);
+              onChange={(v) => {
+                setCurrent(v);
                 setError(null);
               }}
               placeholder="Current password"
               autoComplete="current-password"
               disabled={busy}
-              className={inputClass}
             />
           )}
           {form !== "disable" && (
             <>
-              <input
-                type="password"
+              <PasswordField
                 value={next}
-                onChange={(e) => {
-                  setNext(e.target.value);
+                onChange={(v) => {
+                  setNext(v);
                   setError(null);
                 }}
                 placeholder="New password"
                 autoComplete="new-password"
                 disabled={busy}
-                className={inputClass}
               />
-              <input
-                type="password"
+              <PasswordField
                 value={confirm}
-                onChange={(e) => {
-                  setConfirm(e.target.value);
+                onChange={(v) => {
+                  setConfirm(v);
                   setError(null);
                 }}
                 placeholder="Confirm new password"
                 autoComplete="new-password"
                 disabled={busy}
-                className={inputClass}
               />
             </>
           )}
@@ -268,14 +263,10 @@ function AccessPassword() {
               Cancel
             </button>
           </div>
-
-          {form === "set" && (
-            <p className="text-[10px] leading-relaxed text-ink-ghost">
-              You stay signed in on this device. Every other open tab is signed out.
-            </p>
-          )}
         </form>
       )}
+
+      {setupOpen && <PasswordSetup onCancel={() => setSetupOpen(false)} />}
 
       {!enabled && form === null && (
         <p className="mt-2 text-[10px] leading-relaxed text-ink-ghost">

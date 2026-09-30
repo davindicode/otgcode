@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A password is the default on a fresh install.** First start asks you to set
+  one before the app opens. Declining takes a second step that repeats the
+  tunnel warning — anyone with the URL gets a terminal as you — and says a
+  password can be turned on later from Settings. The choice is recorded, so
+  the prompt appears once.
+- Password fields have a show/hide toggle, on the login screen and when
+  setting one.
 - **Ctrl/Cmd+S saves the file** in the code editor instead of opening the
   browser's save-page dialog.
 - **Undo/redo buttons** in the editor toolbar, so the shortcuts are reachable

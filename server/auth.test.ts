@@ -3,6 +3,7 @@ import {
   createLoginThrottle,
   hashPassword,
   issueToken,
+  MIN_PASSWORD_LENGTH,
   parseCookies,
   SESSION_COOKIE,
   validatePassword,
@@ -169,5 +170,12 @@ describe("login throttle", () => {
     const throttle = createLoginThrottle();
     throttle.recordFailure("login", 0);
     expect(throttle.delayMs("password", 0)).toBe(0);
+  });
+});
+
+describe("password length rule", () => {
+  it("is the same number the client shows", async () => {
+    const { MIN_PASSWORD_LENGTH: clientMin } = await import("../app/lib/workspace.shared");
+    expect(clientMin).toBe(MIN_PASSWORD_LENGTH);
   });
 });

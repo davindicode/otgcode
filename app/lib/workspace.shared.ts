@@ -42,6 +42,9 @@ export interface Workspace {
   hiddenCommands: string[];
 }
 
+/** Also enforced server-side in auth.ts. */
+export const MIN_PASSWORD_LENGTH = 6;
+
 export const MIN_FONT_SIZE = 6;
 export const MAX_FONT_SIZE = 24;
 export const DEFAULT_FONT_SIZE = 8;
