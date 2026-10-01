@@ -804,10 +804,10 @@ export default function InputBox() {
                     key={set}
                     type="button"
                     onClick={() => setComboSet(set)}
-                    className={`px-2 py-0.5 text-[10px] rounded-control select-none ${
+                    className={`px-2 py-0.5 text-[10px] rounded-control border transition-colors select-none ${
                       comboSet === set
-                        ? "relief glow bg-tab-action-on text-tab-action-ink-on ring-1 ring-inset ring-blue-400/60"
-                        : "relief text-tab-action-ink"
+                        ? "relief-accent border-blue-500 text-white"
+                        : "border-line bg-raised text-ink-faint hover:text-ink"
                     }`}
                   >
                     {set}

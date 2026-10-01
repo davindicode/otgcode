@@ -46,7 +46,9 @@ export default function CommandChips({
   const [editing, setEditing] = useState(false);
   const [dialog, setDialog] = useState(false);
 
-  const actionBtn = "px-2.5 py-1 text-[11px] relief rounded-control whitespace-nowrap select-none touch-manipulation";
+  // Same ink as the commands beside them; the glow is what marks edit as armed.
+  const actionBtn =
+    "px-2 py-0.5 text-[11px] relief rounded-control text-ink-muted hover:text-ink select-none touch-manipulation";
 
   return (
     <>
@@ -91,9 +93,7 @@ export default function CommandChips({
           onClick={() => setEditing((v) => !v)}
           aria-pressed={editing}
           title={editing ? "Stop removing" : "Remove buttons"}
-          className={`${actionBtn} ${
-            editing ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70" : "text-ink-faint hover:text-ink-muted"
-          }`}
+          className={`${actionBtn} ${editing ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70" : ""}`}
         >
           {editing ? "done" : "edit"}
         </button>
