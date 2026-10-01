@@ -745,7 +745,6 @@ export default function InputBox() {
                 hidden={hiddenCommands}
                 disabled={!activeSessionId}
                 chipClass={keyBtn}
-                addLabel="+ add command"
                 dialogTitle="Add command"
                 dialogHint="Becomes a button in the cmds group. Runs immediately."
                 commandPlaceholder="./deploy.sh --prod"
@@ -1134,7 +1133,6 @@ export default function InputBox() {
                       hidden={hiddenSlashLabels}
                       disabled={!activeSessionId}
                       chipClass="px-2 py-0.5 text-[11px] relief text-cyan-300 hover:text-cyan-100 rounded-control whitespace-nowrap select-none"
-                      addLabel="+ add slash command"
                       dialogTitle={`Add ${vendor.name} slash command`}
                       dialogHint={`Sent to ${vendor.name} when tapped. Saved for ${vendor.name} only.`}
                       commandPlaceholder="/review"

@@ -22,7 +22,6 @@ export default function CommandChips({
   hidden,
   disabled,
   chipClass,
-  addLabel,
   dialogTitle,
   dialogHint,
   commandPlaceholder,
@@ -36,7 +35,6 @@ export default function CommandChips({
   hidden: string[];
   disabled?: boolean;
   chipClass: string;
-  addLabel: string;
   dialogTitle: string;
   dialogHint: string;
   commandPlaceholder: string;
@@ -79,16 +77,14 @@ export default function CommandChips({
             )}
           </button>
         ))}
-      </div>
 
-      <div className="mt-1.5 flex items-center gap-1.5 border-t border-line/50 pt-1.5">
-        <button
-          type="button"
-          onClick={() => setDialog(true)}
-          title={dialogTitle}
-          className={`${actionBtn} text-blue-300 hover:text-blue-200`}
-        >
-          {addLabel}
+        {/* The controls ride on the same line as the commands they manage; the
+            rule keeps them from reading as two more commands. */}
+        <span aria-hidden="true" className="mx-0.5 select-none text-ink-ghost">
+          |
+        </span>
+        <button type="button" onClick={() => setDialog(true)} title={dialogTitle} className={actionBtn}>
+          +
         </button>
         <button
           type="button"
