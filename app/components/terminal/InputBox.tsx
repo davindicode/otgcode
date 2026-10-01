@@ -1062,16 +1062,20 @@ export default function InputBox() {
                   ) : tmuxSessions.length === 0 ? (
                     <span className="text-[11px] text-ink-faint">No tmux sessions running</span>
                   ) : (
-                    <div className="flex flex-col gap-1 mb-2">
+                    /* Sessions wrap like the command buttons elsewhere: a
+                       full-width row each left most of the drawer empty, and a
+                       name is rarely wider than a few characters. */
+                    <div className="mb-2 flex flex-wrap gap-1">
                       {tmuxSessions.map((s) => (
-                        <div key={s.name} className="flex items-center gap-2">
+                        <span key={s.name} className="relief flex items-center rounded-control">
                           <button
                             onClick={() => handleTmuxAttach(s.name)}
-                            className="flex-1 text-left px-2 py-1 text-[11px] bg-raised text-ink-muted hover:text-ink hover:bg-hover rounded-control border border-line transition-colors"
+                            title={`Attach to ${s.name}`}
+                            className="py-0.5 pl-2 pr-1 text-[11px] text-ink-muted hover:text-ink"
                           >
                             <span className="font-medium">{s.name}</span>
-                            <span className="text-ink-faint ml-2">{s.windows}w</span>
-                            {s.attached && <span className="text-green-500 ml-1">(attached)</span>}
+                            <span className="ml-1.5 text-ink-faint">{s.windows}w</span>
+                            {s.attached && <span className="ml-1 text-green-400">•</span>}
                           </button>
                           <button
                             onClick={() => {
@@ -1079,10 +1083,11 @@ export default function InputBox() {
                               sendInput(activeSessionId, `tmux kill-session -t ${s.name}\n`);
                               setTimeout(fetchTmuxSessions, 500);
                             }}
-                            className="p-1 text-ink-faint hover:text-red-400 transition-colors"
+                            className="py-0.5 pl-0.5 pr-1.5 text-ink-ghost transition-colors hover:text-red-400"
                             title={`Kill session ${s.name}`}
+                            aria-label={`Kill session ${s.name}`}
                           >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -1091,7 +1096,7 @@ export default function InputBox() {
                               />
                             </svg>
                           </button>
-                        </div>
+                        </span>
                       ))}
                     </div>
                   )}

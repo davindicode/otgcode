@@ -19,7 +19,7 @@ interface AuthState {
 
   refresh: () => Promise<void>;
   /** Resolves to an error message, or null on success. */
-  login: (password: string) => Promise<string | null>;
+  login: (password: string, staySignedIn: boolean) => Promise<string | null>;
   logout: () => Promise<void>;
   setPassword: (newPassword: string, currentPassword?: string) => Promise<string | null>;
   disablePassword: (currentPassword: string) => Promise<string | null>;
@@ -74,8 +74,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  login: async (password) => {
-    const error = await post("/api/auth/login", { password });
+  login: async (password, staySignedIn) => {
+    const error = await post("/api/auth/login", { password, staySignedIn });
     if (error) return error;
     set({ authenticated: true });
     return null;

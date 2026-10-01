@@ -11,7 +11,16 @@ const CONFIG_DIR = process.env.OTG_CONFIG_DIR || join(homedir(), ".otgcode");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 
 export const SESSION_COOKIE = "otg_session";
-export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+/**
+ * How long a granted session stays valid.
+ *
+ * Both are session cookies — nothing is written to disk, so closing the
+ * browser always ends the session. The difference is what happens while it is
+ * open: STAY lasts the browsing session, SITTING expires soon enough that
+ * coming back later asks again.
+ */
+export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const SITTING_TTL_MS = 30 * 60 * 1000;
 export const MIN_PASSWORD_LENGTH = 6;
 
 const SCRYPT_KEYLEN = 64;
@@ -170,11 +179,17 @@ export function parseCookies(header: string | undefined | null): Record<string, 
   return out;
 }
 
-// `Secure` is deliberately omitted: the same server is reached over https
-// through the Cloudflare tunnel and over plain http on localhost, and a Secure
-// cookie would never be stored in the localhost case.
-export function sessionCookie(token: string, ttlMs = SESSION_TTL_MS): string {
-  return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(ttlMs / 1000)}`;
+/**
+ * A session cookie: no Max-Age, so the browser keeps it in memory only and
+ * drops it when it closes. Refreshes and new tabs still work; a persisted
+ * cookie would leave a shell reachable for weeks on an unlocked device.
+ *
+ * `Secure` is deliberately omitted: the same server is reached over https
+ * through the Cloudflare tunnel and over plain http on localhost, and a Secure
+ * cookie would never be stored in the localhost case.
+ */
+export function sessionCookie(token: string): string {
+  return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax`;
 }
 
 export function clearedSessionCookie(): string {

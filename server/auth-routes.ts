@@ -11,6 +11,8 @@ import {
   issueToken,
   loadConfig,
   localUsername,
+  SESSION_TTL_MS,
+  SITTING_TTL_MS,
   saveConfig,
   sessionCookie,
   validatePassword,
@@ -63,9 +65,13 @@ export function authGate(req: Request, res: Response, next: NextFunction): void 
   res.status(401).json({ error: "Authentication required" });
 }
 
-/** Issue a fresh session for the current secret and attach it to the response. */
-function grantSession(res: Response): void {
-  res.setHeader("Set-Cookie", sessionCookie(issueToken(loadConfig().sessionSecret)));
+/**
+ * Issue a fresh session for the current secret and attach it to the response.
+ * `stay` chooses how long it lives; the cookie is always a session cookie.
+ */
+function grantSession(res: Response, stay: boolean): void {
+  const ttl = stay ? SESSION_TTL_MS : SITTING_TTL_MS;
+  res.setHeader("Set-Cookie", sessionCookie(issueToken(loadConfig().sessionSecret, Date.now(), ttl)));
 }
 
 export function mountAuthRoutes(app: Express): void {
@@ -89,7 +95,7 @@ export function mountAuthRoutes(app: Express): void {
       return;
     }
 
-    const { password } = (req.body ?? {}) as { password?: unknown };
+    const { password, staySignedIn } = (req.body ?? {}) as { password?: unknown; staySignedIn?: unknown };
     await sleep(throttle.delayMs("login"));
 
     if (typeof password !== "string" || !verifyPassword(password, config.passwordHash)) {
@@ -99,7 +105,7 @@ export function mountAuthRoutes(app: Express): void {
     }
 
     throttle.reset("login");
-    grantSession(res);
+    grantSession(res, staySignedIn === true);
     res.json({ ok: true });
   });
 
@@ -143,7 +149,7 @@ export function mountAuthRoutes(app: Express): void {
       // gets a replacement below so they aren't logged out of their own change.
       sessionSecret: randomBytes(32).toString("hex"),
     });
-    grantSession(res);
+    grantSession(res, true);
     res.json({ ok: true, enabled: true });
   });
 

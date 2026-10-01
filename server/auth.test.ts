@@ -6,6 +6,9 @@ import {
   MIN_PASSWORD_LENGTH,
   parseCookies,
   SESSION_COOKIE,
+  SESSION_TTL_MS,
+  SITTING_TTL_MS,
+  sessionCookie,
   validatePassword,
   verifyPassword,
   verifyToken,
@@ -177,5 +180,27 @@ describe("password length rule", () => {
   it("is the same number the client shows", async () => {
     const { MIN_PASSWORD_LENGTH: clientMin } = await import("../app/lib/workspace.shared");
     expect(clientMin).toBe(MIN_PASSWORD_LENGTH);
+  });
+});
+
+describe("session cookie", () => {
+  it("is a session cookie, so nothing is written to disk", () => {
+    const cookie = sessionCookie("123.abc");
+    expect(cookie).not.toMatch(/max-age/i);
+    expect(cookie).not.toMatch(/expires/i);
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("SameSite=Lax");
+  });
+
+  it("offers a short sitting and a browser-long option", () => {
+    // A sitting has to outlast a page refresh but not an afternoon.
+    expect(SITTING_TTL_MS).toBeGreaterThan(5 * 60 * 1000);
+    expect(SITTING_TTL_MS).toBeLessThan(SESSION_TTL_MS);
+  });
+
+  it("expires a sitting token on time", () => {
+    const token = issueToken(SECRET, 0, SITTING_TTL_MS);
+    expect(verifyToken(token, SECRET, SITTING_TTL_MS - 1)).toBe(true);
+    expect(verifyToken(token, SECRET, SITTING_TTL_MS + 1)).toBe(false);
   });
 });

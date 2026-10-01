@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tunnel warning — anyone with the URL gets a terminal as you — and says a
   password can be turned on later from Settings. The choice is recorded, so
   the prompt appears once.
+- Login has a **Stay signed in until I close the browser** checkbox. The
+  session cookie is never persisted now, so closing the browser always ends
+  the session; unticked, it also expires after 30 minutes so coming back later
+  asks again. Previously a login was remembered for 30 days on disk, which
+  left a shell reachable on an unlocked device for a month.
 - Password fields have a show/hide toggle, on the login screen and when
   setting one.
 - **Ctrl/Cmd+S saves the file** in the code editor instead of opening the

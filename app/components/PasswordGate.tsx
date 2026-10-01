@@ -12,6 +12,7 @@ export default function PasswordGate() {
   const needsReload = useAuthStore((s) => s.needsReload);
   const user = useAuthStore((s) => s.user);
   const [password, setPassword] = useState("");
+  const [stay, setStay] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -25,7 +26,7 @@ export default function PasswordGate() {
     if (busy || !password) return;
     setBusy(true);
     setError(null);
-    const message = await login(password);
+    const message = await login(password, stay);
     if (message) {
       setError(message);
       setPassword("");
@@ -76,6 +77,17 @@ export default function PasswordGate() {
           </p>
         )}
 
+        <label className="mt-3 flex cursor-pointer items-center gap-2 text-[11px] text-ink-faint">
+          <input
+            type="checkbox"
+            checked={stay}
+            onChange={(e) => setStay(e.target.checked)}
+            disabled={busy}
+            className="accent-blue-500"
+          />
+          Stay signed in until I close the browser
+        </label>
+
         <button
           type="submit"
           disabled={busy || !password}
@@ -85,7 +97,11 @@ export default function PasswordGate() {
           {busy ? "Unlocking..." : "Unlock"}
         </button>
 
-        <p className="mt-4 text-center text-[10px] leading-relaxed text-ink-ghost">
+        <p className="mt-3 text-center text-[10px] leading-relaxed text-ink-ghost">
+          Left unticked, the session expires after 30 minutes idle.
+        </p>
+
+        <p className="mt-3 text-center text-[10px] leading-relaxed text-ink-ghost">
           Forgot it? Remove <code className="text-ink-faint">passwordEnabled</code> from{" "}
           <code className="text-ink-faint">~/.otgcode/config.json</code> on the host and restart.
         </p>
