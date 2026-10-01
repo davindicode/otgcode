@@ -55,11 +55,15 @@ export async function loader({ request }: Route.LoaderArgs) {
         const tty = readTty(childPid);
         if (!tty || !tty.startsWith("/dev/")) continue;
         try {
-          const cwd = execFileSync("tmux", ["display-message", "-p", "-c", tty, "#{pane_current_path}"], {
-            encoding: "utf-8",
-            timeout: 2000,
-          }).trim();
-          if (cwd) return Response.json({ cwd });
+          // Two formats in one call: finding the right client is the
+          // expensive part, and the session name comes free with it.
+          const out = execFileSync(
+            "tmux",
+            ["display-message", "-p", "-c", tty, "#{session_name}\n#{pane_current_path}"],
+            { encoding: "utf-8", timeout: 2000 },
+          ).trim();
+          const [tmuxSession, cwd] = out.split("\n");
+          if (cwd) return Response.json({ cwd, tmuxSession: tmuxSession || null });
         } catch {
           // Fall through to PTY-based detection
         }

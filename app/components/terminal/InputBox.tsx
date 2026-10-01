@@ -92,29 +92,51 @@ const VIM_KEYS: QuickKey[] = [
   { label: "G", key: "G", title: "Go to bottom" },
 ];
 
-const TMUX_KEYS: QuickKey[] = [
-  { label: "c new", key: "\x02c", title: "New window" },
-  { label: "n next", key: "\x02n", title: "Next window" },
-  { label: "p prev", key: "\x02p", title: "Previous window" },
-  { label: "0", key: "\x020", title: "Window 0" },
-  { label: "1", key: "\x021", title: "Window 1" },
-  { label: "2", key: "\x022", title: "Window 2" },
-  { label: "3", key: "\x023", title: "Window 3" },
-  { label: "4", key: "\x024", title: "Window 4" },
-  { label: "5", key: "\x025", title: "Window 5" },
-  { label: '" hsplit', key: '\x02"', title: "Split horizontal" },
-  { label: "% vsplit", key: "\x02%", title: "Split vertical" },
-  { label: "o pane", key: "\x02o", title: "Next pane" },
-  { label: "x kill", key: "\x02x", title: "Kill pane" },
-  { label: "z zoom", key: "\x02z", title: "Toggle zoom pane" },
-  { label: "[ scroll", key: "\x02[", title: "Scroll/copy mode (Esc to exit)" },
-  { label: "] paste", key: "\x02]", title: "Paste from tmux buffer" },
-  { label: ", rename", key: "\x02,", title: "Rename window" },
-  { label: "w list", key: "\x02w", title: "List windows" },
-  { label: "s sessions", key: "\x02s", title: "List sessions" },
-  { label: ": cmd", key: "\x02:", title: "Command prompt" },
+// Session-level: these act on the session as a whole, so they sit with its
+// name and the detach button rather than among the window and pane controls.
+const TMUX_SESSION_KEYS: QuickKey[] = [
+  { label: "s switch", key: "\x02s", title: "List and switch sessions" },
+  { label: "$ rename", key: "\x02$", title: "Rename this session" },
+  { label: ": cmd", key: "\x02:", title: "tmux command prompt" },
 ];
 
+// Everything that acts inside the session, grouped by what it operates on.
+const TMUX_GROUPS: { label: string; keys: QuickKey[] }[] = [
+  {
+    label: "windows",
+    keys: [
+      { label: "c new", key: "\x02c", title: "New window" },
+      { label: "n next", key: "\x02n", title: "Next window" },
+      { label: "p prev", key: "\x02p", title: "Previous window" },
+      { label: "0", key: "\x020", title: "Window 0" },
+      { label: "1", key: "\x021", title: "Window 1" },
+      { label: "2", key: "\x022", title: "Window 2" },
+      { label: "3", key: "\x023", title: "Window 3" },
+      { label: "4", key: "\x024", title: "Window 4" },
+      { label: "5", key: "\x025", title: "Window 5" },
+      { label: ", rename", key: "\x02,", title: "Rename window" },
+      { label: "& kill", key: "\x02&", title: "Kill window" },
+      { label: "w list", key: "\x02w", title: "List windows" },
+    ],
+  },
+  {
+    label: "panes",
+    keys: [
+      { label: '" hsplit', key: '\x02"', title: "Split horizontal" },
+      { label: "% vsplit", key: "\x02%", title: "Split vertical" },
+      { label: "o pane", key: "\x02o", title: "Next pane" },
+      { label: "z zoom", key: "\x02z", title: "Toggle zoom pane" },
+      { label: "x kill", key: "\x02x", title: "Kill pane" },
+    ],
+  },
+  {
+    label: "copy",
+    keys: [
+      { label: "[ scroll", key: "\x02[", title: "Scroll/copy mode (Esc to exit)" },
+      { label: "] paste", key: "\x02]", title: "Paste from tmux buffer" },
+    ],
+  },
+];
 // Common key combos shared across all coding CLIs
 // (y/n live in NAV_TAIL — always-visible below the input — since they're also
 // useful for tmux confirms and other action contexts.)
@@ -290,6 +312,7 @@ export default function InputBox() {
   const removeSlash = useWorkspaceStore((s) => s.removeSlash);
   const restoreSlash = useWorkspaceStore((s) => s.restoreSlash);
   const [tmuxSessions, setTmuxSessions] = useState<TmuxSession[]>([]);
+  const [tmuxName, setTmuxName] = useState<string | null>(null);
   const [tmuxLoading, setTmuxLoading] = useState(false);
   const [toolVersions, setToolVersions] = useState<{
     tmux: string | null;
@@ -452,7 +475,10 @@ export default function InputBox() {
       setActiveGroup(null);
     } else {
       setActiveGroup(id);
-      if (id === TMUX_TAB && !inTmux) fetchTmuxSessions();
+      if (id === TMUX_TAB) {
+        if (inTmux) fetchTmuxName();
+        else fetchTmuxSessions();
+      }
       if (id === CD_TAB) fetchDirs();
       if ([TMUX_TAB, NANO_TAB, VIM_TAB, CODE_TAB].includes(id)) fetchToolVersions();
     }
@@ -493,6 +519,18 @@ export default function InputBox() {
     sendInput(activeSessionId, "\x02d");
     setInTmux(activeSessionId, false);
     setActiveGroup(null);
+  };
+
+  // Which tmux session this terminal is attached to, for the header line.
+  const fetchTmuxName = async () => {
+    if (!activeSessionId) return;
+    try {
+      const res = await fetch(`/api/terminal/cwd?sessionId=${activeSessionId}&inTmux=true`);
+      const data = await res.json();
+      setTmuxName(data.tmuxSession ?? null);
+    } catch {
+      setTmuxName(null);
+    }
   };
 
   // cd directory picker — always scoped to the currently-active terminal session
@@ -908,8 +946,14 @@ export default function InputBox() {
           {/* Tmux popup: commands when inside, sessions when outside */}
           {drawerGroup === TMUX_TAB && inTmux && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-              <div className="flex flex-wrap gap-1">
-                {TMUX_KEYS.map((qk) => (
+              {/* The session itself: what you're attached to, and the controls
+                  that act on the whole of it. Kept clear of the window and
+                  pane controls below, which act inside it. */}
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="mr-0.5 shrink-0 text-[10px] text-ink-faint">
+                  session <span className="font-medium text-ink-muted">{tmuxName ?? "…"}</span>
+                </span>
+                {TMUX_SESSION_KEYS.map((qk) => (
                   <button
                     key={qk.label}
                     {...repeatProps(qk.key)}
@@ -924,13 +968,33 @@ export default function InputBox() {
                   onClick={handleTmuxDetach}
                   disabled={!activeSessionId}
                   title="Detach from tmux"
-                  className={exitBtn}
+                  className={`${exitBtn} ml-auto`}
                 >
                   detach
                 </button>
               </div>
+
+              {TMUX_GROUPS.map((group) => (
+                <div key={group.label} className="mt-1.5 flex items-start gap-1.5 border-t border-line/50 pt-1.5">
+                  <span className="w-12 shrink-0 pt-0.5 text-[10px] font-medium text-ink-dim">{group.label}</span>
+                  <div className="flex min-w-0 flex-wrap gap-1">
+                    {group.keys.map((qk) => (
+                      <button
+                        key={qk.label}
+                        {...repeatProps(qk.key)}
+                        disabled={!activeSessionId}
+                        title={qk.title}
+                        className={keyBtn}
+                      >
+                        {qk.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
+
           {drawerGroup === TMUX_TAB && !inTmux && (
             <div className="border-b border-line/50 bg-panel px-3 py-2">
               {!toolVersions.tmux ? (
