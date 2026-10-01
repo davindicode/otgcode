@@ -56,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Toasts dropped their icon — the message already says what it is — and sit a
   step off the app behind them: lighter in the dark theme, darker in the light
   one.
+- Popup headers stay put while their content scrolls — Settings, System Info
+  and Localhost now cap their height and scroll the body, instead of scrolling
+  the title and close button off the top.
 - Modal backdrops are frosted glass rather than a flat dim wash — the
   connecting gate, confirm dialogs and the add-command dialog all share one
   scrim.

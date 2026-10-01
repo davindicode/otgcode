@@ -309,9 +309,9 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       ref={panelRef}
       role="dialog"
       aria-label="Settings"
-      className="absolute right-2 top-10 z-50 max-h-[min(26rem,calc(100vh-4rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto glass rounded-panel"
+      className="absolute right-2 top-10 z-50 flex max-h-[min(26rem,calc(100vh-4rem))] w-80 max-w-[calc(100vw-1rem)] flex-col overflow-hidden glass rounded-panel"
     >
-      <div className="flex items-center justify-between border-b border-line px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between border-b border-line px-3 py-2">
         <span className="text-xs font-medium text-ink-muted">Settings</span>
         <button onClick={onClose} className="text-ink-faint transition-colors hover:text-ink" aria-label="Close">
           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,7 +320,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      <div className="divide-y divide-line/60">
+      <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-line/60">
         <Section
           title="Appearance"
           description="Theme and terminal text size. Saved on the host, so they follow you across refreshes and devices."
