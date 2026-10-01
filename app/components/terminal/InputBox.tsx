@@ -3,6 +3,16 @@ import { useTerminalStore } from "~/stores/terminalStore";
 import { showToast } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
 import CommandChips, { type Chip } from "./CommandChips";
+import {
+  COMBO_SETS,
+  type ComboSet,
+  comboSequence,
+  FN_COMBO_KEYS,
+  NAV_COMBO_KEYS,
+  STICKY_MODES,
+  type StickyMode,
+  SYMBOL_COMBO_KEYS,
+} from "./combos";
 import DropUpSelect from "./DropUpSelect";
 
 interface QuickKey {
@@ -265,30 +275,6 @@ const CODE_TAB = "__code__";
 const GIT_TAB = "__git__";
 const CD_TAB = "__cd__";
 
-type StickyMode = "ctrl" | "ctrl+shift" | "alt" | "alt+shift";
-
-const STICKY_MODES: { id: StickyMode; label: string }[] = [
-  { id: "ctrl", label: "Ctrl+" },
-  { id: "ctrl+shift", label: "Ctrl+Shift+" },
-  { id: "alt", label: "Alt+" },
-  { id: "alt+shift", label: "Alt+Shift+" },
-];
-
-function getStickyKey(ch: string, mode: StickyMode): string {
-  const isLetter = ch >= "A" && ch <= "Z";
-  switch (mode) {
-    case "ctrl":
-      // Ctrl+Letter = control code, Ctrl+Digit = send via CSI u
-      return isLetter ? String.fromCharCode(ch.charCodeAt(0) - 64) : `\x1b[${ch.charCodeAt(0)};5u`;
-    case "ctrl+shift":
-      return `\x1b[${ch.charCodeAt(0)};6u`;
-    case "alt":
-      return `\x1b${isLetter ? ch.toLowerCase() : ch}`;
-    case "alt+shift":
-      return `\x1b${ch}`;
-  }
-}
-
 interface TmuxSession {
   name: string;
   windows: number;
@@ -314,6 +300,7 @@ export default function InputBox() {
   const [tmuxSessions, setTmuxSessions] = useState<TmuxSession[]>([]);
   const [tmuxName, setTmuxName] = useState<string | null>(null);
   const [tmuxGroup, setTmuxGroup] = useState(TMUX_GROUPS[0].label);
+  const [comboSet, setComboSet] = useState<ComboSet>("letters");
   const [tmuxLoading, setTmuxLoading] = useState(false);
   const [toolVersions, setToolVersions] = useState<{
     tmux: string | null;
@@ -521,6 +508,8 @@ export default function InputBox() {
     setInTmux(activeSessionId, false);
     setActiveGroup(null);
   };
+
+  const modeLabel = STICKY_MODES.find((m) => m.id === stickyMode)?.label ?? "";
 
   // Which tmux session this terminal is attached to, for the header line.
   const fetchTmuxName = async () => {
@@ -807,20 +796,80 @@ export default function InputBox() {
           {/* Sticky modifier popup */}
           {drawerGroup === STICKY_TAB && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-              <div className="flex items-start gap-1.5">
+              {/* Which keys to show. Letters and digits alone were 36 buttons;
+                  the named keys would have pushed that past 60. */}
+              <div className="mb-1.5 flex flex-wrap items-center gap-1">
+                {COMBO_SETS.map((set) => (
+                  <button
+                    key={set}
+                    type="button"
+                    onClick={() => setComboSet(set)}
+                    className={`px-2 py-0.5 text-[10px] rounded-control select-none ${
+                      comboSet === set
+                        ? "relief glow bg-tab-action-on text-tab-action-ink-on ring-1 ring-inset ring-blue-400/60"
+                        : "relief text-tab-action-ink"
+                    }`}
+                  >
+                    {set}
+                  </button>
+                ))}
+              </div>
+
+              {/* The modifier is the prefix for everything to its right. */}
+              <div className="flex items-start gap-1.5 border-t border-line/50 pt-1.5">
                 <DropUpSelect value={stickyMode} options={STICKY_MODES} onChange={setStickyMode} />
-                <div className="flex flex-wrap gap-1 min-w-0">
-                  {"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((ch) => (
-                    <button
-                      key={ch}
-                      {...repeatProps(getStickyKey(ch, stickyMode))}
-                      disabled={!activeSessionId}
-                      title={`${STICKY_MODES.find((m) => m.id === stickyMode)?.label}${ch}`}
-                      className={keyBtn}
-                    >
-                      {ch}
-                    </button>
-                  ))}
+                <div className="flex min-w-0 flex-wrap gap-1">
+                  {comboSet === "numbers" &&
+                    "0123456789".split("").map((ch) => (
+                      <button
+                        key={ch}
+                        {...repeatProps(comboSequence(ch, stickyMode))}
+                        disabled={!activeSessionId}
+                        title={`${modeLabel}${ch}`}
+                        className={keyBtn}
+                      >
+                        {ch}
+                      </button>
+                    ))}
+
+                  {comboSet === "letters" &&
+                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((ch) => (
+                      <button
+                        key={ch}
+                        {...repeatProps(comboSequence(ch, stickyMode))}
+                        disabled={!activeSessionId}
+                        title={`${modeLabel}${ch}`}
+                        className={keyBtn}
+                      >
+                        {ch}
+                      </button>
+                    ))}
+
+                  {(comboSet === "nav" || comboSet === "function") &&
+                    (comboSet === "nav" ? NAV_COMBO_KEYS : FN_COMBO_KEYS).map((key) => (
+                      <button
+                        key={key.label}
+                        {...repeatProps(comboSequence(key.label, stickyMode))}
+                        disabled={!activeSessionId}
+                        title={`${modeLabel}${key.title}`}
+                        className={keyBtn}
+                      >
+                        {key.label}
+                      </button>
+                    ))}
+
+                  {comboSet === "symbols" &&
+                    SYMBOL_COMBO_KEYS.map((key) => (
+                      <button
+                        key={key.label}
+                        {...repeatProps(comboSequence(key.label, stickyMode))}
+                        disabled={!activeSessionId}
+                        title={`${modeLabel}${key.label} — ${key.title}`}
+                        className={keyBtn}
+                      >
+                        {key.label}
+                      </button>
+                    ))}
                 </div>
               </div>
             </div>
