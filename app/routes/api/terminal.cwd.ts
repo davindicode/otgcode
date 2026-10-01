@@ -81,5 +81,17 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
   }
 
-  return Response.json({ cwd: process.env.DEFAULT_CWD || process.env.HOME || "/" });
+  let tmuxSession: string | null = null;
+  if (url.searchParams.get("inTmux") === "true") {
+    try {
+      tmuxSession =
+        execFileSync("tmux", ["display-message", "-p", "#{session_name}"], {
+          encoding: "utf-8",
+          timeout: 2000,
+        }).trim() || null;
+    } catch {
+      // No tmux server, or nothing attached.
+    }
+  }
+  return Response.json({ cwd: process.env.DEFAULT_CWD || process.env.HOME || "/", tmuxSession });
 }

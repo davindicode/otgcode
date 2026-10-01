@@ -313,6 +313,7 @@ export default function InputBox() {
   const restoreSlash = useWorkspaceStore((s) => s.restoreSlash);
   const [tmuxSessions, setTmuxSessions] = useState<TmuxSession[]>([]);
   const [tmuxName, setTmuxName] = useState<string | null>(null);
+  const [tmuxGroup, setTmuxGroup] = useState(TMUX_GROUPS[0].label);
   const [tmuxLoading, setTmuxLoading] = useState(false);
   const [toolVersions, setToolVersions] = useState<{
     tmux: string | null;
@@ -946,12 +947,12 @@ export default function InputBox() {
           {/* Tmux popup: commands when inside, sessions when outside */}
           {drawerGroup === TMUX_TAB && inTmux && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-              {/* The session itself: what you're attached to, and the controls
-                  that act on the whole of it. Kept clear of the window and
-                  pane controls below, which act inside it. */}
+              {/* The session itself: its name in full, then the controls that
+                  act on the whole of it. Buttons wrap around the name rather
+                  than the name giving way to them. */}
               <div className="flex flex-wrap items-center gap-1">
-                <span className="mr-0.5 shrink-0 text-[10px] text-ink-faint">
-                  session <span className="font-medium text-ink-muted">{tmuxName ?? "…"}</span>
+                <span className="shrink-0 text-[10px] text-ink-faint">
+                  session <span className="font-medium text-ink-muted">{tmuxName || "unknown"}</span>
                 </span>
                 {TMUX_SESSION_KEYS.map((qk) => (
                   <button
@@ -968,30 +969,34 @@ export default function InputBox() {
                   onClick={handleTmuxDetach}
                   disabled={!activeSessionId}
                   title="Detach from tmux"
-                  className={`${exitBtn} ml-auto`}
+                  className={exitBtn}
                 >
                   detach
                 </button>
               </div>
 
-              {TMUX_GROUPS.map((group) => (
-                <div key={group.label} className="mt-1.5 flex items-start gap-1.5 border-t border-line/50 pt-1.5">
-                  <span className="w-12 shrink-0 pt-0.5 text-[10px] font-medium text-ink-dim">{group.label}</span>
-                  <div className="flex min-w-0 flex-wrap gap-1">
-                    {group.keys.map((qk) => (
-                      <button
-                        key={qk.label}
-                        {...repeatProps(qk.key)}
-                        disabled={!activeSessionId}
-                        title={qk.title}
-                        className={keyBtn}
-                      >
-                        {qk.label}
-                      </button>
-                    ))}
-                  </div>
+              {/* One group at a time: windows, panes and copy are three sets of
+                  controls that are rarely needed together. */}
+              <div className="mt-1.5 flex items-start gap-1.5 border-t border-line/50 pt-1.5">
+                <DropUpSelect
+                  value={tmuxGroup}
+                  options={TMUX_GROUPS.map((g) => ({ id: g.label, label: g.label }))}
+                  onChange={setTmuxGroup}
+                />
+                <div className="flex min-w-0 flex-wrap gap-1">
+                  {(TMUX_GROUPS.find((g) => g.label === tmuxGroup) ?? TMUX_GROUPS[0]).keys.map((qk) => (
+                    <button
+                      key={qk.label}
+                      {...repeatProps(qk.key)}
+                      disabled={!activeSessionId}
+                      title={qk.title}
+                      className={keyBtn}
+                    >
+                      {qk.label}
+                    </button>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           )}
 
@@ -1129,7 +1134,7 @@ export default function InputBox() {
                       hidden={hiddenSlashLabels}
                       disabled={!activeSessionId}
                       chipClass="px-2 py-0.5 text-[11px] relief text-cyan-300 hover:text-cyan-100 rounded-control whitespace-nowrap select-none"
-                      addLabel={`+ add ${vendor.name} command`}
+                      addLabel="+ add slash command"
                       dialogTitle={`Add ${vendor.name} slash command`}
                       dialogHint={`Sent to ${vendor.name} when tapped. Saved for ${vendor.name} only.`}
                       commandPlaceholder="/review"
