@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { showToast } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
+import CommandChips, { type Chip } from "./CommandChips";
+import DropUpSelect from "./DropUpSelect";
 
 interface QuickKey {
   label: string;
@@ -161,6 +162,10 @@ const CLI_VENDORS: CliVendor[] = [
       { label: "/config", title: "Open config", command: "/config\n" },
       { label: "/memory", title: "Edit CLAUDE.md memory", command: "/memory\n" },
       { label: "/review", title: "Review a PR", command: "/review\n" },
+      { label: "/context", title: "Show context window usage", command: "/context\n" },
+      { label: "/resume", title: "Resume a past session", command: "/resume\n" },
+      { label: "/agents", title: "Manage subagents", command: "/agents\n" },
+      { label: "/status", title: "Show account and system status", command: "/status\n" },
       { label: "/vim", title: "Toggle vim mode", command: "/vim\n" },
     ],
   },
@@ -268,104 +273,22 @@ interface TmuxSession {
   attached: boolean;
 }
 
-function AddCommandDialog({
-  existing,
-  onAdd,
-  onClose,
-}: {
-  existing: string[];
-  onAdd: (label: string, command: string) => void;
-  onClose: () => void;
-}) {
-  const [label, setLabel] = useState("");
-  const [command, setCommand] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const trimmedLabel = label.trim();
-  const trimmedCommand = command.trim();
-  const duplicate = existing.includes(trimmedLabel);
-  const valid = !!trimmedLabel && !!trimmedCommand && !duplicate;
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!valid) return;
-    onAdd(trimmedLabel, trimmedCommand);
-    onClose();
-  };
-
-  const field = "field w-full px-2.5 py-1.5 text-xs";
-
-  return createPortal(
-    <div className="scrim fixed inset-0 z-[160] flex items-center justify-center px-4">
-      <form onSubmit={submit} className="glass w-full max-w-xs rounded-panel p-4">
-        <h2 className="text-xs font-medium text-ink">Add command</h2>
-        <p className="mt-0.5 text-[11px] text-ink-faint">Becomes a button in the cmds group. Runs immediately.</p>
-
-        <label className="mt-3 block text-[11px] text-ink-dim" htmlFor="cmd-label">
-          Button label
-        </label>
-        <input
-          id="cmd-label"
-          ref={inputRef}
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="deploy"
-          className={`mt-1 ${field}`}
-        />
-
-        <label className="mt-2.5 block text-[11px] text-ink-dim" htmlFor="cmd-command">
-          Command
-        </label>
-        <input
-          id="cmd-command"
-          value={command}
-          onChange={(e) => setCommand(e.target.value)}
-          placeholder="./deploy.sh --prod"
-          className={`mt-1 font-mono ${field}`}
-        />
-
-        {duplicate && <p className="mt-2 text-[11px] text-red-400">A button called "{trimmedLabel}" already exists</p>}
-
-        <div className="mt-4 flex items-center gap-2">
-          <button
-            type="submit"
-            disabled={!valid}
-            className="relief-accent rounded-control px-2.5 py-1 text-xs font-medium text-white disabled:bg-control disabled:text-ink-faint"
-          >
-            Add
-          </button>
-          <button type="button" onClick={onClose} className="relief rounded-control px-2.5 py-1 text-xs text-ink-muted">
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>,
-    document.body,
-  );
-}
-
 export default function InputBox() {
   const [text, setText] = useState("");
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   // What is currently painted. Lags `activeGroup` on close so the drawer can
   // animate shut instead of vanishing.
   const [drawerGroup, setDrawerGroup] = useState<string | null>(null);
-  const [editingCommands, setEditingCommands] = useState(false);
-  const [commandDialog, setCommandDialog] = useState(false);
   const customCommands = useWorkspaceStore((s) => s.customCommands);
   const hiddenCommands = useWorkspaceStore((s) => s.hiddenCommands);
   const addCommand = useWorkspaceStore((s) => s.addCommand);
   const removeCommand = useWorkspaceStore((s) => s.removeCommand);
   const restoreCommand = useWorkspaceStore((s) => s.restoreCommand);
+  const customSlash = useWorkspaceStore((s) => s.customSlash);
+  const hiddenSlash = useWorkspaceStore((s) => s.hiddenSlash);
+  const addSlash = useWorkspaceStore((s) => s.addSlash);
+  const removeSlash = useWorkspaceStore((s) => s.removeSlash);
+  const restoreSlash = useWorkspaceStore((s) => s.restoreSlash);
   const [tmuxSessions, setTmuxSessions] = useState<TmuxSession[]>([]);
   const [tmuxLoading, setTmuxLoading] = useState(false);
   const [toolVersions, setToolVersions] = useState<{
@@ -383,9 +306,6 @@ export default function InputBox() {
   const [cdLoading, setCdLoading] = useState(false);
   const [stickyMode, setStickyMode] = useState<StickyMode>("ctrl");
   const [codeVendorIdx, setCodeVendorIdx] = useState(0);
-  const [codeVendorOpen, setCodeVendorOpen] = useState(false);
-  const codeVendorBtnRef = useRef<HTMLButtonElement>(null);
-  const codeVendorMenuRef = useRef<HTMLDivElement>(null);
   const [gitCommitMsg, setGitCommitMsg] = useState("");
   const [gitConfigName, setGitConfigName] = useState("");
   const [gitConfigEmail, setGitConfigEmail] = useState("");
@@ -407,16 +327,6 @@ export default function InputBox() {
   const sessions = useTerminalStore((s) => s.sessions);
 
   // Close vendor dropdown on outside click
-  useEffect(() => {
-    if (!codeVendorOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (codeVendorBtnRef.current?.contains(e.target as Node)) return;
-      if (codeVendorMenuRef.current?.contains(e.target as Node)) return;
-      setCodeVendorOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [codeVendorOpen]);
 
   const activeSession = activeSessionId ? sessions[activeSessionId] : null;
   const inTmux = activeSession?.inTmux ?? false;
@@ -726,19 +636,21 @@ export default function InputBox() {
 
   const isCmdsGroup = activeStandardGroup?.label === "cmds";
   // Built-ins the user removed drop out; their own commands are appended.
-  const visibleCommands: (QuickKey & { custom?: boolean })[] = !activeStandardGroup
+  const visibleCommands: Chip[] = !activeStandardGroup
     ? []
     : isCmdsGroup
       ? [
-          ...activeStandardGroup.keys.filter((k) => !hiddenCommands.includes(k.label)),
+          ...activeStandardGroup.keys
+            .filter((k) => !hiddenCommands.includes(k.label))
+            .map((k) => ({ label: k.label, command: k.key, title: k.title })),
           ...customCommands.map((c) => ({
             label: c.label,
-            key: `${c.command}\n`,
+            command: `${c.command}\n`,
             title: c.command,
             custom: true,
           })),
         ]
-      : activeStandardGroup.keys;
+      : activeStandardGroup.keys.map((k) => ({ label: k.label, command: k.key, title: k.title }));
 
   return (
     <div
@@ -782,14 +694,6 @@ export default function InputBox() {
         </div>
       </div>
 
-      {commandDialog && (
-        <AddCommandDialog
-          existing={visibleCommands.map((c) => c.label)}
-          onAdd={(label, command) => addCommand({ label, command })}
-          onClose={() => setCommandDialog(false)}
-        />
-      )}
-
       {/* One animating container for every drawer: grid-template-rows 0fr->1fr
           transitions to the content's own height, which differs per drawer. */}
       <div className="drawer" data-open={activeGroup ? "true" : "false"}>
@@ -797,70 +701,20 @@ export default function InputBox() {
           {/* Standard key group popup (cmds) */}
           {activeStandardGroup && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-              <div className="flex flex-wrap items-center gap-1">
-                {visibleCommands.map((qk) => (
-                  <span key={qk.label} className="relative inline-flex">
-                    <button
-                      {...(editingCommands ? {} : repeatProps(qk.key))}
-                      disabled={!activeSessionId && !editingCommands}
-                      title={editingCommands ? `Remove "${qk.label}"` : qk.title}
-                      onClick={editingCommands ? () => removeCommand(qk.label, !!qk.custom) : undefined}
-                      className={`${keyBtn} ${editingCommands ? "pr-5 opacity-80" : ""}`}
-                    >
-                      {qk.label}
-                      {editingCommands && (
-                        <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[11px] leading-none text-red-400">
-                          ×
-                        </span>
-                      )}
-                    </button>
-                  </span>
-                ))}
-              </div>
-
-              {isCmdsGroup && (
-                <div className="mt-1.5 flex items-center gap-1.5 border-t border-line/50 pt-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setCommandDialog(true)}
-                    title="Add a command button"
-                    className={`${actionBtn} text-blue-300 hover:text-blue-200`}
-                  >
-                    + add command
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingCommands((v) => !v)}
-                    aria-pressed={editingCommands}
-                    title={editingCommands ? "Stop removing" : "Remove command buttons"}
-                    className={`${actionBtn} ${
-                      editingCommands
-                        ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70"
-                        : "text-ink-faint hover:text-ink-muted"
-                    }`}
-                  >
-                    {editingCommands ? "done" : "edit"}
-                  </button>
-                  {editingCommands && <span className="text-[10px] text-ink-ghost">tap a command to remove it</span>}
-                </div>
-              )}
-
-              {isCmdsGroup && editingCommands && hiddenCommands.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                  <span className="text-[10px] text-ink-ghost">removed:</span>
-                  {hiddenCommands.map((label) => (
-                    <button
-                      key={label}
-                      type="button"
-                      onClick={() => restoreCommand(label)}
-                      title={`Restore "${label}"`}
-                      className={`${keyBtn} text-[10px] opacity-70`}
-                    >
-                      + {label}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <CommandChips
+                chips={visibleCommands}
+                hidden={hiddenCommands}
+                disabled={!activeSessionId}
+                chipClass={keyBtn}
+                addLabel="+ add command"
+                dialogTitle="Add command"
+                dialogHint="Becomes a button in the cmds group. Runs immediately."
+                commandPlaceholder="./deploy.sh --prod"
+                onRun={(command) => activeSessionId && sendInput(activeSessionId, command)}
+                onAdd={(label, command) => addCommand({ label, command })}
+                onRemove={removeCommand}
+                onRestore={restoreCommand}
+              />
             </div>
           )}
 
@@ -915,49 +769,25 @@ export default function InputBox() {
           {/* Sticky modifier popup */}
           {drawerGroup === STICKY_TAB && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-              <div className="flex items-center gap-1 mb-1.5">
-                {STICKY_MODES.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => setStickyMode(m.id)}
-                    className={`px-2 py-0.5 text-[10px] rounded-control border transition-colors select-none ${
-                      stickyMode === m.id
-                        ? "relief-accent text-white border-blue-500"
-                        : "bg-raised text-ink-faint hover:text-ink border-line"
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {"0123456789".split("").map((ch) => (
-                  <button
-                    key={ch}
-                    {...repeatProps(getStickyKey(ch, stickyMode))}
-                    disabled={!activeSessionId}
-                    title={`${STICKY_MODES.find((m) => m.id === stickyMode)?.label}${ch}`}
-                    className={keyBtn}
-                  >
-                    {ch}
-                  </button>
-                ))}
-                {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((ch) => (
-                  <button
-                    key={ch}
-                    {...repeatProps(getStickyKey(ch, stickyMode))}
-                    disabled={!activeSessionId}
-                    title={`${STICKY_MODES.find((m) => m.id === stickyMode)?.label}${ch}`}
-                    className={keyBtn}
-                  >
-                    {ch}
-                  </button>
-                ))}
+              <div className="flex items-start gap-1.5">
+                <DropUpSelect value={stickyMode} options={STICKY_MODES} onChange={setStickyMode} />
+                <div className="flex flex-wrap gap-1 min-w-0">
+                  {"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((ch) => (
+                    <button
+                      key={ch}
+                      {...repeatProps(getStickyKey(ch, stickyMode))}
+                      disabled={!activeSessionId}
+                      title={`${STICKY_MODES.find((m) => m.id === stickyMode)?.label}${ch}`}
+                      className={keyBtn}
+                    >
+                      {ch}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
 
-          {/* Nano popup: commands when inside, file opener when outside */}
           {drawerGroup === NANO_TAB && inEditor === "nano" && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
               <div className="flex flex-wrap gap-1">
@@ -1173,69 +1003,31 @@ export default function InputBox() {
           {drawerGroup === CODE_TAB &&
             (() => {
               const vendor = CLI_VENDORS[codeVendorIdx] || CLI_VENDORS[0];
+              const prefix = `${vendor.name}:`;
+              // Slash commands are per CLI: claude's set is not codex's.
+              const slashChips: Chip[] = [
+                ...vendor.slashCmds
+                  .filter((c) => !hiddenSlash.includes(prefix + c.label))
+                  .map((c) => ({ label: c.label, command: c.command, title: c.title })),
+                ...customSlash
+                  .filter((c) => c.vendor === vendor.name)
+                  .map((c) => ({ label: c.label, command: `${c.command}\n`, title: c.command, custom: true })),
+              ];
+              const hiddenSlashLabels = hiddenSlash
+                .filter((k) => k.startsWith(prefix))
+                .map((k) => k.slice(prefix.length));
+
               return (
                 <div className="border-b border-line/50 bg-panel px-2 py-1.5 max-h-64 overflow-y-auto">
-                  {/* Common keys (no header) */}
-                  <div className="flex flex-wrap gap-1 mb-1.5">
-                    {CODE_COMMON_KEYS.map((qk) => (
-                      <button
-                        key={qk.label}
-                        {...repeatProps(qk.key)}
-                        disabled={!activeSessionId}
-                        title={qk.title}
-                        className={keyBtn}
-                      >
-                        {qk.label}
-                      </button>
-                    ))}
-                  </div>
-                  {/* Selected vendor: toggle selector left, buttons right */}
-                  <div className="flex items-start gap-1.5 border-t border-line/50 pt-1.5">
-                    <button
-                      ref={codeVendorBtnRef}
-                      onClick={() => setCodeVendorOpen((v) => !v)}
-                      className="text-[10px] text-ink-dim hover:text-ink font-medium flex items-center gap-0.5 pt-0.5 select-none shrink-0"
-                    >
-                      <svg
-                        className="w-2.5 h-2.5 transition-transform"
-                        style={{ transform: codeVendorOpen ? "rotate(90deg)" : "rotate(0deg)" }}
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M6 4l8 6-8 6V4z" />
-                      </svg>
-                      {vendor.name}
-                    </button>
-                    {codeVendorOpen &&
-                      createPortal(
-                        <div
-                          ref={codeVendorMenuRef}
-                          className="fixed bg-raised border border-line-strong rounded-control shadow-lg min-w-[80px] py-0.5"
-                          style={{
-                            zIndex: 9999,
-                            ...(() => {
-                              const r = codeVendorBtnRef.current?.getBoundingClientRect();
-                              return r ? { left: r.left, bottom: window.innerHeight - r.top + 4 } : {};
-                            })(),
-                          }}
-                        >
-                          {CLI_VENDORS.map((v, i) => (
-                            <button
-                              key={v.name}
-                              onClick={() => {
-                                setCodeVendorIdx(i);
-                                setCodeVendorOpen(false);
-                              }}
-                              className={`block w-full text-left px-3 py-1 text-[11px] hover:bg-hover transition-colors ${i === codeVendorIdx ? "text-blue-400" : "text-ink-muted"}`}
-                            >
-                              {v.name}
-                            </button>
-                          ))}
-                        </div>,
-                        document.body,
-                      )}
+                  {/* Selected CLI on the left; its launchers and keys beside it. */}
+                  <div className="flex items-start gap-1.5">
+                    <DropUpSelect
+                      value={vendor.name}
+                      options={CLI_VENDORS.map((v) => ({ id: v.name, label: v.name }))}
+                      onChange={(name) => setCodeVendorIdx(CLI_VENDORS.findIndex((v) => v.name === name))}
+                    />
                     <div className="flex flex-wrap gap-1 min-w-0">
-                      {/* Launch buttons (purple) */}
+                      {/* Launchers (purple) */}
                       {vendor.launch.map((cmd) => (
                         <button
                           key={`${vendor.name}-${cmd.label}`}
@@ -1249,8 +1041,10 @@ export default function InputBox() {
                           {cmd.label}
                         </button>
                       ))}
-                      {/* Vendor-specific keys */}
-                      {vendor.keys.map((qk) => (
+                      {/* Key combos: the ones every CLI shares, then this one's
+                          own, as a single group — they are the same kind of
+                          thing and were split across two rows for no reason. */}
+                      {[...CODE_COMMON_KEYS, ...vendor.keys].map((qk) => (
                         <button
                           key={`${vendor.name}-${qk.label}`}
                           {...repeatProps(qk.key)}
@@ -1261,21 +1055,25 @@ export default function InputBox() {
                           {qk.label}
                         </button>
                       ))}
-                      {/* Slash commands (cyan) */}
-                      {vendor.slashCmds.map((cmd) => (
-                        <button
-                          key={`${vendor.name}-${cmd.label}`}
-                          onClick={() => {
-                            if (activeSessionId) sendInput(activeSessionId, cmd.command);
-                          }}
-                          disabled={!activeSessionId}
-                          title={cmd.title}
-                          className="px-2 py-0.5 text-[11px] relief text-cyan-300 hover:text-cyan-100 rounded-control whitespace-nowrap select-none"
-                        >
-                          {cmd.label}
-                        </button>
-                      ))}
                     </div>
+                  </div>
+
+                  {/* Slash commands, customisable per CLI. */}
+                  <div className="mt-1.5 border-t border-line/50 pt-1.5">
+                    <CommandChips
+                      chips={slashChips}
+                      hidden={hiddenSlashLabels}
+                      disabled={!activeSessionId}
+                      chipClass="px-2 py-0.5 text-[11px] relief text-cyan-300 hover:text-cyan-100 rounded-control whitespace-nowrap select-none"
+                      addLabel={`+ add ${vendor.name} command`}
+                      dialogTitle={`Add ${vendor.name} slash command`}
+                      dialogHint={`Sent to ${vendor.name} when tapped. Saved for ${vendor.name} only.`}
+                      commandPlaceholder="/review"
+                      onRun={(command) => activeSessionId && sendInput(activeSessionId, command)}
+                      onAdd={(label, command) => addSlash({ vendor: vendor.name, label, command })}
+                      onRemove={(label, isCustom) => removeSlash(vendor.name, label, isCustom)}
+                      onRestore={(label) => restoreSlash(vendor.name, label)}
+                    />
                   </div>
                 </div>
               );

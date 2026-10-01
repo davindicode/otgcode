@@ -28,6 +28,12 @@ export interface CustomCommand {
   command: string;
 }
 
+/** A slash command the user added, scoped to one coding CLI. */
+export interface SlashCommand extends CustomCommand {
+  /** CLI_VENDORS name: claude, codex, opencode. */
+  vendor: string;
+}
+
 export interface Workspace {
   theme: Theme;
   /** Terminal font size in px. */
@@ -40,6 +46,10 @@ export interface Workspace {
   customCommands: CustomCommand[];
   /** Labels of built-in commands the user removed from the cmds group. */
   hiddenCommands: string[];
+  /** Slash commands the user added, per CLI. */
+  customSlash: SlashCommand[];
+  /** Built-in slash commands the user removed, as `vendor:label`. */
+  hiddenSlash: string[];
 }
 
 /** Also enforced server-side in auth.ts. */
@@ -64,6 +74,8 @@ export function defaultWorkspace(): Workspace {
     activeId: null,
     customCommands: [],
     hiddenCommands: [],
+    customSlash: [],
+    hiddenSlash: [],
   };
 }
 
@@ -102,6 +114,25 @@ function commands(value: unknown): CustomCommand[] {
     if (!label || !command || seen.has(label)) continue;
     seen.add(label);
     out.push({ label, command });
+  }
+  return out;
+}
+
+/** Same shape as `commands`, plus the CLI it belongs to. */
+function slashCommands(value: unknown): SlashCommand[] {
+  if (!Array.isArray(value)) return [];
+  const out: SlashCommand[] = [];
+  const seen = new Set<string>();
+  for (const raw of value.slice(0, MAX_CUSTOM_COMMANDS)) {
+    if (!raw || typeof raw !== "object") continue;
+    const entry = raw as Record<string, unknown>;
+    const vendor = str(entry.vendor).trim();
+    const label = str(entry.label).trim();
+    const command = str(entry.command);
+    const key = `${vendor}:${label}`;
+    if (!vendor || !label || !command || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ vendor, label, command });
   }
   return out;
 }
@@ -150,5 +181,7 @@ export function sanitize(input: unknown, base: Workspace = defaultWorkspace()): 
     activeId,
     customCommands: raw.customCommands === undefined ? base.customCommands : commands(raw.customCommands),
     hiddenCommands: raw.hiddenCommands === undefined ? base.hiddenCommands : labels(raw.hiddenCommands),
+    customSlash: raw.customSlash === undefined ? base.customSlash : slashCommands(raw.customSlash),
+    hiddenSlash: raw.hiddenSlash === undefined ? base.hiddenSlash : labels(raw.hiddenSlash),
   };
 }

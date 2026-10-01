@@ -3,6 +3,7 @@ import {
   type CustomCommand,
   DEFAULT_EDITOR_FONT_SIZE,
   DEFAULT_FONT_SIZE,
+  type SlashCommand,
   type Theme,
   type Workspace,
 } from "~/lib/workspace.shared";
@@ -19,6 +20,8 @@ interface WorkspaceState {
   editorFontSize: number;
   customCommands: CustomCommand[];
   hiddenCommands: string[];
+  customSlash: SlashCommand[];
+  hiddenSlash: string[];
   restored: Workspace | null;
 
   hydrate: () => Promise<void>;
@@ -29,6 +32,10 @@ interface WorkspaceState {
   /** Remove a custom command, or hide a built-in one. */
   removeCommand: (label: string, isCustom: boolean) => void;
   restoreCommand: (label: string) => void;
+  /** Slash commands are scoped per coding CLI: claude's set is not codex's. */
+  addSlash: (command: SlashCommand) => void;
+  removeSlash: (vendor: string, label: string, isCustom: boolean) => void;
+  restoreSlash: (vendor: string, label: string) => void;
   /** Persist the current tab strip. */
   saveTabs: (patch: Pick<Workspace, "tabs" | "activeId">) => void;
 }
@@ -101,6 +108,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   editorFontSize: DEFAULT_EDITOR_FONT_SIZE,
   customCommands: [],
   hiddenCommands: [],
+  customSlash: [],
+  hiddenSlash: [],
   restored: null,
 
   hydrate: async () => {
@@ -115,6 +124,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         editorFontSize: data.editorFontSize,
         customCommands: data.customCommands,
         hiddenCommands: data.hiddenCommands,
+        customSlash: data.customSlash,
+        hiddenSlash: data.hiddenSlash,
         restored: data,
       });
     } catch {
@@ -161,6 +172,36 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const hiddenCommands = get().hiddenCommands.filter((l) => l !== label);
     set({ hiddenCommands });
     queue({ hiddenCommands });
+  },
+
+  addSlash: (command) => {
+    const customSlash = [
+      ...get().customSlash.filter((c) => !(c.vendor === command.vendor && c.label === command.label)),
+      command,
+    ];
+    set({ customSlash });
+    queue({ customSlash });
+  },
+
+  removeSlash: (vendor, label, isCustom) => {
+    if (isCustom) {
+      const customSlash = get().customSlash.filter((c) => !(c.vendor === vendor && c.label === label));
+      set({ customSlash });
+      queue({ customSlash });
+      return;
+    }
+    const key = `${vendor}:${label}`;
+    if (get().hiddenSlash.includes(key)) return;
+    const hiddenSlash = [...get().hiddenSlash, key];
+    set({ hiddenSlash });
+    queue({ hiddenSlash });
+  },
+
+  restoreSlash: (vendor, label) => {
+    const key = `${vendor}:${label}`;
+    const hiddenSlash = get().hiddenSlash.filter((k) => k !== key);
+    set({ hiddenSlash });
+    queue({ hiddenSlash });
   },
 
   saveTabs: (patch) => queue(patch),

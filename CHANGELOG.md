@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - System Info shows **connection latency** to the server alongside the app
   version, coloured by quality — green under 100ms, amber to 300ms, red beyond
   — with deeper shades in the light theme so each state stays legible.
+- **Custom slash commands, per coding CLI.** Each CLI's slash row takes the
+  same add/edit/remove treatment as cmds, saved separately for claude, codex
+  and opencode — so the same label can mean different things in each, and
+  removing one from claude leaves codex alone.
 - **Custom commands.** The cmds group has an "add" button that opens a small
   dialog for a label and a command, and an "edit" toggle that turns every
   button into a remove target. Removed built-ins can be restored from the same

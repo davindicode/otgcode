@@ -152,4 +152,34 @@ describe("sanitize", () => {
     });
     expect(result.tabs[1].openedFrom).toBe("e1");
   });
+
+  it("scopes slash commands per CLI and drops malformed ones", () => {
+    const result = sanitize({
+      customSlash: [
+        { vendor: "claude", label: "/ship", command: "/ship" },
+        { vendor: "codex", label: "/ship", command: "/ship" },
+        { vendor: "claude", label: "/ship", command: "duplicate for the same CLI" },
+        { vendor: "", label: "/novendor", command: "/x" },
+        { vendor: "claude", label: "", command: "/x" },
+        "not an object",
+      ],
+    });
+    // Same label is fine on two different CLIs; a repeat within one is not.
+    expect(result.customSlash).toEqual([
+      { vendor: "claude", label: "/ship", command: "/ship" },
+      { vendor: "codex", label: "/ship", command: "/ship" },
+    ]);
+  });
+
+  it("keys hidden slash commands by CLI", () => {
+    expect(sanitize({ hiddenSlash: ["claude:/cost", "codex:/cost", "claude:/cost"] }).hiddenSlash).toEqual([
+      "claude:/cost",
+      "codex:/cost",
+    ]);
+  });
+
+  it("leaves slash commands untouched when the patch omits them", () => {
+    const base = sanitize({ customSlash: [{ vendor: "claude", label: "/ship", command: "/ship" }] });
+    expect(sanitize({ fontSize: 12 }, base).customSlash).toHaveLength(1);
+  });
 });
