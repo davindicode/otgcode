@@ -14,7 +14,6 @@ interface TerminalSession {
   fitAddon: FitAddon | null;
   error: string | null;
   outputBuffer: string[];
-  inTmux: boolean;
   /** Set when this terminal *is* a tmux session rather than a shell. */
   tmuxSession?: string;
   cdCwd: string;
@@ -37,7 +36,6 @@ interface TerminalState {
   renameSession: (sessionId: string, name: string) => void;
   setFontSize: (size: number) => void;
   setDefaultCwd: (cwd: string) => void;
-  setInTmux: (sessionId: string, inTmux: boolean) => void;
   setCdCwd: (sessionId: string, cwd: string) => void;
 }
 
@@ -66,7 +64,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           set({
             sessions: {
               ...get().sessions,
-              [session.id]: { ...get().sessions[session.id], status: "connecting", inTmux: false },
+              [session.id]: { ...get().sessions[session.id], status: "connecting" },
             },
           });
           socket.emit("create_terminal", {
@@ -198,7 +196,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           fitAddon: null,
           error: null,
           outputBuffer: [],
-          inTmux: !!tmuxSession,
           tmuxSession,
           cdCwd: "",
         },
@@ -313,12 +310,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     }
   },
   setDefaultCwd: (cwd) => set({ defaultCwd: cwd }),
-  setInTmux: (sessionId, inTmux) => {
-    const { sessions } = get();
-    const session = sessions[sessionId];
-    if (!session) return;
-    set({ sessions: { ...sessions, [sessionId]: { ...session, inTmux } } });
-  },
   setCdCwd: (sessionId, cwd) => {
     const { sessions } = get();
     const session = sessions[sessionId];

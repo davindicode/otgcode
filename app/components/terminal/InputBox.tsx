@@ -190,6 +190,54 @@ const DRAWER_MS = 280;
 // field's py-2 and its 1px borders.
 const TEXTAREA_MAX_PX = 3 * 20 + 16 + 2;
 
+// Controls for the session a tmux tab is attached to. No session list or
+// switch: the tab is bound to one session and choosing one happens in the +
+// picker. No detach either — closing the tab detaches, and the session keeps
+// running, which is the whole point of it.
+const TMUX_SESSION_KEYS: QuickKey[] = [
+  { label: "$ rename", key: "\x02$", title: "Rename this session" },
+  { label: ": cmd", key: "\x02:", title: "tmux command prompt" },
+];
+
+// Grouped by what each control acts on, one group shown at a time.
+const TMUX_GROUPS: { label: string; keys: QuickKey[] }[] = [
+  {
+    label: "windows",
+    keys: [
+      { label: "c new", key: "\x02c", title: "New window" },
+      { label: "n next", key: "\x02n", title: "Next window" },
+      { label: "p prev", key: "\x02p", title: "Previous window" },
+      { label: "0", key: "\x020", title: "Window 0" },
+      { label: "1", key: "\x021", title: "Window 1" },
+      { label: "2", key: "\x022", title: "Window 2" },
+      { label: "3", key: "\x023", title: "Window 3" },
+      { label: "4", key: "\x024", title: "Window 4" },
+      { label: "5", key: "\x025", title: "Window 5" },
+      { label: ", rename", key: "\x02,", title: "Rename window" },
+      { label: "& kill", key: "\x02&", title: "Kill window" },
+      { label: "w list", key: "\x02w", title: "List windows" },
+    ],
+  },
+  {
+    label: "panes",
+    keys: [
+      { label: '" hsplit', key: '\x02"', title: "Split horizontal" },
+      { label: "% vsplit", key: "\x02%", title: "Split vertical" },
+      { label: "o pane", key: "\x02o", title: "Next pane" },
+      { label: "z zoom", key: "\x02z", title: "Toggle zoom pane" },
+      { label: "x kill", key: "\x02x", title: "Kill pane" },
+    ],
+  },
+  {
+    label: "copy",
+    keys: [
+      { label: "[ scroll", key: "\x02[", title: "Scroll/copy mode (Esc to exit)" },
+      { label: "] paste", key: "\x02]", title: "Paste from tmux buffer" },
+    ],
+  },
+];
+
+const TMUX_TAB = "__tmux__";
 const TEXT_TAB = "__text__";
 const STICKY_TAB = "__sticky__";
 const CODE_TAB = "__code__";
@@ -219,6 +267,7 @@ export default function InputBox() {
   const removeSlash = useWorkspaceStore((s) => s.removeSlash);
   const restoreSlash = useWorkspaceStore((s) => s.restoreSlash);
   const [comboSet, setComboSet] = useState<ComboSet>("letters");
+  const [tmuxGroup, setTmuxGroup] = useState(TMUX_GROUPS[0].label);
   const [toolVersions, setToolVersions] = useState<{
     claude: string | null;
     codex: string | null;
@@ -244,14 +293,14 @@ export default function InputBox() {
   }, [activeGroup]);
   const activeSessionId = useTerminalStore((s) => s.activeSessionId);
   const sendInput = useTerminalStore((s) => s.sendInput);
-  const setInTmux = useTerminalStore((s) => s.setInTmux);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
 
   // Close vendor dropdown on outside click
 
   const activeSession = activeSessionId ? sessions[activeSessionId] : null;
-  const inTmux = activeSession?.inTmux ?? false;
+  // A tmux tab runs tmux as its process, so this is also "am I in tmux".
+  const tmuxSession = activeSession?.tmuxSession;
   const cdCwd = activeSession?.cdCwd ?? "";
 
   // --- Handlers ---
@@ -390,7 +439,7 @@ export default function InputBox() {
       let targetDir = dir;
       if (!targetDir) {
         try {
-          const cwdRes = await fetch(`/api/terminal/cwd?sessionId=${sessionId}&inTmux=${inTmux}`);
+          const cwdRes = await fetch(`/api/terminal/cwd?sessionId=${sessionId}&inTmux=${!!tmuxSession}`);
           const cwdData = await cwdRes.json();
           if (cwdData.cwd) targetDir = cwdData.cwd;
         } catch {}
@@ -440,6 +489,9 @@ export default function InputBox() {
   const actionTabOff = `${tabBase} relief text-tab-action-ink`;
   const actionTabOn = `${tabBase} relief glow bg-tab-action-on text-tab-action-ink-on ring-2 ring-inset ring-blue-400/70`;
   // CLI tool tabs (code, git) — purple
+  // In-app tabs (tmux) — green
+  const appTabOff = `${tabBase} relief text-tab-app-ink`;
+  const appTabOn = `${tabBase} relief glow bg-tab-app-on text-tab-app-ink-on ring-2 ring-inset ring-green-400/70`;
   const cliTabOff = `${tabBase} relief text-tab-cli-ink`;
   const cliTabOn = `${tabBase} relief glow bg-tab-cli-on text-tab-cli-ink-on ring-2 ring-inset ring-purple-400/70`;
   // Popup action buttons — same raised treatment as Send, tinted by role.
@@ -452,6 +504,7 @@ export default function InputBox() {
   const SECTORS = {
     native: { on: actionTabOn, off: actionTabOff },
     cli: { on: cliTabOn, off: cliTabOff },
+    app: { on: appTabOn, off: appTabOff },
   } as const;
 
   const tabBtn = (
@@ -474,7 +527,7 @@ export default function InputBox() {
 
   // Resolve which key group to show in the popup
   const activeStandardGroup =
-    drawerGroup && ![TEXT_TAB, STICKY_TAB, CODE_TAB, GIT_TAB, CD_TAB].includes(drawerGroup)
+    drawerGroup && ![TMUX_TAB, TEXT_TAB, STICKY_TAB, CODE_TAB, GIT_TAB, CD_TAB].includes(drawerGroup)
       ? TERMINAL_GROUPS.find((g) => g.label === drawerGroup)
       : null;
 
@@ -504,6 +557,7 @@ export default function InputBox() {
       {/* Tab bar */}
       <div className="border-b border-line/50 overflow-x-auto scrollbar-none" style={{ minWidth: 0 }}>
         <div className="flex items-center gap-1 px-2 py-1 w-max">
+          {tmuxSession && tabBtn(TMUX_TAB, "tmux", `Controls for session "${tmuxSession}"`, false, "app")}
           {tabBtn(TEXT_TAB, "text", "Type a command or message", !activeSessionId)}
           {/* Native terminal tabs (blue) — always in same order, hidden in editor mode */}
           {TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !activeSessionId))}
@@ -586,6 +640,51 @@ export default function InputBox() {
           )}
 
           {/* Sticky modifier popup */}
+          {drawerGroup === TMUX_TAB && tmuxSession && (
+            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="shrink-0 text-[10px] text-ink-faint">
+                  session <span className="font-medium text-blue-300">{tmuxSession}</span>
+                </span>
+                <span aria-hidden="true" className="mx-0.5 select-none text-ink-ghost">
+                  |
+                </span>
+                {TMUX_SESSION_KEYS.map((qk) => (
+                  <button
+                    key={qk.label}
+                    {...repeatProps(qk.key)}
+                    disabled={!activeSessionId}
+                    title={qk.title}
+                    className={keyBtn}
+                  >
+                    {qk.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-1.5 flex items-start gap-1.5 border-t border-line/50 pt-1.5">
+                <DropUpSelect
+                  value={tmuxGroup}
+                  options={TMUX_GROUPS.map((g) => ({ id: g.label, label: g.label }))}
+                  onChange={setTmuxGroup}
+                />
+                <div className="flex min-w-0 flex-wrap gap-1">
+                  {(TMUX_GROUPS.find((g) => g.label === tmuxGroup) ?? TMUX_GROUPS[0]).keys.map((qk) => (
+                    <button
+                      key={qk.label}
+                      {...repeatProps(qk.key)}
+                      disabled={!activeSessionId}
+                      title={qk.title}
+                      className={keyBtn}
+                    >
+                      {qk.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {drawerGroup === STICKY_TAB && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
               {/* Which keys to show. Letters and digits alone were 36 buttons;
