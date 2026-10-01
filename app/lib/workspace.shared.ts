@@ -8,7 +8,7 @@ export type Theme = "dark" | "light";
 
 /** Terminal and explorer tabs are user-created; viewer tabs come from opening
  *  a file in an explorer. */
-export type TabKind = "terminal" | "explorer" | "viewer";
+export type TabKind = "terminal" | "explorer" | "viewer" | "tmux";
 
 export interface WorkspaceTab {
   id: string;
@@ -20,6 +20,8 @@ export interface WorkspaceTab {
   path: string;
   /** Viewer: the explorer tab it was opened from, so grouping survives a reload. */
   openedFrom: string;
+  /** tmux: the session this tab is attached to. */
+  tmuxSession: string;
 }
 
 /** A command button the user added to the cmds group. */
@@ -63,7 +65,7 @@ const MAX_CUSTOM_COMMANDS = 40;
 
 const MAX_TABS = 32;
 const MAX_STRING = 4096;
-const KINDS: TabKind[] = ["terminal", "explorer", "viewer"];
+const KINDS: TabKind[] = ["terminal", "explorer", "viewer", "tmux"];
 
 export function defaultWorkspace(): Workspace {
   return {
@@ -93,11 +95,22 @@ function tabs(value: unknown): WorkspaceTab[] {
     const id = str(tab.id);
     const kind = KINDS.find((k) => k === tab.kind);
     if (!id || !kind || seen.has(id)) continue;
-    // A viewer tab with no file can't be reopened, so it isn't worth keeping.
+    // A tab that can't be reopened isn't worth keeping: a viewer needs its
+    // file, a tmux tab needs its session name.
     const path = str(tab.path);
+    const tmuxSession = str(tab.tmuxSession);
     if (kind === "viewer" && !path) continue;
+    if (kind === "tmux" && !tmuxSession) continue;
     seen.add(id);
-    out.push({ id, kind, title: str(tab.title), cwd: str(tab.cwd), path, openedFrom: str(tab.openedFrom) });
+    out.push({
+      id,
+      kind,
+      title: str(tab.title),
+      cwd: str(tab.cwd),
+      path,
+      openedFrom: str(tab.openedFrom),
+      tmuxSession,
+    });
   }
   return out;
 }

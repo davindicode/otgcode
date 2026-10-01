@@ -16,6 +16,7 @@ const tab = (over: Partial<WorkspaceTab> = {}): WorkspaceTab => ({
   cwd: "/home/me",
   path: "",
   openedFrom: "",
+  tmuxSession: "",
   ...over,
 });
 

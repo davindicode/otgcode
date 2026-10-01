@@ -14,7 +14,7 @@ import { useTerminalStore } from "./terminalStore";
  * This store owns tab identity and ordering; the per-tab content still lives
  * in terminalStore / fileStore, keyed by the same id.
  */
-export type TabKind = "terminal" | "explorer" | "viewer";
+export type TabKind = "terminal" | "explorer" | "viewer" | "tmux";
 
 export interface Tab {
   id: string;
@@ -24,6 +24,8 @@ export interface Tab {
   path?: string;
   /** Viewer tabs only: the explorer tab this file was opened from. */
   openedFrom?: string;
+  /** tmux tabs only: the session this tab is attached to. */
+  tmuxSession?: string;
 }
 
 interface TabsState {
@@ -32,6 +34,10 @@ interface TabsState {
 
   openTerminal: (opts?: { id?: string; title?: string; cwd?: string }) => string;
   openExplorer: (opts?: { id?: string; title?: string; cwd?: string }) => string;
+  /** Attach a tab to a tmux session, or focus the tab already on it. */
+  openTmux: (session: string, opts?: { id?: string }) => string;
+  /** Close every tab attached to a session that no longer exists. */
+  closeTmuxTabs: (session: string) => void;
   /** Opens the file, or focuses its tab if it is already open. */
   openViewer: (path: string, fromTabId?: string) => string;
   close: (id: string) => void;
@@ -84,6 +90,28 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return tabId;
   },
 
+  openTmux: (session, { id } = {}) => {
+    const existing = get().tabs.find((t) => t.kind === "tmux" && t.tmuxSession === session);
+    if (existing) {
+      set({ activeId: existing.id });
+      syncContentFocus(existing.id, get().tabs);
+      return existing.id;
+    }
+    const tabId = id ?? nextId("tmux");
+    useTerminalStore.getState().createSession(tabId, session, undefined, session);
+    set((s) => ({
+      tabs: [...s.tabs, { id: tabId, kind: "tmux", title: session, tmuxSession: session }],
+      activeId: tabId,
+    }));
+    return tabId;
+  },
+
+  closeTmuxTabs: (session) => {
+    for (const tab of get().tabs.filter((t) => t.kind === "tmux" && t.tmuxSession === session)) {
+      get().close(tab.id);
+    }
+  },
+
   openViewer: (path, fromTabId) => {
     // Reopening a file that's already in a tab just focuses it, rather than
     // stacking duplicates of the same document.
@@ -107,7 +135,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (index === -1) return;
     const tab = tabs[index];
 
-    if (tab.kind === "terminal") useTerminalStore.getState().closeSession(id);
+    if (tab.kind === "terminal" || tab.kind === "tmux") useTerminalStore.getState().closeSession(id);
     if (tab.kind === "explorer") useFileStore.getState().closeSession(id);
 
     const remaining = tabs.filter((t) => t.id !== id);
@@ -141,6 +169,9 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       if (tab.kind === "terminal") {
         useTerminalStore.getState().createSession(tab.id, tab.title, tab.cwd || undefined);
         tabs.push({ id: tab.id, kind: "terminal", title: tab.title });
+      } else if (tab.kind === "tmux" && tab.tmuxSession) {
+        useTerminalStore.getState().createSession(tab.id, tab.title, undefined, tab.tmuxSession);
+        tabs.push({ id: tab.id, kind: "tmux", title: tab.title, tmuxSession: tab.tmuxSession });
       } else if (tab.kind === "explorer") {
         useFileStore.getState().createSession(tab.id, tab.title, tab.cwd);
         tabs.push({ id: tab.id, kind: "explorer", title: tab.title });
@@ -167,7 +198,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
  */
 function syncContentFocus(id: string, tabs: Tab[]): void {
   const tab = tabs.find((t) => t.id === id);
-  if (tab?.kind === "terminal") useTerminalStore.getState().setActiveSession(id);
+  if (tab?.kind === "terminal" || tab?.kind === "tmux") useTerminalStore.getState().setActiveSession(id);
   if (tab?.kind === "explorer") useFileStore.getState().setActiveSession(id);
 }
 
@@ -180,6 +211,7 @@ export function toWorkspaceTabs(tabs: Tab[]): WorkspaceTab[] {
     kind: tab.kind,
     title: tab.title,
     openedFrom: tab.openedFrom ?? "",
+    tmuxSession: tab.tmuxSession ?? "",
     cwd:
       tab.kind === "explorer"
         ? (files[tab.id]?.cwd ?? "")

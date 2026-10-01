@@ -139,7 +139,7 @@ export default function AppShell() {
                 className="flex-1 flex flex-col min-h-0"
                 style={{ display: tab.id === activeId ? "flex" : "none" }}
               >
-                {tab.kind === "terminal" && <TerminalPane sessionId={tab.id} />}
+                {(tab.kind === "terminal" || tab.kind === "tmux") && <TerminalPane sessionId={tab.id} />}
                 {tab.kind === "explorer" && <FilesPage sessionId={tab.id} />}
                 {tab.kind === "viewer" && tab.path && <ViewerPane tabId={tab.id} path={tab.path} />}
               </div>
@@ -150,7 +150,7 @@ export default function AppShell() {
         {/* The terminal's control surface. Rendered once rather than per tab:
             it binds to the active session, and mounting one of these per
             terminal tab would duplicate a lot of state for no benefit. */}
-        {activeTab?.kind === "terminal" && <InputBox />}
+        {(activeTab?.kind === "terminal" || activeTab?.kind === "tmux") && <InputBox />}
       </div>
       {!socketConnected && <ConnectionGate />}
     </div>

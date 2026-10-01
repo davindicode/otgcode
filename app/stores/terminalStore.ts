@@ -15,7 +15,8 @@ interface TerminalSession {
   error: string | null;
   outputBuffer: string[];
   inTmux: boolean;
-  inEditor: "nano" | "vim" | null;
+  /** Set when this terminal *is* a tmux session rather than a shell. */
+  tmuxSession?: string;
   cdCwd: string;
 }
 
@@ -27,7 +28,7 @@ interface TerminalState {
   defaultCwd: string;
 
   initSocket: () => void;
-  createSession: (sessionId: string, name?: string, cwd?: string) => void;
+  createSession: (sessionId: string, name?: string, cwd?: string, tmuxSession?: string) => void;
   registerTerminal: (sessionId: string, terminal: Terminal, fitAddon: FitAddon) => void;
   sendInput: (sessionId: string, data: string) => void;
   resizeTerminal: (sessionId: string, rows: number, cols: number) => void;
@@ -37,7 +38,6 @@ interface TerminalState {
   setFontSize: (size: number) => void;
   setDefaultCwd: (cwd: string) => void;
   setInTmux: (sessionId: string, inTmux: boolean) => void;
-  setInEditor: (sessionId: string, editor: "nano" | "vim" | null) => void;
   setCdCwd: (sessionId: string, cwd: string) => void;
 }
 
@@ -66,12 +66,15 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           set({
             sessions: {
               ...get().sessions,
-              [session.id]: { ...get().sessions[session.id], status: "connecting", inTmux: false, inEditor: null },
+              [session.id]: { ...get().sessions[session.id], status: "connecting", inTmux: false },
             },
           });
           socket.emit("create_terminal", {
             sessionId: session.id,
             cwd: get().defaultCwd || undefined,
+            // The whole point of a tmux tab: reconnecting re-attaches rather
+            // than leaving you in a fresh shell outside the session.
+            tmuxSession: session.tmuxSession,
           });
         }
       }
@@ -180,7 +183,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     });
   },
 
-  createSession: (sessionId, name, cwd) => {
+  createSession: (sessionId, name, cwd, tmuxSession) => {
     const { sessions } = get();
     const socket = getSocket();
 
@@ -195,8 +198,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           fitAddon: null,
           error: null,
           outputBuffer: [],
-          inTmux: false,
-          inEditor: null,
+          inTmux: !!tmuxSession,
+          tmuxSession,
           cdCwd: "",
         },
       },
@@ -206,7 +209,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     // Socket.IO buffers emits while offline. Avoid buffering this create because
     // the connect handler owns recreation and would otherwise create it twice.
     if (socket.connected) {
-      socket.emit("create_terminal", { sessionId, cwd: cwd || get().defaultCwd || undefined });
+      socket.emit("create_terminal", { sessionId, cwd: cwd || get().defaultCwd || undefined, tmuxSession });
     }
   },
 
@@ -315,12 +318,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     const session = sessions[sessionId];
     if (!session) return;
     set({ sessions: { ...sessions, [sessionId]: { ...session, inTmux } } });
-  },
-  setInEditor: (sessionId, editor) => {
-    const { sessions } = get();
-    const session = sessions[sessionId];
-    if (!session) return;
-    set({ sessions: { ...sessions, [sessionId]: { ...session, inEditor: editor } } });
   },
   setCdCwd: (sessionId, cwd) => {
     const { sessions } = get();

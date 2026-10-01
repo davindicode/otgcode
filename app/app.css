@@ -41,13 +41,10 @@
 
   --t-tab-action-on: #1a2a3e;
   --t-tab-cli-on: #35204d;
-  --t-tab-app-on: #1a3e2a;
   --t-tab-action-ink: #93c5fd;
   --t-tab-action-ink-on: #d8ecff;
   --t-tab-cli-ink: #d0abfa;
   --t-tab-cli-ink-on: #eeddff;
-  --t-tab-app-ink: #86efac;
-  --t-tab-app-ink-on: #d8ffe6;
 
   --t-scrim: #090912;       /* modal / offline overlay veil */
   --t-accent: #569cd6;      /* focus rings, links, dividers */
@@ -126,13 +123,10 @@ html.light {
 
   --t-tab-action-on: #cfe0fb;
   --t-tab-cli-on: #e2d2f8;
-  --t-tab-app-on: #cfead6;
   --t-tab-action-ink: #1d4ed8;
   --t-tab-action-ink-on: #1035a6;
   --t-tab-cli-ink: #6d28d9;
   --t-tab-cli-ink-on: #4c1d95;
-  --t-tab-app-ink: #15803d;
-  --t-tab-app-ink-on: #0b5f2b;
 
   --t-scrim: #5a6176;
   --t-accent: #2563eb;
@@ -198,14 +192,11 @@ html.light {
   --color-control-hover: var(--t-control-hover);
 
   --color-tab-action-on: var(--t-tab-action-on);
-  --color-tab-app-on: var(--t-tab-app-on);
   --color-tab-cli-on: var(--t-tab-cli-on);
   --color-tab-action-ink: var(--t-tab-action-ink);
   --color-tab-action-ink-on: var(--t-tab-action-ink-on);
   --color-tab-cli-ink: var(--t-tab-cli-ink);
   --color-tab-cli-ink-on: var(--t-tab-cli-ink-on);
-  --color-tab-app-ink: var(--t-tab-app-ink);
-  --color-tab-app-ink-on: var(--t-tab-app-ink-on);
 
   --color-accent: var(--t-accent);
   --color-scrim: var(--t-scrim);

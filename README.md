@@ -38,7 +38,7 @@
 </table>
 
 
-One pane with a single tab strip, VS Code style. Tabs come in three kinds — **Terminal**, **Explorer**, and the **viewer/editor** tabs that open when you pick a file in an explorer. `+` asks which kind to create; file tabs are spawned by the explorer, so an explorer always stays a file browser. Each tab's controls sit in the bottom bar and change with the tab. Localhost previews, system info and settings live in popups under the header icons. Every tab stays mounted in the DOM with CSS visibility toggling, preserving terminal state and WebSocket connections across switches. Everything routes through a single Cloudflare Quick Tunnel.
+One pane with a single tab strip, VS Code style. Tabs come in four kinds — **Terminal**, **tmux session**, **Explorer**, and the **viewer/editor** tabs that open when you pick a file in an explorer. A tmux tab *is* its session: it runs tmux rather than a shell, so a reconnect re-attaches instead of dropping you into a shell outside it. `+` asks which kind to create; file tabs are spawned by the explorer, so an explorer always stays a file browser. Each tab's controls sit in the bottom bar and change with the tab. Localhost previews, system info and settings live in popups under the header icons. Every tab stays mounted in the DOM with CSS visibility toggling, preserving terminal state and WebSocket connections across switches. Everything routes through a single Cloudflare Quick Tunnel.
 
 Install it to a home screen and it runs standalone like a native app; the layout, open tabs and your preferences are saved on the host, so a refresh or a reconnect from another device puts you back where you were.
 
@@ -50,11 +50,8 @@ Install it to a home screen and it runs standalone like a native app; the layout
   - **Ctrl+** — sticky modifier combos (Ctrl, Ctrl+Shift, Alt, Alt+Shift) with full A-Z and 0-9
   - **code** — coding CLI launchers (Claude Code, Codex, OpenCode) with vendor selector, permission presets, and slash commands
   - **git** — quick actions (status, log, diff, add, fetch, pull, push, stash, branch), commit with message input, git config setup (user.name/email)
-  - **nano / vim** — file opener with version detection, in-app command buttons, save/exit shortcuts
-  - **tmux** — session manager (list, attach, create, kill), in-session window/pane controls, auto extended-keys compatibility
 - **Always-visible nav keys** below input — Enter, Bksp, arrows, Esc, Tab, PgUp/PgDn
 - **Context-aware tabs** — editor mode (nano/vim) disables action tabs; tmux mode hides nano/vim; plain terminal shows everything
-- Auto-reset of tmux/editor state on socket reconnect
 - System info popup with OS, kernel, CPU, memory, GPU details
 - Tool version detection (nano, vim, tmux, claude, codex, opencode)
 

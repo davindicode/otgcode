@@ -8,14 +8,23 @@ export function registerSocketHandlers(io: Server): void {
     // Track sessions owned by this socket for cleanup
     const ownedSessions = new Set<string>();
 
-    socket.on("create_terminal", (data: { sessionId: string; cwd?: string }) => {
-      const { sessionId, cwd } = data;
-      console.log(`create_terminal: ${sessionId}, cwd: ${cwd || "(default)"}`);
+    socket.on("create_terminal", (data: { sessionId: string; cwd?: string; tmuxSession?: string }) => {
+      const { sessionId, cwd, tmuxSession } = data;
+      console.log(
+        `create_terminal: ${sessionId}, cwd: ${cwd || "(default)"}${tmuxSession ? `, tmux: ${tmuxSession}` : ""}`,
+      );
       if (!sessionId) return;
 
       ownedSessions.add(sessionId);
 
+      // A tmux tab runs tmux as its process rather than a shell that then
+      // attaches. `new -A` attaches if the session exists and creates it
+      // otherwise, so a reconnect lands back in the same session instead of a
+      // bare shell outside it.
+      const tmux = tmuxSession ? { shell: "tmux", args: ["new", "-A", "-s", tmuxSession] } : {};
+
       createPty(sessionId, socket.id, {
+        ...tmux,
         cwd,
         onData: (output) => {
           socket.emit("terminal_output", { sessionId, data: output });

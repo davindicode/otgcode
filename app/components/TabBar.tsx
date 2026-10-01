@@ -2,6 +2,9 @@ import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "re
 import { type FileKind, fileKind } from "~/lib/fileTypes";
 import { type Tab, useTabsStore } from "~/stores/tabsStore";
 import RenamableTab from "./RenamableTab";
+import TmuxPicker from "./TmuxPicker";
+
+type NewKind = "terminal" | "explorer" | "tmux";
 
 const TerminalIcon = () => (
   <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -16,6 +19,19 @@ const TerminalIcon = () => (
 const ExplorerIcon = () => (
   <svg className="w-3.5 h-3.5 shrink-0 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
     <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+  </svg>
+);
+
+const TmuxIcon = () => (
+  <svg
+    className="w-3.5 h-3.5 shrink-0 text-green-400"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    strokeWidth={2}
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 5h16v14H4z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M4 12h8" />
   </svg>
 );
 
@@ -109,6 +125,7 @@ const KIND_ICONS: Record<FileKind, () => React.ReactElement> = {
 
 function tabIcon(tab: Tab) {
   if (tab.kind === "terminal") return <TerminalIcon />;
+  if (tab.kind === "tmux") return <TmuxIcon />;
   if (tab.kind === "explorer") return <ExplorerIcon />;
   // A viewer tab shows what it holds, so the strip reads at a glance.
   const Icon = KIND_ICONS[fileKind(tab.path ?? "")];
@@ -123,7 +140,7 @@ function NewTabMenu({
   onClose,
 }: {
   anchor: RefObject<HTMLButtonElement | null>;
-  onPick: (kind: "terminal" | "explorer") => void;
+  onPick: (kind: NewKind) => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -168,7 +185,7 @@ function NewTabMenu({
     };
   }, [onClose]);
 
-  const item = (kind: "terminal" | "explorer", label: string, hint: string, icon: React.ReactNode) => (
+  const item = (kind: NewKind, label: string, hint: string, icon: React.ReactNode) => (
     <button
       type="button"
       onClick={() => onPick(kind)}
@@ -191,6 +208,7 @@ function NewTabMenu({
       className="fixed z-50 w-56 overflow-hidden glass rounded-panel py-1"
     >
       {item("terminal", "Terminal tab", "A new shell session", <TerminalIcon />)}
+      {item("tmux", "tmux session", "Attach to a session that survives reconnects", <TmuxIcon />)}
       {item("explorer", "Explorer tab", "Browse files and folders", <ExplorerIcon />)}
     </div>
   );
@@ -209,11 +227,14 @@ export default function TabBar() {
   const openTerminal = useTabsStore((s) => s.openTerminal);
   const openExplorer = useTabsStore((s) => s.openExplorer);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [tmuxPicker, setTmuxPicker] = useState(false);
   const plusRef = useRef<HTMLButtonElement>(null);
 
-  const pick = (kind: "terminal" | "explorer") => {
+  const pick = (kind: NewKind) => {
     setMenuOpen(false);
-    if (kind === "terminal") openTerminal();
+    // A tmux tab needs its session chosen first — the tab *is* that session.
+    if (kind === "tmux") setTmuxPicker(true);
+    else if (kind === "terminal") openTerminal();
     else openExplorer();
   };
 
@@ -254,6 +275,7 @@ export default function TabBar() {
         </button>
       </div>
       {menuOpen && <NewTabMenu anchor={plusRef} onPick={pick} onClose={() => setMenuOpen(false)} />}
+      {tmuxPicker && <TmuxPicker onClose={() => setTmuxPicker(false)} />}
     </div>
   );
 }

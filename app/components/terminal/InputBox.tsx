@@ -71,82 +71,6 @@ const NAV_ARROWS: QuickKey[] = [
   { label: "→", key: "\x1b[C", title: "Cursor right" },
 ];
 
-const NANO_KEYS: QuickKey[] = [
-  { label: "Ctrl+O save", key: "\x0f", title: "Write out (save)" },
-  { label: "Ctrl+W search", key: "\x17", title: "Search" },
-  { label: "Ctrl+K cut", key: "\x0b", title: "Cut line" },
-  { label: "Ctrl+U paste", key: "\x15", title: "Paste" },
-  { label: "Ctrl+G help", key: "\x07", title: "Help" },
-  { label: "Ctrl+\\ replace", key: "\x1c", title: "Search & replace" },
-  { label: "Ctrl+C pos", key: "\x03", title: "Show cursor position" },
-  { label: "Ctrl+_ goto", key: "\x1f", title: "Go to line number" },
-];
-
-const VIM_KEYS: QuickKey[] = [
-  { label: ":w", key: ":w\n", title: "Write (save)" },
-  { label: ":q", key: ":q\n", title: "Quit" },
-  { label: ":wq", key: ":wq\n", title: "Write & quit" },
-  { label: ":q!", key: ":q!\n", title: "Force quit" },
-  { label: "Esc", key: "\x1b", title: "Normal mode" },
-  { label: "i", key: "i", title: "Insert mode" },
-  { label: "a", key: "a", title: "Append" },
-  { label: "o", key: "o", title: "Open line below" },
-  { label: "dd", key: "dd", title: "Delete line" },
-  { label: "yy", key: "yy", title: "Yank line" },
-  { label: "p", key: "p", title: "Paste" },
-  { label: "u", key: "u", title: "Undo" },
-  { label: "Ctrl+R", key: "\x12", title: "Redo" },
-  { label: "/", key: "/", title: "Search" },
-  { label: "n", key: "n", title: "Next match" },
-  { label: "gg", key: "gg", title: "Go to top" },
-  { label: "G", key: "G", title: "Go to bottom" },
-];
-
-// Session-level: these act on the session as a whole, so they sit with its
-// name and the detach button rather than among the window and pane controls.
-const TMUX_SESSION_KEYS: QuickKey[] = [
-  { label: "s switch", key: "\x02s", title: "List and switch sessions" },
-  { label: "$ rename", key: "\x02$", title: "Rename this session" },
-  { label: ": cmd", key: "\x02:", title: "tmux command prompt" },
-];
-
-// Everything that acts inside the session, grouped by what it operates on.
-const TMUX_GROUPS: { label: string; keys: QuickKey[] }[] = [
-  {
-    label: "windows",
-    keys: [
-      { label: "c new", key: "\x02c", title: "New window" },
-      { label: "n next", key: "\x02n", title: "Next window" },
-      { label: "p prev", key: "\x02p", title: "Previous window" },
-      { label: "0", key: "\x020", title: "Window 0" },
-      { label: "1", key: "\x021", title: "Window 1" },
-      { label: "2", key: "\x022", title: "Window 2" },
-      { label: "3", key: "\x023", title: "Window 3" },
-      { label: "4", key: "\x024", title: "Window 4" },
-      { label: "5", key: "\x025", title: "Window 5" },
-      { label: ", rename", key: "\x02,", title: "Rename window" },
-      { label: "& kill", key: "\x02&", title: "Kill window" },
-      { label: "w list", key: "\x02w", title: "List windows" },
-    ],
-  },
-  {
-    label: "panes",
-    keys: [
-      { label: '" hsplit', key: '\x02"', title: "Split horizontal" },
-      { label: "% vsplit", key: "\x02%", title: "Split vertical" },
-      { label: "o pane", key: "\x02o", title: "Next pane" },
-      { label: "z zoom", key: "\x02z", title: "Toggle zoom pane" },
-      { label: "x kill", key: "\x02x", title: "Kill pane" },
-    ],
-  },
-  {
-    label: "copy",
-    keys: [
-      { label: "[ scroll", key: "\x02[", title: "Scroll/copy mode (Esc to exit)" },
-      { label: "] paste", key: "\x02]", title: "Paste from tmux buffer" },
-    ],
-  },
-];
 // Common key combos shared across all coding CLIs
 // (y/n live in NAV_TAIL — always-visible below the input — since they're also
 // useful for tmux confirms and other action contexts.)
@@ -268,9 +192,6 @@ const TEXTAREA_MAX_PX = 3 * 20 + 16 + 2;
 
 const TEXT_TAB = "__text__";
 const STICKY_TAB = "__sticky__";
-const TMUX_TAB = "__tmux__";
-const NANO_TAB = "__nano__";
-const VIM_TAB = "__vim__";
 const CODE_TAB = "__code__";
 const GIT_TAB = "__git__";
 const CD_TAB = "__cd__";
@@ -297,22 +218,13 @@ export default function InputBox() {
   const addSlash = useWorkspaceStore((s) => s.addSlash);
   const removeSlash = useWorkspaceStore((s) => s.removeSlash);
   const restoreSlash = useWorkspaceStore((s) => s.restoreSlash);
-  const [tmuxSessions, setTmuxSessions] = useState<TmuxSession[]>([]);
-  const [tmuxName, setTmuxName] = useState<string | null>(null);
-  const [tmuxGroup, setTmuxGroup] = useState(TMUX_GROUPS[0].label);
   const [comboSet, setComboSet] = useState<ComboSet>("letters");
-  const [tmuxLoading, setTmuxLoading] = useState(false);
   const [toolVersions, setToolVersions] = useState<{
-    tmux: string | null;
-    nano: string | null;
-    vim: string | null;
     claude: string | null;
     codex: string | null;
     opencode: string | null;
-  }>({ tmux: null, nano: null, vim: null, claude: null, codex: null, opencode: null });
+  }>({ claude: null, codex: null, opencode: null });
   const toolVersionsFetched = useRef(false);
-  const [tmuxNewName, setTmuxNewName] = useState("");
-  const [editorFileName, setEditorFileName] = useState("");
   const [cdDirs, setCdDirs] = useState<string[]>([]);
   const [cdLoading, setCdLoading] = useState(false);
   const [stickyMode, setStickyMode] = useState<StickyMode>("ctrl");
@@ -333,7 +245,6 @@ export default function InputBox() {
   const activeSessionId = useTerminalStore((s) => s.activeSessionId);
   const sendInput = useTerminalStore((s) => s.sendInput);
   const setInTmux = useTerminalStore((s) => s.setInTmux);
-  const setInEditor = useTerminalStore((s) => s.setInEditor);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
 
@@ -341,7 +252,6 @@ export default function InputBox() {
 
   const activeSession = activeSessionId ? sessions[activeSessionId] : null;
   const inTmux = activeSession?.inTmux ?? false;
-  const inEditor = activeSession?.inEditor ?? null;
   const cdCwd = activeSession?.cdCwd ?? "";
 
   // --- Handlers ---
@@ -458,68 +368,15 @@ export default function InputBox() {
     if (activeSessionId) fetchDirs();
   }, [activeSessionId]);
 
+  const modeLabel = STICKY_MODES.find((m) => m.id === stickyMode)?.label ?? "";
+
   const toggleGroup = (id: string) => {
     if (activeGroup === id) {
       setActiveGroup(null);
     } else {
       setActiveGroup(id);
-      if (id === TMUX_TAB) {
-        if (inTmux) fetchTmuxName();
-        else fetchTmuxSessions();
-      }
       if (id === CD_TAB) fetchDirs();
-      if ([TMUX_TAB, NANO_TAB, VIM_TAB, CODE_TAB].includes(id)) fetchToolVersions();
-    }
-  };
-
-  // Tmux
-  const fetchTmuxSessions = async () => {
-    setTmuxLoading(true);
-    try {
-      const res = await fetch("/api/tmux/sessions");
-      const data = await res.json();
-      setTmuxSessions(data.sessions || []);
-    } catch {
-      setTmuxSessions([]);
-      showToast("Failed to load tmux sessions");
-    }
-    setTmuxLoading(false);
-  };
-
-  const handleTmuxAttach = (name: string) => {
-    if (!activeSessionId) return;
-    // Set extended-keys off inline via shell command to avoid visible tmux prompt flicker
-    sendInput(activeSessionId, `tmux set -g extended-keys off 2>/dev/null; tmux attach -t ${name}\n`);
-    setInTmux(activeSessionId, true);
-    setActiveGroup(null);
-  };
-
-  const handleTmuxNew = () => {
-    if (!activeSessionId || !tmuxNewName.trim()) return;
-    sendInput(activeSessionId, `tmux set -g extended-keys off 2>/dev/null; tmux new -s ${tmuxNewName.trim()}\n`);
-    setTmuxNewName("");
-    setInTmux(activeSessionId, true);
-    setActiveGroup(null);
-  };
-
-  const handleTmuxDetach = () => {
-    if (!activeSessionId) return;
-    sendInput(activeSessionId, "\x02d");
-    setInTmux(activeSessionId, false);
-    setActiveGroup(null);
-  };
-
-  const modeLabel = STICKY_MODES.find((m) => m.id === stickyMode)?.label ?? "";
-
-  // Which tmux session this terminal is attached to, for the header line.
-  const fetchTmuxName = async () => {
-    if (!activeSessionId) return;
-    try {
-      const res = await fetch(`/api/terminal/cwd?sessionId=${activeSessionId}&inTmux=true`);
-      const data = await res.json();
-      setTmuxName(data.tmuxSession ?? null);
-    } catch {
-      setTmuxName(null);
+      if (id === CODE_TAB) fetchToolVersions();
     }
   };
 
@@ -573,34 +430,6 @@ export default function InputBox() {
   };
 
   // Editors
-  const handleOpenEditor = (editor: "nano" | "vim") => {
-    if (!activeSessionId || !editorFileName.trim()) return;
-    sendInput(activeSessionId, `${editor} ${editorFileName.trim()}\n`);
-    setEditorFileName("");
-    setInEditor(activeSessionId, editor);
-    setActiveGroup(editor === "nano" ? NANO_TAB : VIM_TAB);
-  };
-
-  const handleExitNano = () => {
-    if (!activeSessionId) return;
-    sendInput(activeSessionId, "\x18");
-    setInEditor(activeSessionId, null);
-    setActiveGroup(null);
-  };
-
-  const handleExitVim = () => {
-    if (!activeSessionId) return;
-    sendInput(activeSessionId, "\x1b:q!\n");
-    setInEditor(activeSessionId, null);
-    setActiveGroup(null);
-  };
-
-  const handleSaveExitVim = () => {
-    if (!activeSessionId) return;
-    sendInput(activeSessionId, "\x1b:wq\n");
-    setInEditor(activeSessionId, null);
-    setActiveGroup(null);
-  };
 
   // --- Styles ---
   const tabBase = "px-2.5 py-0.5 text-[11px] rounded-control whitespace-nowrap shrink-0 select-none touch-manipulation";
@@ -613,29 +442,16 @@ export default function InputBox() {
   // CLI tool tabs (code, git) — purple
   const cliTabOff = `${tabBase} relief text-tab-cli-ink`;
   const cliTabOn = `${tabBase} relief glow bg-tab-cli-on text-tab-cli-ink-on ring-2 ring-inset ring-purple-400/70`;
-  // Program tabs (nano, vim, tmux) — green
-  const appTabOff = `${tabBase} relief text-tab-app-ink`;
-  const appTabOn = `${tabBase} relief glow bg-tab-app-on text-tab-app-ink-on ring-2 ring-inset ring-green-400/70`;
-
   // Popup action buttons — same raised treatment as Send, tinted by role.
   const keyBtn =
     "px-2 py-0.5 text-[11px] relief text-ink-muted hover:text-ink rounded-control whitespace-nowrap select-none touch-manipulation";
   const actionBtn = "px-2.5 py-1 text-[11px] relief rounded-control whitespace-nowrap select-none touch-manipulation";
-  const exitBtn =
-    "px-2 py-0.5 text-[11px] relief text-red-300 hover:text-red-100 rounded-control whitespace-nowrap select-none touch-manipulation";
-  const saveExitBtn =
-    "px-2 py-0.5 text-[11px] relief text-green-300 hover:text-green-100 rounded-control whitespace-nowrap select-none touch-manipulation";
 
-  // --- Determine which tabs to show ---
-  // Editor mode (nano/vim): only editor tab + sticky (+ tmux if in tmux)
-  // Tmux mode: all action tabs + tmux tab (no nano/vim — can't track state inside tmux)
-  // Plain terminal: all action tabs + all app tabs
-  const isEditorMode = inEditor !== null;
-
+  // The drawer is the same for a terminal tab and a tmux tab now, so there is
+  // no per-mode tab set to work out.
   const SECTORS = {
     native: { on: actionTabOn, off: actionTabOff },
     cli: { on: cliTabOn, off: cliTabOff },
-    app: { on: appTabOn, off: appTabOff },
   } as const;
 
   const tabBtn = (
@@ -658,7 +474,7 @@ export default function InputBox() {
 
   // Resolve which key group to show in the popup
   const activeStandardGroup =
-    drawerGroup && ![TEXT_TAB, STICKY_TAB, TMUX_TAB, NANO_TAB, VIM_TAB, CODE_TAB, GIT_TAB, CD_TAB].includes(drawerGroup)
+    drawerGroup && ![TEXT_TAB, STICKY_TAB, CODE_TAB, GIT_TAB, CD_TAB].includes(drawerGroup)
       ? TERMINAL_GROUPS.find((g) => g.label === drawerGroup)
       : null;
 
@@ -690,35 +506,11 @@ export default function InputBox() {
         <div className="flex items-center gap-1 px-2 py-1 w-max">
           {tabBtn(TEXT_TAB, "text", "Type a command or message", !activeSessionId)}
           {/* Native terminal tabs (blue) — always in same order, hidden in editor mode */}
-          {!isEditorMode && TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !activeSessionId))}
-          {!isEditorMode && tabBtn(CD_TAB, "cd", "Change directory", !activeSessionId)}
+          {TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !activeSessionId))}
+          {tabBtn(CD_TAB, "cd", "Change directory", !activeSessionId)}
           {tabBtn(STICKY_TAB, "combos", "Modifier key combinations")}
-          {!isEditorMode && tabBtn(CODE_TAB, "code", "Coding CLI launchers & keys", !activeSessionId, "cli")}
-          {!isEditorMode && tabBtn(GIT_TAB, "git", "Git actions", !activeSessionId, "cli")}
-          {/* Program tabs (green) — nano/vim hidden in tmux mode, shown with active indicator in editor mode */}
-          {!inTmux &&
-            tabBtn(
-              NANO_TAB,
-              inEditor === "nano" ? "nano \u2318" : "nano",
-              inEditor === "nano" ? "nano commands" : "Open file in nano",
-              !activeSessionId && inEditor !== "nano",
-              "app",
-            )}
-          {!inTmux &&
-            tabBtn(
-              VIM_TAB,
-              inEditor === "vim" ? "vim \u2318" : "vim",
-              inEditor === "vim" ? "vim commands" : "Open file in vim",
-              !activeSessionId && inEditor !== "vim",
-              "app",
-            )}
-          {tabBtn(
-            TMUX_TAB,
-            inTmux ? "tmux \u2318" : "tmux",
-            inTmux ? "tmux commands" : "tmux sessions",
-            !activeSessionId && !inTmux,
-            "app",
-          )}
+          {tabBtn(CODE_TAB, "code", "Coding CLI launchers & keys", !activeSessionId, "cli")}
+          {tabBtn(GIT_TAB, "git", "Git actions", !activeSessionId, "cli")}
         </div>
       </div>
 
@@ -875,251 +667,9 @@ export default function InputBox() {
             </div>
           )}
 
-          {drawerGroup === NANO_TAB && inEditor === "nano" && (
-            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-              <div className="flex flex-wrap gap-1">
-                {NANO_KEYS.map((qk) => (
-                  <button
-                    key={qk.label}
-                    {...repeatProps(qk.key)}
-                    disabled={!activeSessionId}
-                    title={qk.title}
-                    className={keyBtn}
-                  >
-                    {qk.label}
-                  </button>
-                ))}
-                <button
-                  onClick={handleExitNano}
-                  disabled={!activeSessionId}
-                  title="Exit nano (Ctrl+X)"
-                  className={exitBtn}
-                >
-                  exit
-                </button>
-              </div>
-            </div>
-          )}
-          {drawerGroup === NANO_TAB && inEditor !== "nano" && (
-            <div className="border-b border-line/50 bg-panel px-3 py-2">
-              {!toolVersions.nano ? (
-                <span className="text-[11px] text-yellow-400">
-                  nano is not installed. Install it via your package manager.
-                </span>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-ink-faint">
-                    nano{toolVersions.nano ? ` v${toolVersions.nano}` : ""}
-                  </span>
-                  <input
-                    value={editorFileName}
-                    onChange={(e) => setEditorFileName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("nano")}
-                    placeholder="filename or path..."
-                    className="field flex-1 px-2 py-1 text-[11px]"
-                  />
-                  <button
-                    onClick={() => handleOpenEditor("nano")}
-                    disabled={!editorFileName.trim() || !activeSessionId}
-                    className="px-2 py-1 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
-                  >
-                    Open
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Vim popup: commands when inside, file opener when outside */}
-          {drawerGroup === VIM_TAB && inEditor === "vim" && (
-            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-              <div className="flex flex-wrap gap-1">
-                {VIM_KEYS.map((qk) => (
-                  <button
-                    key={qk.label}
-                    {...repeatProps(qk.key)}
-                    disabled={!activeSessionId}
-                    title={qk.title}
-                    className={keyBtn}
-                  >
-                    {qk.label}
-                  </button>
-                ))}
-                <button
-                  onClick={handleSaveExitVim}
-                  disabled={!activeSessionId}
-                  title="Save and exit (:wq)"
-                  className={saveExitBtn}
-                >
-                  save+exit
-                </button>
-                <button
-                  onClick={handleExitVim}
-                  disabled={!activeSessionId}
-                  title="Force quit (:q!)"
-                  className={exitBtn}
-                >
-                  quit
-                </button>
-              </div>
-            </div>
-          )}
-          {drawerGroup === VIM_TAB && inEditor !== "vim" && (
-            <div className="border-b border-line/50 bg-panel px-3 py-2">
-              {!toolVersions.vim ? (
-                <span className="text-[11px] text-yellow-400">
-                  vim is not installed. Install it via your package manager.
-                </span>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-ink-faint">vim v{toolVersions.vim}</span>
-                  <input
-                    value={editorFileName}
-                    onChange={(e) => setEditorFileName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("vim")}
-                    placeholder="filename or path..."
-                    className="field flex-1 px-2 py-1 text-[11px]"
-                  />
-                  <button
-                    onClick={() => handleOpenEditor("vim")}
-                    disabled={!editorFileName.trim() || !activeSessionId}
-                    className="px-2 py-1 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
-                  >
-                    Open
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Tmux popup: commands when inside, sessions when outside */}
-          {drawerGroup === TMUX_TAB && inTmux && (
-            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-              {/* The session itself: its name in full, then the controls that
-                  act on the whole of it. Buttons wrap around the name rather
-                  than the name giving way to them. */}
-              <div className="flex flex-wrap items-center gap-1">
-                <span className="shrink-0 text-[10px] text-ink-faint">
-                  session <span className="font-medium text-ink-muted">{tmuxName || "unknown"}</span>
-                </span>
-                {TMUX_SESSION_KEYS.map((qk) => (
-                  <button
-                    key={qk.label}
-                    {...repeatProps(qk.key)}
-                    disabled={!activeSessionId}
-                    title={qk.title}
-                    className={keyBtn}
-                  >
-                    {qk.label}
-                  </button>
-                ))}
-                <button
-                  onClick={handleTmuxDetach}
-                  disabled={!activeSessionId}
-                  title="Detach from tmux"
-                  className={exitBtn}
-                >
-                  detach
-                </button>
-              </div>
-
-              {/* One group at a time: windows, panes and copy are three sets of
-                  controls that are rarely needed together. */}
-              <div className="mt-1.5 flex items-start gap-1.5 border-t border-line/50 pt-1.5">
-                <DropUpSelect
-                  value={tmuxGroup}
-                  options={TMUX_GROUPS.map((g) => ({ id: g.label, label: g.label }))}
-                  onChange={setTmuxGroup}
-                />
-                <div className="flex min-w-0 flex-wrap gap-1">
-                  {(TMUX_GROUPS.find((g) => g.label === tmuxGroup) ?? TMUX_GROUPS[0]).keys.map((qk) => (
-                    <button
-                      key={qk.label}
-                      {...repeatProps(qk.key)}
-                      disabled={!activeSessionId}
-                      title={qk.title}
-                      className={keyBtn}
-                    >
-                      {qk.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {drawerGroup === TMUX_TAB && !inTmux && (
-            <div className="border-b border-line/50 bg-panel px-3 py-2">
-              {!toolVersions.tmux ? (
-                <span className="text-[11px] text-yellow-400">
-                  tmux is not installed. Install it via your package manager.
-                </span>
-              ) : (
-                <>
-                  <span className="text-[10px] text-ink-ghost float-right">v{toolVersions.tmux}</span>
-                  {tmuxLoading ? (
-                    <span className="text-[11px] text-ink-faint">Loading...</span>
-                  ) : tmuxSessions.length === 0 ? (
-                    <span className="text-[11px] text-ink-faint">No tmux sessions running</span>
-                  ) : (
-                    /* Sessions wrap like the command buttons elsewhere: a
-                       full-width row each left most of the drawer empty, and a
-                       name is rarely wider than a few characters. */
-                    <div className="mb-2 flex flex-wrap gap-1">
-                      {tmuxSessions.map((s) => (
-                        <span key={s.name} className="relief flex items-center rounded-control">
-                          <button
-                            onClick={() => handleTmuxAttach(s.name)}
-                            title={`Attach to ${s.name}`}
-                            className="py-0.5 pl-2 pr-1 text-[11px] text-ink-muted hover:text-ink"
-                          >
-                            <span className="font-medium">{s.name}</span>
-                            <span className="ml-1.5 text-ink-faint">{s.windows}w</span>
-                            {s.attached && <span className="ml-1 text-green-400">•</span>}
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (!activeSessionId) return;
-                              sendInput(activeSessionId, `tmux kill-session -t ${s.name}\n`);
-                              setTimeout(fetchTmuxSessions, 500);
-                            }}
-                            className="py-0.5 pl-0.5 pr-1.5 text-ink-ghost transition-colors hover:text-red-400"
-                            title={`Kill session ${s.name}`}
-                            aria-label={`Kill session ${s.name}`}
-                          >
-                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 mt-1">
-                    <input
-                      value={tmuxNewName}
-                      onChange={(e) => setTmuxNewName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleTmuxNew()}
-                      placeholder="New session name..."
-                      className="field flex-1 px-2 py-1 text-[11px]"
-                    />
-                    <button
-                      onClick={handleTmuxNew}
-                      disabled={!tmuxNewName.trim() || !activeSessionId}
-                      className="px-2 py-1 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
-                    >
-                      Create
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
 
           {/* Code tab: common keys + selected vendor panel */}
           {drawerGroup === CODE_TAB &&

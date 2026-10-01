@@ -30,6 +30,8 @@ export function createPty(
   ownerId: string,
   options: {
     shell?: string;
+    /** Arguments for `shell`. A tmux tab spawns tmux itself, not a shell. */
+    args?: string[];
     cwd?: string;
     cols?: number;
     rows?: number;
@@ -44,11 +46,12 @@ export function createPty(
   const shell = options.shell || process.env.DEFAULT_SHELL || getDefaultShell();
   const cwd = options.cwd || process.env.DEFAULT_CWD || process.env.HOME || process.env.USERPROFILE || "/";
 
-  console.log(`pty-manager: spawning shell="${shell}", cwd="${cwd}"`);
+  const args = options.args ?? [];
+  console.log(`pty-manager: spawning "${shell}" ${args.join(" ")} in "${cwd}"`);
 
   let proc: pty.IPty;
   try {
-    proc = pty.spawn(shell, [], {
+    proc = pty.spawn(shell, args, {
       name: "xterm-256color",
       cols: options.cols || 80,
       rows: options.rows || 24,
