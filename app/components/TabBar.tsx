@@ -214,6 +214,95 @@ function NewTabMenu({
   );
 }
 
+/** A mouse this far from where it went down is dragging, not clicking. */
+const DRAG_SLOP_PX = 6;
+/** How long a finger has to rest on a tab before it picks it up. */
+const TOUCH_HOLD_MS = 300;
+
+/**
+ * Where the dragged tab belongs now, as an index into the strip *without* it —
+ * before the first remaining tab whose middle the pointer hasn't passed.
+ */
+function dropIndex(others: HTMLElement[], x: number): number {
+  const at = others.findIndex((el) => {
+    const rect = el.getBoundingClientRect();
+    return x < rect.left + rect.width / 2;
+  });
+  return at === -1 ? others.length : at;
+}
+
+/**
+ * Drag-to-reorder, one code path for mouse and touch.
+ *
+ * Touch waits for a hold before taking the tab, so a swipe still scrolls the
+ * strip; a mouse starts as soon as it has moved too far to be a click. Once
+ * dragging, touchmove is cancelled by hand: `touch-action` is read when the
+ * gesture begins, so it cannot call off a scroll already under way.
+ *
+ * The tab moves as you drag rather than following the pointer under a ghost —
+ * the strip itself is the preview.
+ */
+function useTabReorder(stripRef: RefObject<HTMLDivElement | null>) {
+  const move = useTabsStore((s) => s.move);
+  const [dragId, setDragId] = useState<string | null>(null);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as Element;
+    // The close button, the + and the rename input own their own gestures.
+    if (target.closest("button, input")) return;
+    const id = target.closest<HTMLElement>("[data-tab-id]")?.dataset.tabId;
+    const strip = stripRef.current;
+    if (!id || !strip) return;
+
+    const { pointerId, clientX: startX } = e;
+    const holdFirst = e.pointerType !== "mouse";
+    let dragging = false;
+    let hold: ReturnType<typeof setTimeout> | null = null;
+
+    const start = () => {
+      hold = null;
+      dragging = true;
+      setDragId(id);
+    };
+
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      if (!dragging) {
+        if (Math.abs(ev.clientX - startX) <= DRAG_SLOP_PX) return;
+        // A finger that moves before the hold is through is scrolling.
+        if (holdFirst) return end();
+        start();
+      }
+      const others = [...strip.querySelectorAll<HTMLElement>("[data-tab-id]")].filter((el) => el.dataset.tabId !== id);
+      move(id, dropIndex(others, ev.clientX));
+    };
+
+    // Dragging and scrolling are the same gesture to the browser; the drag wins
+    // once it has started.
+    const onTouchMove = (ev: TouchEvent) => {
+      if (dragging) ev.preventDefault();
+    };
+
+    function end() {
+      if (hold) clearTimeout(hold);
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", end);
+      document.removeEventListener("pointercancel", end);
+      document.removeEventListener("touchmove", onTouchMove);
+      if (dragging) setDragId(null);
+    }
+
+    if (holdFirst) hold = setTimeout(start, TOUCH_HOLD_MS);
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", end);
+    document.addEventListener("pointercancel", end);
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+  };
+
+  return { dragId, onPointerDown };
+}
+
 /**
  * One strip for every tab in the app. Replaces the old per-pane tab rows and
  * the mobile footer: there is a single pane now, so there is a single strip.
@@ -229,6 +318,8 @@ export default function TabBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [tmuxPicker, setTmuxPicker] = useState(false);
   const plusRef = useRef<HTMLButtonElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const { dragId, onPointerDown } = useTabReorder(stripRef);
 
   const pick = (kind: NewKind) => {
     setMenuOpen(false);
@@ -240,10 +331,16 @@ export default function TabBar() {
 
   return (
     <div className="bar-edge relative flex items-center border-b border-line bg-surface shrink-0">
-      <div className="flex items-center overflow-x-auto scrollbar-none flex-1 min-w-0">
+      <div
+        ref={stripRef}
+        onPointerDown={onPointerDown}
+        className="flex items-center overflow-x-auto scrollbar-none flex-1 min-w-0"
+      >
         {tabs.map((tab) => (
           <RenamableTab
             key={tab.id}
+            id={tab.id}
+            dragging={tab.id === dragId}
             name={tab.title}
             isActive={tab.id === activeId}
             // A viewer tab is named by its file; renaming it would be a lie.

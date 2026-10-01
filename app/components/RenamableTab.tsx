@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
 interface RenamableTabProps {
+  /** Tab id, used by the strip's drag-to-reorder hit testing. */
+  id?: string;
+  /** True while this tab is the one being dragged. */
+  dragging?: boolean;
   name: string;
   isActive: boolean;
   existingNames: string[];
@@ -16,6 +20,8 @@ interface RenamableTabProps {
 }
 
 export default function RenamableTab({
+  id,
+  dragging = false,
   name,
   isActive,
   existingNames,
@@ -51,6 +57,7 @@ export default function RenamableTab({
 
   return (
     <div
+      data-tab-id={id}
       onClick={onClick}
       onDoubleClick={(e) => {
         if (!renamable) return;
@@ -58,11 +65,11 @@ export default function RenamableTab({
         setEditing(true);
       }}
       title={title}
-      className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-control px-3 py-1.5 text-sm my-1 ml-1 ${
+      className={`flex shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-control px-3 py-1.5 text-sm my-1 ml-1 ${
         isActive
           ? "relief text-ink ring-1 ring-inset ring-blue-500/45"
           : "text-ink-dim transition-colors hover:bg-surface/60 hover:text-ink"
-      }`}
+      } ${dragging ? "opacity-60 ring-1 ring-inset ring-blue-400/70" : ""}`}
     >
       {icon}
       {editing && renamable ? (

@@ -119,6 +119,23 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           },
         },
       });
+
+      // The PTY is spawned at 80x24 and the server drops a resize for a session
+      // it hasn't created yet, so a terminal that measured itself before the
+      // PTY existed never got its real size across. A shell reflows at its next
+      // prompt and hides it; tmux paints a whole screen the moment it attaches,
+      // so a tmux tab sat drawn at 80x24 until some unrelated layout change
+      // resized the pane. Push the size here, where the PTY is known to exist.
+      if (session.terminal) {
+        // A no-op while this tab is hidden: the fit addon can't measure a
+        // display:none pane. It re-fits from its ResizeObserver when shown.
+        session.fitAddon?.fit();
+        socket.emit("terminal_resize", {
+          sessionId: data.sessionId,
+          cols: session.terminal.cols,
+          rows: session.terminal.rows,
+        });
+      }
     });
 
     socket.on("terminal_output", (data: { sessionId: string; data: string }) => {

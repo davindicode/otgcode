@@ -41,6 +41,8 @@ interface TabsState {
   /** Opens the file, or focuses its tab if it is already open. */
   openViewer: (path: string, fromTabId?: string) => string;
   close: (id: string) => void;
+  /** Drag-to-reorder: `toIndex` indexes the strip with this tab taken out. */
+  move: (id: string, toIndex: number) => void;
   setActive: (id: string) => void;
   rename: (id: string, title: string) => void;
   /** Replace the whole strip — used when restoring a saved workspace. */
@@ -63,6 +65,21 @@ export function insertIndexFor(tabs: Tab[], fromTabId?: string): number {
   let at = origin + 1;
   while (at < tabs.length && tabs[at].kind === "viewer" && tabs[at].openedFrom === fromTabId) at++;
   return at;
+}
+
+/**
+ * Moves `from` to `to`, where `to` indexes the list *after* the item is taken
+ * out — the same convention as splice, and what a drop position means: "third
+ * of the ones that are left".
+ */
+export function reorder<T>(items: T[], from: number, to: number): T[] {
+  if (from < 0 || from >= items.length) return items;
+  const rest = items.slice();
+  const [item] = rest.splice(from, 1);
+  const at = Math.max(0, Math.min(rest.length, to));
+  if (at === from) return items;
+  rest.splice(at, 0, item);
+  return rest;
 }
 
 function nextTitle(tabs: Tab[], kind: TabKind, label: string): string {
@@ -147,6 +164,15 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
     set({ tabs: remaining, activeId: nextActive });
     if (nextActive && nextActive !== activeId) syncContentFocus(nextActive, remaining);
+  },
+
+  move: (id, toIndex) => {
+    const tabs = reorder(
+      get().tabs,
+      get().tabs.findIndex((t) => t.id === id),
+      toIndex,
+    );
+    if (tabs !== get().tabs) set({ tabs });
   },
 
   setActive: (id) => {

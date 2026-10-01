@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { insertIndexFor, type Tab } from "./tabsStore";
+import { insertIndexFor, reorder, type Tab } from "./tabsStore";
 
 const explorer = (id: string): Tab => ({ id, kind: "explorer", title: id });
 const terminal = (id: string): Tab => ({ id, kind: "terminal", title: id });
@@ -42,5 +42,29 @@ describe("insertIndexFor", () => {
 
   it("handles an empty strip", () => {
     expect(insertIndexFor([], "e1")).toBe(0);
+  });
+});
+
+describe("reorder", () => {
+  const strip = ["a", "b", "c", "d"];
+
+  it("drops a tab between two others", () => {
+    // "after b" is index 1 once a is taken out.
+    expect(reorder(strip, 0, 1)).toEqual(["b", "a", "c", "d"]);
+  });
+
+  it("drops a tab at either end", () => {
+    expect(reorder(strip, 2, 0)).toEqual(["c", "a", "b", "d"]);
+    expect(reorder(strip, 0, 3)).toEqual(["b", "c", "d", "a"]);
+  });
+
+  it("returns the same array when nothing moves", () => {
+    expect(reorder(strip, 1, 1)).toBe(strip);
+    expect(reorder(strip, 0, -5)).toBe(strip);
+    expect(reorder(strip, 9, 0)).toBe(strip);
+  });
+
+  it("clamps a drop past the end", () => {
+    expect(reorder(strip, 1, 99)).toEqual(["a", "c", "d", "b"]);
   });
 });
