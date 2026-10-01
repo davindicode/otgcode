@@ -69,7 +69,6 @@ export default function AppShell() {
 
   const tabs = useTabsStore((s) => s.tabs);
   const activeId = useTabsStore((s) => s.activeId);
-  const activeTab = tabs.find((t) => t.id === activeId) ?? null;
 
   useEffect(() => {
     refreshAuth();
@@ -147,10 +146,17 @@ export default function AppShell() {
           )}
         </div>
 
-        {/* The terminal's control surface. Rendered once rather than per tab:
-            it binds to the active session, and mounting one of these per
-            terminal tab would duplicate a lot of state for no benefit. */}
-        {(activeTab?.kind === "terminal" || activeTab?.kind === "tmux") && <InputBox />}
+        {/* One control surface per terminal or tmux tab, hidden unless that
+            tab is showing. Sharing one bound to the active session carried the
+            open drawer and the typed text across tabs, and could leave a tmux
+            drawer open on a tab with no tmux session behind it. */}
+        {tabs
+          .filter((tab) => tab.kind === "terminal" || tab.kind === "tmux")
+          .map((tab) => (
+            <div key={tab.id} hidden={tab.id !== activeId}>
+              <InputBox sessionId={tab.id} />
+            </div>
+          ))}
       </div>
       {!socketConnected && <ConnectionGate />}
     </div>

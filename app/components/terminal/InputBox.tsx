@@ -250,7 +250,14 @@ interface TmuxSession {
   attached: boolean;
 }
 
-export default function InputBox() {
+/**
+ * The command-line helpers for one terminal or tmux tab.
+ *
+ * One instance per tab, not one shared instance bound to whichever tab is
+ * active: the open drawer, the typed text, the picked CLI and the cd listing
+ * are all things a tab should keep while you work in another one.
+ */
+export default function InputBox({ sessionId }: { sessionId: string }) {
   const [text, setText] = useState("");
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   // What is currently painted. Lags `activeGroup` on close so the drawer can
@@ -291,22 +298,21 @@ export default function InputBox() {
     const timer = setTimeout(() => setDrawerGroup(null), DRAWER_MS);
     return () => clearTimeout(timer);
   }, [activeGroup]);
-  const activeSessionId = useTerminalStore((s) => s.activeSessionId);
   const sendInput = useTerminalStore((s) => s.sendInput);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
 
   // Close vendor dropdown on outside click
 
-  const activeSession = activeSessionId ? sessions[activeSessionId] : null;
+  const session = sessions[sessionId] ?? null;
   // A tmux tab runs tmux as its process, so this is also "am I in tmux".
-  const tmuxSession = activeSession?.tmuxSession;
-  const cdCwd = activeSession?.cdCwd ?? "";
+  const tmuxSession = session?.tmuxSession;
+  const cdCwd = session?.cdCwd ?? "";
 
   // --- Handlers ---
   const handleSend = () => {
-    if (!activeSessionId || !text) return;
-    sendInput(activeSessionId, text + "\n");
+    if (!sessionId || !text) return;
+    sendInput(sessionId, text + "\n");
     setText("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     textareaRef.current?.focus();
@@ -321,14 +327,14 @@ export default function InputBox() {
 
   const handleQuickKey = useCallback(
     (key: string) => {
-      if (!activeSessionId) return;
+      if (!sessionId) return;
       if (key.length === 2 && key.charCodeAt(0) < 0x20 && key.charCodeAt(1) >= 0x20) {
-        sendInput(activeSessionId, key);
+        sendInput(sessionId, key);
       } else {
-        sendInput(activeSessionId, key);
+        sendInput(sessionId, key);
       }
     },
-    [activeSessionId, sendInput],
+    [sessionId, sendInput],
   );
 
   // Long-press repeat with scroll detection
@@ -402,21 +408,6 @@ export default function InputBox() {
     } catch {}
   };
 
-  // Initial fetch
-  useEffect(() => {
-    if (toolVersionsFetched.current) return;
-    toolVersionsFetched.current = true;
-    fetchToolVersions();
-  }, []);
-
-  // When the active terminal tab changes while the cd picker is open, resync
-  // to that terminal's current cwd (the cd panel is per-terminal stateful).
-  useEffect(() => {
-    if (activeGroup !== CD_TAB) return;
-    setCdDirs([]);
-    if (activeSessionId) fetchDirs();
-  }, [activeSessionId]);
-
   const modeLabel = STICKY_MODES.find((m) => m.id === stickyMode)?.label ?? "";
 
   const toggleGroup = (id: string) => {
@@ -431,7 +422,6 @@ export default function InputBox() {
 
   // cd directory picker — always scoped to the currently-active terminal session
   const fetchDirs = async (dir?: string) => {
-    const sessionId = activeSessionId;
     if (!sessionId) return;
     setCdLoading(true);
     try {
@@ -449,8 +439,8 @@ export default function InputBox() {
       const data = await res.json();
       if (data.error) {
         showToast(`Can't list directory: ${data.error}`);
-      } else if (useTerminalStore.getState().activeSessionId === sessionId) {
-        // Only apply the result if the user hasn't switched to a different tab while we were fetching
+      } else if (useTerminalStore.getState().sessions[sessionId]) {
+        // Drop the result if the tab was closed while we were fetching.
         setCdCwd(sessionId, data.dir);
         setCdDirs(
           (data.entries || [])
@@ -466,15 +456,15 @@ export default function InputBox() {
   };
 
   const handleCdTo = (dir: string) => {
-    if (!activeSessionId) return;
+    if (!sessionId) return;
     const absPath = dir === ".." ? cdCwd.replace(/\/[^/]+$/, "") || "/" : `${cdCwd}/${dir}`;
-    sendInput(activeSessionId, `cd '${absPath}'\n`);
+    sendInput(sessionId, `cd '${absPath}'\n`);
     fetchDirs(absPath);
   };
 
   const handleCdHome = () => {
-    if (!activeSessionId) return;
-    sendInput(activeSessionId, "cd ~\n");
+    if (!sessionId) return;
+    sendInput(sessionId, "cd ~\n");
     fetchDirs(); // No dir param = defaults to HOME
   };
 
@@ -558,13 +548,13 @@ export default function InputBox() {
       <div className="border-b border-line/50 overflow-x-auto scrollbar-none" style={{ minWidth: 0 }}>
         <div className="flex items-center gap-1 px-2 py-1 w-max">
           {tmuxSession && tabBtn(TMUX_TAB, "tmux", `Controls for session "${tmuxSession}"`, false, "app")}
-          {tabBtn(TEXT_TAB, "text", "Type a command or message", !activeSessionId)}
+          {tabBtn(TEXT_TAB, "text", "Type a command or message", !sessionId)}
           {/* Native terminal tabs (blue) — always in same order, hidden in editor mode */}
-          {TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !activeSessionId))}
-          {tabBtn(CD_TAB, "cd", "Change directory", !activeSessionId)}
+          {TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !sessionId))}
+          {tabBtn(CD_TAB, "cd", "Change directory", !sessionId)}
           {tabBtn(STICKY_TAB, "combos", "Modifier key combinations")}
-          {tabBtn(CODE_TAB, "code", "Coding CLI launchers & keys", !activeSessionId, "cli")}
-          {tabBtn(GIT_TAB, "git", "Git actions", !activeSessionId, "cli")}
+          {tabBtn(CODE_TAB, "code", "Coding CLI launchers & keys", !sessionId, "cli")}
+          {tabBtn(GIT_TAB, "git", "Git actions", !sessionId, "cli")}
         </div>
       </div>
 
@@ -578,12 +568,12 @@ export default function InputBox() {
               <CommandChips
                 chips={visibleCommands}
                 hidden={hiddenCommands}
-                disabled={!activeSessionId}
+                disabled={!sessionId}
                 chipClass={keyBtn}
                 dialogTitle="Add command"
                 dialogHint="Becomes a button in the cmds group. Runs immediately."
                 commandPlaceholder="./deploy.sh --prod"
-                onRun={(command) => activeSessionId && sendInput(activeSessionId, command)}
+                onRun={(command) => sessionId && sendInput(sessionId, command)}
                 onAdd={(label, command) => addCommand({ label, command })}
                 onRemove={removeCommand}
                 onRestore={restoreCommand}
@@ -609,7 +599,7 @@ export default function InputBox() {
                 <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
                   <button
                     onClick={() => handleCdTo("..")}
-                    disabled={!activeSessionId}
+                    disabled={!sessionId}
                     className={`${keyBtn} text-yellow-400 hover:text-yellow-300`}
                     title="Go up one directory"
                   >
@@ -617,7 +607,7 @@ export default function InputBox() {
                   </button>
                   <button
                     onClick={handleCdHome}
-                    disabled={!activeSessionId}
+                    disabled={!sessionId}
                     className={`${keyBtn} text-blue-400 hover:text-blue-300`}
                     title="Go to home directory"
                   >
@@ -627,7 +617,7 @@ export default function InputBox() {
                     <button
                       key={dir}
                       onClick={() => handleCdTo(dir)}
-                      disabled={!activeSessionId}
+                      disabled={!sessionId}
                       className="px-2 py-0.5 text-[11px] relief text-purple-300 hover:text-purple-100 rounded-control whitespace-nowrap select-none touch-manipulation"
                       title={`cd ${dir}`}
                     >
@@ -653,7 +643,7 @@ export default function InputBox() {
                   <button
                     key={qk.label}
                     {...repeatProps(qk.key)}
-                    disabled={!activeSessionId}
+                    disabled={!sessionId}
                     title={qk.title}
                     className={keyBtn}
                   >
@@ -673,7 +663,7 @@ export default function InputBox() {
                     <button
                       key={qk.label}
                       {...repeatProps(qk.key)}
-                      disabled={!activeSessionId}
+                      disabled={!sessionId}
                       title={qk.title}
                       className={keyBtn}
                     >
@@ -715,7 +705,7 @@ export default function InputBox() {
                       <button
                         key={ch}
                         {...repeatProps(comboSequence(ch, stickyMode))}
-                        disabled={!activeSessionId}
+                        disabled={!sessionId}
                         title={`${modeLabel}${ch}`}
                         className={keyBtn}
                       >
@@ -728,7 +718,7 @@ export default function InputBox() {
                       <button
                         key={ch}
                         {...repeatProps(comboSequence(ch, stickyMode))}
-                        disabled={!activeSessionId}
+                        disabled={!sessionId}
                         title={`${modeLabel}${ch}`}
                         className={keyBtn}
                       >
@@ -741,7 +731,7 @@ export default function InputBox() {
                       <button
                         key={key.label}
                         {...repeatProps(comboSequence(key.label, stickyMode))}
-                        disabled={!activeSessionId}
+                        disabled={!sessionId}
                         title={`${modeLabel}${key.title}`}
                         className={keyBtn}
                       >
@@ -754,7 +744,7 @@ export default function InputBox() {
                       <button
                         key={key.label}
                         {...repeatProps(comboSequence(key.label, stickyMode))}
-                        disabled={!activeSessionId}
+                        disabled={!sessionId}
                         title={`${modeLabel}${key.label} — ${key.title}`}
                         className={keyBtn}
                       >
@@ -803,9 +793,9 @@ export default function InputBox() {
                         <button
                           key={`${vendor.name}-${cmd.label}`}
                           onClick={() => {
-                            if (activeSessionId) sendInput(activeSessionId, cmd.command);
+                            if (sessionId) sendInput(sessionId, cmd.command);
                           }}
-                          disabled={!activeSessionId}
+                          disabled={!sessionId}
                           title={cmd.title}
                           className="px-2 py-0.5 text-[11px] relief text-purple-300 hover:text-purple-100 rounded-control whitespace-nowrap select-none"
                         >
@@ -819,7 +809,7 @@ export default function InputBox() {
                         <button
                           key={`${vendor.name}-${qk.label}`}
                           {...repeatProps(qk.key)}
-                          disabled={!activeSessionId}
+                          disabled={!sessionId}
                           title={qk.title}
                           className={keyBtn}
                         >
@@ -834,12 +824,12 @@ export default function InputBox() {
                     <CommandChips
                       chips={slashChips}
                       hidden={hiddenSlashLabels}
-                      disabled={!activeSessionId}
+                      disabled={!sessionId}
                       chipClass="px-2 py-0.5 text-[11px] relief text-cyan-300 hover:text-cyan-100 rounded-control whitespace-nowrap select-none"
                       dialogTitle={`Add ${vendor.name} slash command`}
                       dialogHint={`Sent to ${vendor.name} when tapped. Saved for ${vendor.name} only.`}
                       commandPlaceholder="/review"
-                      onRun={(command) => activeSessionId && sendInput(activeSessionId, command)}
+                      onRun={(command) => sessionId && sendInput(sessionId, command)}
                       onAdd={(label, command) => addSlash({ vendor: vendor.name, label, command })}
                       onRemove={(label, isCustom) => removeSlash(vendor.name, label, isCustom)}
                       onRestore={(label) => restoreSlash(vendor.name, label)}
@@ -858,9 +848,9 @@ export default function InputBox() {
                   <button
                     key={cmd.label}
                     onClick={() => {
-                      if (activeSessionId) sendInput(activeSessionId, cmd.command);
+                      if (sessionId) sendInput(sessionId, cmd.command);
                     }}
-                    disabled={!activeSessionId}
+                    disabled={!sessionId}
                     title={cmd.title}
                     className={keyBtn}
                   >
@@ -875,9 +865,9 @@ export default function InputBox() {
                   value={gitCommitMsg}
                   onChange={(e) => setGitCommitMsg(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && gitCommitMsg.trim() && activeSessionId) {
+                    if (e.key === "Enter" && gitCommitMsg.trim() && sessionId) {
                       const escaped = gitCommitMsg.replace(/'/g, "'\\''");
-                      sendInput(activeSessionId, `git commit -m '${escaped}'\n`);
+                      sendInput(sessionId, `git commit -m '${escaped}'\n`);
                       setGitCommitMsg("");
                     }
                   }}
@@ -886,13 +876,13 @@ export default function InputBox() {
                 />
                 <button
                   onClick={() => {
-                    if (activeSessionId && gitCommitMsg.trim()) {
+                    if (sessionId && gitCommitMsg.trim()) {
                       const escaped = gitCommitMsg.replace(/'/g, "'\\''");
-                      sendInput(activeSessionId, `git commit -m '${escaped}'\n`);
+                      sendInput(sessionId, `git commit -m '${escaped}'\n`);
                       setGitCommitMsg("");
                     }
                   }}
-                  disabled={!gitCommitMsg.trim() || !activeSessionId}
+                  disabled={!gitCommitMsg.trim() || !sessionId}
                   className="px-2 py-0.5 text-[11px] relief-accent relief-success text-white rounded-control shrink-0"
                 >
                   Commit
@@ -915,13 +905,13 @@ export default function InputBox() {
                 />
                 <button
                   onClick={() => {
-                    if (!activeSessionId) return;
+                    if (!sessionId) return;
                     if (gitConfigName.trim())
-                      sendInput(activeSessionId, `git config --global user.name '${gitConfigName.trim()}'\n`);
+                      sendInput(sessionId, `git config --global user.name '${gitConfigName.trim()}'\n`);
                     if (gitConfigEmail.trim())
-                      sendInput(activeSessionId, `git config --global user.email '${gitConfigEmail.trim()}'\n`);
+                      sendInput(sessionId, `git config --global user.email '${gitConfigEmail.trim()}'\n`);
                   }}
-                  disabled={!activeSessionId || (!gitConfigName.trim() && !gitConfigEmail.trim())}
+                  disabled={!sessionId || (!gitConfigName.trim() && !gitConfigEmail.trim())}
                   className="px-2 py-0.5 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors shrink-0"
                 >
                   Set
@@ -946,7 +936,7 @@ export default function InputBox() {
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!text || !activeSessionId}
+                  disabled={!text || !sessionId}
                   className="px-4 py-2 relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-panel text-sm font-medium transition-colors"
                 >
                   Send
@@ -959,7 +949,7 @@ export default function InputBox() {
                   <button
                     key={qk.label}
                     {...repeatProps(qk.key)}
-                    disabled={!activeSessionId}
+                    disabled={!sessionId}
                     title={qk.title}
                     className={`${keyBtn} text-[10px] px-1.5`}
                   >
@@ -970,7 +960,7 @@ export default function InputBox() {
                   <button
                     key={qk.label}
                     {...repeatProps(qk.key)}
-                    disabled={!activeSessionId}
+                    disabled={!sessionId}
                     title={qk.title}
                     className={`${keyBtn} text-[10px] px-1.5`}
                   >
@@ -981,7 +971,7 @@ export default function InputBox() {
                   <button
                     key={qk.label}
                     {...repeatProps(qk.key)}
-                    disabled={!activeSessionId}
+                    disabled={!sessionId}
                     title={qk.title}
                     className={`${keyBtn} text-[10px] px-1.5`}
                   >
