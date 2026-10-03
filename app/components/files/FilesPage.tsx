@@ -55,7 +55,14 @@ function FileSessionView({ session }: { session: FileSession }) {
   useEffect(() => {
     if (didInit.current) return;
     didInit.current = true;
-    if (!session.cwd) loadDirectory("");
+    // A restored tab brings back its path but not its contents — a directory
+    // listing has to be read fresh, so it is never persisted. Load either way;
+    // "" lets the server pick the default directory for a brand new tab.
+    loadDirectory(session.cwd).then((err) => {
+      // A path from a past session can be gone by now (a cleaned /tmp, a
+      // deleted branch worktree). Open on the default rather than an error.
+      if (err && session.cwd) loadDirectory("");
+    });
   }, []);
 
   const { cwd, entries, showHidden, loading } = session;
