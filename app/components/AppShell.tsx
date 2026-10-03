@@ -15,22 +15,17 @@ import TerminalPane from "./terminal/TerminalPane";
 import ViewerPane from "./ViewerPane";
 
 /**
- * Reopen the tabs recorded in the workspace file, or start with one terminal
- * on a fresh install.
+ * Reopen the tabs recorded in the workspace file. A fresh install opens on an
+ * empty board: the first tab is the user's to pick with +, rather than a shell
+ * nobody asked for. Closing every tab is the same state, and stays that way.
  */
 function restoreTabs() {
   const saved = useWorkspaceStore.getState().restored;
   const tabs = useTabsStore.getState();
-  if (tabs.tabs.length > 0) return;
+  if (tabs.tabs.length > 0 || !saved) return;
 
-  if (saved) {
-    useTerminalStore.setState({ fontSize: saved.fontSize });
-    if (saved.tabs.length > 0) {
-      tabs.restore(saved.tabs, saved.activeId);
-      return;
-    }
-  }
-  tabs.openTerminal();
+  useTerminalStore.setState({ fontSize: saved.fontSize });
+  if (saved.tabs.length > 0) tabs.restore(saved.tabs, saved.activeId);
 }
 
 /** Mirror tab changes back into the workspace file (the store debounces). */
@@ -129,7 +124,7 @@ export default function AppShell() {
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
           {tabs.length === 0 ? (
             <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">
-              No tabs open — use + to start a terminal or an explorer.
+              Nothing open — use + to start a terminal, a tmux session or a file explorer.
             </div>
           ) : (
             tabs.map((tab) => (
