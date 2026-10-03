@@ -73,6 +73,12 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
             // The whole point of a tmux tab: reconnecting re-attaches rather
             // than leaving you in a fresh shell outside the session.
             tmuxSession: session.tmuxSession,
+            // The pane has been on screen since before the drop, so its size
+            // is known here. Spawning the PTY at it means tmux's first paint
+            // already fills the pane, instead of drawing 80x24 and waiting for
+            // a resize to repaint the rest.
+            cols: session.terminal?.cols,
+            rows: session.terminal?.rows,
           });
         }
       }

@@ -934,12 +934,18 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                   className="field scrollbar-none flex-1 resize-none rounded-panel px-3 py-2 text-[16px] leading-5"
                   style={{ maxHeight: TEXTAREA_MAX_PX }}
                 />
+                {/* A glyph rather than the word: the composer is narrow on a
+                phone and the text area is what should get the width. */}
                 <button
                   onClick={handleSend}
                   disabled={!text || !sessionId}
-                  className="px-4 py-2 relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-panel text-sm font-medium transition-colors"
+                  aria-label="Send"
+                  title="Send"
+                  className="relief-accent shrink-0 self-end rounded-panel p-2.5 text-white transition-colors disabled:bg-control disabled:text-ink-faint"
                 >
-                  Send
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                  </svg>
                 </button>
               </div>
 
