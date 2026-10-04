@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { shellQuote } from "~/lib/shell";
+import { useTabsStore } from "~/stores/tabsStore";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { showToast } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
@@ -166,6 +167,12 @@ const DRAWER_MS = 280;
 // switch: the tab is bound to one session and choosing one happens in the +
 // picker. No detach either — closing the tab detaches, and the session keeps
 // running, which is the whole point of it.
+/** Getting out of, or confirming, whatever tmux view a control opened. */
+const TMUX_EXIT_KEYS: QuickKey[] = [
+  { label: "Esc", key: "\x1b", title: "Leave the tmux list / prompt" },
+  { label: "Enter", key: "\r", title: "Confirm" },
+];
+
 const TMUX_SESSION_KEYS: QuickKey[] = [
   { label: "$ rename", key: "\x02$", title: "Rename this session" },
   { label: ": cmd", key: "\x02:", title: "tmux command prompt" },
@@ -427,6 +434,17 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     return [];
   };
 
+  // tmux's `$ rename` prompt completes whenever the user finishes typing, with
+  // nothing for the app to observe — so while the tmux controls are open, the
+  // real name is re-read. Bounded to that: the drawer is not open for long.
+  useEffect(() => {
+    if (drawerGroup !== TMUX_TAB || !tmuxSession) return;
+    const syncTmuxNames = useTabsStore.getState().syncTmuxNames;
+    syncTmuxNames();
+    const id = setInterval(syncTmuxNames, 3000);
+    return () => clearInterval(id);
+  }, [drawerGroup, tmuxSession]);
+
   const toggleGroup = (id: string) => {
     if (activeGroup === id) {
       setActiveGroup(null);
@@ -671,6 +689,23 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                   options={TMUX_GROUPS.map((g) => ({ id: g.label, label: g.label }))}
                   onChange={setTmuxGroup}
                 />
+                {/* Fixed, whichever group is showing: `w list`, `: cmd` and the
+                    rename prompt all open a tmux view that Esc is the way out
+                    of, and Enter the way to confirm. */}
+                {TMUX_EXIT_KEYS.map((qk) => (
+                  <button
+                    key={qk.label}
+                    {...repeatProps(qk.key)}
+                    disabled={!sessionId}
+                    title={qk.title}
+                    className={`${keyBtn} shrink-0`}
+                  >
+                    {qk.label}
+                  </button>
+                ))}
+                <span aria-hidden="true" className="mx-0.5 shrink-0 select-none text-ink-ghost">
+                  |
+                </span>
                 <div className="flex min-w-0 flex-wrap gap-1">
                   {(TMUX_GROUPS.find((g) => g.label === tmuxGroup) ?? TMUX_GROUPS[0]).keys.map((qk) => (
                     <button

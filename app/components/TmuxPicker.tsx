@@ -17,6 +17,7 @@ interface TmuxSession {
  */
 export default function TmuxPicker({ onClose }: { onClose: () => void }) {
   const openTmux = useTabsStore((s) => s.openTmux);
+  const syncTmuxNames = useTabsStore((s) => s.syncTmuxNames);
   const closeTmuxTabs = useTabsStore((s) => s.closeTmuxTabs);
   const showToast = useToastStore((s) => s.show);
 
@@ -27,6 +28,10 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
+    // A tab whose session was renamed from inside tmux still holds the old
+    // name, and attaching by that name would open a second tab for a session
+    // already on screen. Reconcile before listing.
+    await syncTmuxNames();
     try {
       const res = await fetch("/api/tmux/sessions");
       const data = (await res.json()) as { sessions: TmuxSession[]; version: string | null };
@@ -35,7 +40,7 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
     } catch {
       setSessions([]);
     }
-  }, []);
+  }, [syncTmuxNames]);
 
   useEffect(() => {
     load();
