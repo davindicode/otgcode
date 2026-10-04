@@ -16,6 +16,7 @@ import {
   SYMBOL_COMBO_KEYS,
 } from "./combos";
 import DropUpSelect from "./DropUpSelect";
+import { dragScroll } from "./dragScroll";
 
 interface QuickKey {
   label: string;
@@ -50,29 +51,6 @@ const TERMINAL_GROUPS: QuickKeyGroup[] = [
 ];
 
 // Always-visible nav keys (shown below text input)
-const NAV_KEYS: QuickKey[] = [
-  { label: "Enter", key: "\r", title: "Enter / Confirm" },
-  { label: "Bksp", key: "\x7f", title: "Backspace" },
-];
-
-// Less common nav keys (shown after NAV_KEYS)
-const NAV_TAIL: QuickKey[] = [
-  { label: "Esc", key: "\x1b", title: "Escape" },
-  { label: "Tab", key: "\t", title: "Autocomplete" },
-  { label: "PgUp", key: "\x1b[5~", title: "Page up" },
-  { label: "PgDn", key: "\x1b[6~", title: "Page down" },
-  { label: "y", key: "y", title: "Yes — approve / confirm (tmux kill-pane, Claude prompts, etc.)" },
-  { label: "n", key: "n", title: "No — deny / decline" },
-];
-
-// Arrow keys pinned to the end of the bar
-const NAV_ARROWS: QuickKey[] = [
-  { label: "↑", key: "\x1b[A", title: "Up / Previous command" },
-  { label: "↓", key: "\x1b[B", title: "Down / Next command" },
-  { label: "←", key: "\x1b[D", title: "Cursor left" },
-  { label: "→", key: "\x1b[C", title: "Cursor right" },
-];
-
 // Common key combos shared across all coding CLIs
 // (y/n live in NAV_TAIL — always-visible below the input — since they're also
 // useful for tmux confirms and other action contexts.)
@@ -243,7 +221,7 @@ const KB_TAB = "__keyboard__";
  * a coding CLI and git are all "a bar of keys with something above it" — they
  * were four tabs duplicating the same two rows.
  */
-type KbMode = "keys" | ComboSet | `cli:${string}` | "git";
+type KbMode = ComboSet | `cli:${string}` | "git";
 
 /** The git form line, chosen the way a combo modifier is. */
 type GitForm = "commit" | "config";
@@ -280,7 +258,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const [cdDirs, setCdDirs] = useState<string[]>([]);
   const [cdLoading, setCdLoading] = useState(false);
   const [stickyMode, setStickyMode] = useState<StickyMode>("none");
-  const [kbMode, setKbMode] = useState<KbMode>("keys");
+  const [kbMode, setKbMode] = useState<KbMode>("nav");
   const [gitForm, setGitForm] = useState<GitForm>("commit");
   const [gitCommitMsg, setGitCommitMsg] = useState("");
   const [gitConfigName, setGitConfigName] = useState("");
@@ -406,7 +384,6 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const modeLabel = stickyMode === "none" ? "" : (STICKY_MODES.find((m) => m.id === stickyMode)?.label ?? "");
 
   const KB_MODES: { id: KbMode; label: string }[] = [
-    { id: "keys", label: "keys" },
     ...COMBO_SETS.map((set) => ({ id: set as KbMode, label: set })),
     ...CLI_VENDORS.map((v) => ({ id: `cli:${v.name}` as KbMode, label: v.name })),
     { id: "git", label: "git" },
@@ -430,11 +407,25 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
       }));
     }
     if (comboSet === "nav" || comboSet === "function") {
-      return (comboSet === "nav" ? NAV_COMBO_KEYS : FN_COMBO_KEYS).map((key) => ({
+      const keys = (comboSet === "nav" ? NAV_COMBO_KEYS : FN_COMBO_KEYS).map((key) => ({
         label: key.label,
         seq: comboSequence(key.label, stickyMode),
         title: `${modeLabel}${key.title}`,
       }));
+      if (comboSet !== "nav") return keys;
+      // y/n answer the prompts coding CLIs and tmux put up, so they belong
+      // with nav. Through the letter path, so a modifier still applies.
+      return [
+        ...keys,
+        ...[
+          { ch: "Y", title: "Yes — approve / confirm" },
+          { ch: "N", title: "No — deny / decline" },
+        ].map(({ ch, title }) => ({
+          label: stickyMode === "none" ? ch.toLowerCase() : ch,
+          seq: comboSequence(ch, stickyMode),
+          title: `${modeLabel}${title}`,
+        })),
+      ];
     }
     if (comboSet === "symbols") {
       return SYMBOL_COMBO_KEYS.map((key) => ({
@@ -624,7 +615,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
           {drawerGroup === CD_TAB && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="shrink-0 text-[11px] text-ink-faint">navigate</span>
+                <span className="shrink-0 text-[11px] text-ink-faint">current</span>
                 <span
                   className="text-[10px] text-ink-ghost overflow-hidden text-ellipsis whitespace-nowrap flex-1"
                   title={cdCwd}
@@ -837,20 +828,10 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
               </div>
 
               {/* 3. The keys. One line, scrolled sideways — never taller. */}
-              <div className="mt-1.5 flex items-center gap-1 overflow-x-auto scrollbar-none border-t border-line/50 pt-1.5">
-                {kbMode === "keys" &&
-                  [...NAV_KEYS, ...NAV_TAIL, ...NAV_ARROWS].map((qk) => (
-                    <button
-                      key={qk.label}
-                      {...repeatProps(qk.key)}
-                      disabled={!sessionId}
-                      title={qk.title}
-                      className={`${keyBtn} shrink-0 px-1.5 text-[10px]`}
-                    >
-                      {qk.label}
-                    </button>
-                  ))}
-
+              <div
+                onPointerDown={dragScroll}
+                className="mt-1.5 flex items-center gap-1 overflow-x-auto scrollbar-none border-t border-line/50 pt-1.5"
+              >
                 {comboSet &&
                   comboKeys().map((key) => (
                     <button
@@ -866,6 +847,17 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
 
                 {vendor && (
                   <>
+                    {/* Enter first: inside a coding CLI, confirming is the key
+                        you reach for most, and switching sets to find it defeats
+                        the point of a sector being chosen. */}
+                    <button
+                      {...repeatProps("\r")}
+                      disabled={!sessionId}
+                      title="Enter / confirm"
+                      className={`${keyBtn} shrink-0`}
+                    >
+                      Enter
+                    </button>
                     {vendor.launch.map((cmd) => (
                       <button
                         key={`${vendor.name}-${cmd.label}`}

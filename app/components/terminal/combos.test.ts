@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { comboSequence, FN_COMBO_KEYS, MODIFIER_PARAM, NAV_COMBO_KEYS } from "./combos";
+import { COMBO_SETS, comboSequence, FN_COMBO_KEYS, MODIFIER_PARAM, NAV_COMBO_KEYS } from "./combos";
 
 const seq = (label: string, mode: Parameters<typeof comboSequence>[1]) => comboSequence(label, mode);
 
@@ -104,5 +104,30 @@ describe("the none modifier", () => {
     expect(comboSequence("←", "ctrl")).toBe("\x1b[1;5D");
     expect(comboSequence("PgUp", "alt")).toBe("\x1b[5;3~");
     expect(comboSequence("A", "ctrl")).toBe("\x01");
+  });
+});
+
+describe("the nav set after absorbing the always-present row", () => {
+  it("sends the plain control character with no modifier", () => {
+    expect(comboSequence("Enter", "none")).toBe("\r");
+    expect(comboSequence("Bksp", "none")).toBe("\x7f");
+    expect(comboSequence("Esc", "none")).toBe("\x1b");
+    expect(comboSequence("Tab", "none")).toBe("\t");
+  });
+
+  it("encodes them with CSI u once a modifier is on, since they have no other form", () => {
+    expect(comboSequence("Enter", "ctrl")).toBe("\x1b[13;5u");
+    expect(comboSequence("Tab", "alt")).toBe("\x1b[9;3u");
+    expect(comboSequence("Esc", "ctrl+shift")).toBe("\x1b[27;6u");
+  });
+
+  it("still carries the keys the old nav set had", () => {
+    for (const label of ["←", "→", "↑", "↓", "Home", "End", "PgUp", "PgDn", "Ins", "Del"]) {
+      expect(comboSequence(label, "none").startsWith("\x1b[")).toBe(true);
+    }
+  });
+
+  it("opens on nav", () => {
+    expect(COMBO_SETS[0]).toBe("nav");
   });
 });

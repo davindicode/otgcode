@@ -58,7 +58,26 @@ export type NamedKey = { label: string; title: string; seq: (m: number) => strin
 const csi = (final: string) => (m: number) => (m === 1 ? `\x1b[${final}` : `\x1b[1;${m}${final}`);
 const tilde = (code: number) => (m: number) => (m === 1 ? `\x1b[${code}~` : `\x1b[${code};${m}~`);
 
+/**
+ * `CSI <code> ; <mod> u` — the encoding for keys that have no modified form of
+ * their own. Unmodified they send their original control character, which is
+ * what every program understands; modified, they need this.
+ */
+const csiU = (code: number, plain: string) => (m: number) => (m === 1 ? plain : `\x1b[${code};${m}u`);
+
+/**
+ * The default set: everything a terminal needs that is not a character.
+ *
+ * Enter, Bksp, Esc and Tab used to sit in a separate always-present row that
+ * could not take a modifier, which made two near-identical sets — this one and
+ * that row — differing only by Ins/Del. One set, and the modifier applies to
+ * all of it.
+ */
 export const NAV_COMBO_KEYS: NamedKey[] = [
+  { label: "Enter", title: "Enter / confirm", seq: csiU(13, "\r") },
+  { label: "Bksp", title: "Backspace", seq: csiU(127, "\x7f") },
+  { label: "Esc", title: "Escape", seq: csiU(27, "\x1b") },
+  { label: "Tab", title: "Tab / complete", seq: csiU(9, "\t") },
   { label: "←", title: "Left", seq: csi("D") },
   { label: "→", title: "Right", seq: csi("C") },
   { label: "↑", title: "Up", seq: csi("A") },
@@ -104,7 +123,8 @@ export const SYMBOL_COMBO_KEYS: { label: string; title: string; ch: string; ctrl
   { label: "/", title: "Undo (readline)", ch: "/" },
 ];
 
-export const COMBO_SETS = ["numbers", "letters", "nav", "function", "symbols"] as const;
+// nav first: it is the set the keyboard opens on.
+export const COMBO_SETS = ["nav", "numbers", "letters", "function", "symbols"] as const;
 export type ComboSet = (typeof COMBO_SETS)[number];
 
 /** Sequence for a labelled key in one of the combo sets. */
