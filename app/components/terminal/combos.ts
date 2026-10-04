@@ -3,12 +3,13 @@
  * terminals actually expect. Pure, so the sequences are checked by tests
  * rather than by pressing every button in a shell.
  */
-export type StickyMode = "none" | "ctrl" | "ctrl+shift" | "alt" | "alt+shift";
+export type StickyMode = "none" | "shift" | "ctrl" | "ctrl+shift" | "alt" | "alt+shift";
 
 export const STICKY_MODES: { id: StickyMode; label: string }[] = [
   // The default: these sets double as a plain character keyboard, which is
   // what you want on a phone before you want a modifier.
   { id: "none", label: "none" },
+  { id: "shift", label: "Shift+" },
   { id: "ctrl", label: "Ctrl+" },
   { id: "ctrl+shift", label: "Ctrl+Shift+" },
   { id: "alt", label: "Alt+" },
@@ -20,19 +21,45 @@ export const STICKY_MODES: { id: StickyMode; label: string }[] = [
 // than a `1;1` sequence no terminal emits.
 export const MODIFIER_PARAM: Record<StickyMode, number> = {
   none: 1,
+  shift: 2,
   ctrl: 5,
   "ctrl+shift": 6,
   alt: 3,
   "alt+shift": 4,
 };
 
+/**
+ * What the digit keys send with Shift held, on a US layout.
+ *
+ * There is no layout-independent answer: the app sends characters straight to
+ * the pty, so there is no keymap in between to consult. A physical key prints
+ * both of these on it, which is the same bargain.
+ */
+const SHIFTED_DIGITS: Record<string, string> = {
+  "1": "!",
+  "2": "@",
+  "3": "#",
+  "4": "$",
+  "5": "%",
+  "6": "^",
+  "7": "&",
+  "8": "*",
+  "9": "(",
+  "0": ")",
+};
+
 export function getStickyKey(ch: string, mode: StickyMode): string {
   const isLetter = ch >= "A" && ch <= "Z";
   switch (mode) {
     case "none":
-      // Unmodified, a letter key sends its lowercase character; the label is
-      // lowercased to match, so the button says what it sends.
+      // A key is labelled with the key, not its output — `A` sends `a`, the
+      // same bargain a physical keyboard makes.
       return isLetter ? ch.toLowerCase() : ch;
+    case "shift":
+      // Shift is a layout matter rather than a control sequence: the shifted
+      // character, or the character itself where there is no shifted form (the
+      // symbol set is already specific characters).
+      return isLetter ? ch : (SHIFTED_DIGITS[ch] ?? ch);
     case "ctrl":
       // Ctrl+Letter = control code, Ctrl+Digit = send via CSI u
       return isLetter ? String.fromCharCode(ch.charCodeAt(0) - 64) : `\x1b[${ch.charCodeAt(0)};5u`;
@@ -77,7 +104,10 @@ export const NAV_COMBO_KEYS: NamedKey[] = [
   { label: "Enter", title: "Enter / confirm", seq: csiU(13, "\r") },
   { label: "Bksp", title: "Backspace", seq: csiU(127, "\x7f") },
   { label: "Esc", title: "Escape", seq: csiU(27, "\x1b") },
-  { label: "Tab", title: "Tab / complete", seq: csiU(9, "\t") },
+  // Shift+Tab is back-tab, `CSI Z` — older and universally understood, where
+  // the generic `CSI 9;2u` would reach almost nothing. It is what cycles
+  // permission modes in Claude Code and reverse-completes in a shell.
+  { label: "Tab", title: "Tab / complete", seq: (m) => (m === 2 ? "\x1b[Z" : csiU(9, "\t")(m)) },
   { label: "←", title: "Left", seq: csi("D") },
   { label: "→", title: "Right", seq: csi("C") },
   { label: "↑", title: "Up", seq: csi("A") },

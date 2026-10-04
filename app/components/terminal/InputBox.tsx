@@ -392,18 +392,26 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const vendor = kbMode.startsWith("cli:") ? CLI_VENDORS.find((v) => `cli:${v.name}` === kbMode) : undefined;
 
   /** The bottom row's keys for the current combo set, modifier already applied. */
+  /** `Ctrl+A`, or `A — sends "a"` where a key and its output differ visibly. */
+  const sentLabel = (label: string, seq: string) =>
+    seq.length === 1 && seq >= " " && seq !== label ? `${label} — sends "${seq}"` : label;
+
   const comboKeys = (): { label: string; seq: string; title: string }[] => {
     if (comboSet === "numbers") {
-      return "0123456789"
-        .split("")
-        .map((ch) => ({ label: ch, seq: comboSequence(ch, stickyMode), title: `${modeLabel}${ch}` }));
+      return "0123456789".split("").map((ch) => ({
+        label: ch,
+        seq: comboSequence(ch, stickyMode),
+        title: sentLabel(`${modeLabel}${ch}`, comboSequence(ch, stickyMode)),
+      }));
     }
     if (comboSet === "letters") {
       return "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((ch) => ({
-        // Unmodified, the key sends lowercase, so it says lowercase.
-        label: stickyMode === "none" ? ch.toLowerCase() : ch,
+        // Labelled with the key, like a keyboard: `A` sends `a` unmodified.
+        label: ch,
         seq: comboSequence(ch, stickyMode),
-        title: `${modeLabel}${ch}`,
+        // A key labelled `A` that sends `a` is worth spelling out; a control
+        // code is not, so only a printable result is named.
+        title: sentLabel(`${modeLabel}${ch}`, comboSequence(ch, stickyMode)),
       }));
     }
     if (comboSet === "nav" || comboSet === "function") {
@@ -421,7 +429,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
           { ch: "Y", title: "Yes — approve / confirm" },
           { ch: "N", title: "No — deny / decline" },
         ].map(({ ch, title }) => ({
-          label: stickyMode === "none" ? ch.toLowerCase() : ch,
+          label: ch,
           seq: comboSequence(ch, stickyMode),
           title: `${modeLabel}${title}`,
         })),

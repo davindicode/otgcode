@@ -131,3 +131,41 @@ describe("the nav set after absorbing the always-present row", () => {
     expect(COMBO_SETS[0]).toBe("nav");
   });
 });
+
+describe("the shift modifier", () => {
+  it("is what makes capitals reachable at all", () => {
+    expect(comboSequence("A", "none")).toBe("a");
+    expect(comboSequence("A", "shift")).toBe("A");
+  });
+
+  it("sends back-tab for Shift+Tab, not the generic CSI u form", () => {
+    // What cycles permission modes in Claude Code; CSI 9;2u reaches nothing.
+    expect(comboSequence("Tab", "shift")).toBe("\x1b[Z");
+    expect(comboSequence("Tab", "ctrl")).toBe("\x1b[9;5u");
+  });
+
+  it("uses parameter 2 for the keys that take one", () => {
+    expect(comboSequence("←", "shift")).toBe("\x1b[1;2D");
+    expect(comboSequence("F3", "shift")).toBe("\x1b[1;2R");
+    expect(comboSequence("PgDn", "shift")).toBe("\x1b[6;2~");
+  });
+
+  it("gives the digits their shifted characters", () => {
+    expect(comboSequence("1", "shift")).toBe("!");
+    expect(comboSequence("7", "shift")).toBe("&");
+    expect(comboSequence("0", "shift")).toBe(")");
+  });
+
+  it("leaves an already-specific character alone", () => {
+    // The symbol set is characters, not keys, so there is nothing to shift.
+    expect(comboSequence("[", "shift")).toBe("[");
+    expect(comboSequence("Space", "shift")).toBe(" ");
+  });
+
+  it("does not disturb the other modifiers", () => {
+    expect(comboSequence("A", "ctrl")).toBe("\x01");
+    expect(comboSequence("A", "alt")).toBe("\x1ba");
+    expect(comboSequence("A", "alt+shift")).toBe("\x1bA");
+    expect(comboSequence("←", "ctrl")).toBe("\x1b[1;5D");
+  });
+});
