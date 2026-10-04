@@ -3,17 +3,23 @@
  * terminals actually expect. Pure, so the sequences are checked by tests
  * rather than by pressing every button in a shell.
  */
-export type StickyMode = "ctrl" | "ctrl+shift" | "alt" | "alt+shift";
+export type StickyMode = "none" | "ctrl" | "ctrl+shift" | "alt" | "alt+shift";
 
 export const STICKY_MODES: { id: StickyMode; label: string }[] = [
+  // The default: these sets double as a plain character keyboard, which is
+  // what you want on a phone before you want a modifier.
+  { id: "none", label: "none" },
   { id: "ctrl", label: "Ctrl+" },
   { id: "ctrl+shift", label: "Ctrl+Shift+" },
   { id: "alt", label: "Alt+" },
   { id: "alt+shift", label: "Alt+Shift+" },
 ];
 
-// xterm's modifier parameter, used by every CSI sequence below.
+// xterm's modifier parameter, used by every CSI sequence below. 1 is "no
+// modifier", which the builders turn into the plain form of the key rather
+// than a `1;1` sequence no terminal emits.
 export const MODIFIER_PARAM: Record<StickyMode, number> = {
+  none: 1,
   ctrl: 5,
   "ctrl+shift": 6,
   alt: 3,
@@ -23,6 +29,10 @@ export const MODIFIER_PARAM: Record<StickyMode, number> = {
 export function getStickyKey(ch: string, mode: StickyMode): string {
   const isLetter = ch >= "A" && ch <= "Z";
   switch (mode) {
+    case "none":
+      // Unmodified, a letter key sends its lowercase character; the label is
+      // lowercased to match, so the button says what it sends.
+      return isLetter ? ch.toLowerCase() : ch;
     case "ctrl":
       // Ctrl+Letter = control code, Ctrl+Digit = send via CSI u
       return isLetter ? String.fromCharCode(ch.charCodeAt(0) - 64) : `\x1b[${ch.charCodeAt(0)};5u`;
@@ -42,8 +52,11 @@ export function getStickyKey(ch: string, mode: StickyMode): string {
  */
 export type NamedKey = { label: string; title: string; seq: (m: number) => string };
 
-const csi = (final: string) => (m: number) => `\x1b[1;${m}${final}`;
-const tilde = (code: number) => (m: number) => `\x1b[${code};${m}~`;
+// m === 1 is unmodified, which has its own shorter canonical form — `CSI D`,
+// not `CSI 1;1 D`. Terminals accept both, but programs that pattern-match on
+// raw input only recognise the plain one.
+const csi = (final: string) => (m: number) => (m === 1 ? `\x1b[${final}` : `\x1b[1;${m}${final}`);
+const tilde = (code: number) => (m: number) => (m === 1 ? `\x1b[${code}~` : `\x1b[${code};${m}~`);
 
 export const NAV_COMBO_KEYS: NamedKey[] = [
   { label: "←", title: "Left", seq: csi("D") },

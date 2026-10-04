@@ -82,3 +82,27 @@ describe("symbols", () => {
     expect(seq(".", "alt")).toBe("\x1b.");
   });
 });
+
+describe("the none modifier", () => {
+  it("sends a plain character for letters, digits and symbols", () => {
+    expect(comboSequence("A", "none")).toBe("a");
+    expect(comboSequence("7", "none")).toBe("7");
+    expect(comboSequence("[", "none")).toBe("[");
+    expect(comboSequence("Space", "none")).toBe(" ");
+  });
+
+  it("uses the canonical unmodified form for named keys, not a 1;1 parameter", () => {
+    expect(comboSequence("←", "none")).toBe("\x1b[D");
+    expect(comboSequence("Home", "none")).toBe("\x1b[H");
+    expect(comboSequence("PgUp", "none")).toBe("\x1b[5~");
+    expect(comboSequence("F5", "none")).toBe("\x1b[15~");
+    // F1-F4 keep the CSI form they already had; only the parameter drops out.
+    expect(comboSequence("F1", "none")).toBe("\x1b[P");
+  });
+
+  it("leaves the modified sequences exactly as they were", () => {
+    expect(comboSequence("←", "ctrl")).toBe("\x1b[1;5D");
+    expect(comboSequence("PgUp", "alt")).toBe("\x1b[5;3~");
+    expect(comboSequence("A", "ctrl")).toBe("\x01");
+  });
+});

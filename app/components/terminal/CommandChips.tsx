@@ -22,6 +22,7 @@ export default function CommandChips({
   hidden,
   disabled,
   chipClass,
+  layout = "wrap",
   dialogTitle,
   dialogHint,
   commandPlaceholder,
@@ -35,6 +36,12 @@ export default function CommandChips({
   hidden: string[];
   disabled?: boolean;
   chipClass: string;
+  /**
+   * `wrap` grows downward, up to the three-row cap. `row` stays one line and
+   * scrolls sideways, with the controls pinned beside it — for the keyboard,
+   * where every row has a fixed height.
+   */
+  layout?: "wrap" | "row";
   dialogTitle: string;
   dialogHint: string;
   commandPlaceholder: string;
@@ -45,6 +52,7 @@ export default function CommandChips({
 }) {
   const [editing, setEditing] = useState(false);
   const [dialog, setDialog] = useState(false);
+  const row = layout === "row";
 
   // Same ink as the commands beside them; the glow is what marks edit as armed.
   const actionBtn =
@@ -63,29 +71,40 @@ export default function CommandChips({
         />
       )}
 
-      <div className="chip-rows flex flex-wrap items-center gap-1">
-        {chips.map((chip) => (
-          <button
-            key={chip.label}
-            type="button"
-            disabled={disabled && !editing}
-            title={editing ? `Remove "${chip.label}"` : chip.title}
-            onClick={() => (editing ? onRemove(chip.label, !!chip.custom) : onRun(chip.command))}
-            className={`${chipClass} ${editing ? "relative pr-5 opacity-80" : ""}`}
-          >
-            {chip.label}
-            {editing && (
-              <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[11px] leading-none text-red-400">×</span>
-            )}
-          </button>
-        ))}
+      <div className={row ? "flex items-center gap-1" : "chip-rows flex flex-wrap items-center gap-1"}>
+        <div
+          className={
+            row
+              ? "flex min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-none"
+              : "flex flex-wrap items-center gap-1"
+          }
+        >
+          {chips.map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              disabled={disabled && !editing}
+              title={editing ? `Remove "${chip.label}"` : chip.title}
+              onClick={() => (editing ? onRemove(chip.label, !!chip.custom) : onRun(chip.command))}
+              className={`${chipClass} ${editing ? "relative pr-5 opacity-80" : ""}`}
+            >
+              {chip.label}
+              {editing && (
+                <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[11px] leading-none text-red-400">
+                  ×
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
 
         {/* The controls ride on the same line as the commands they manage; the
-            rule keeps them from reading as two more commands. */}
-        <span aria-hidden="true" className="mx-0.5 select-none text-ink-ghost">
+            rule keeps them from reading as two more commands. In `row` they are
+            outside the scrolling half, so they stay reachable at any scroll. */}
+        <span aria-hidden="true" className="mx-0.5 shrink-0 select-none text-ink-ghost">
           |
         </span>
-        <button type="button" onClick={() => setDialog(true)} title={dialogTitle} className={actionBtn}>
+        <button type="button" onClick={() => setDialog(true)} title={dialogTitle} className={`${actionBtn} shrink-0`}>
           +
         </button>
         <button
@@ -93,11 +112,11 @@ export default function CommandChips({
           onClick={() => setEditing((v) => !v)}
           aria-pressed={editing}
           title={editing ? "Stop removing" : "Remove buttons"}
-          className={`${actionBtn} ${editing ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70" : ""}`}
+          className={`${actionBtn} shrink-0 ${editing ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70" : ""}`}
         >
           {editing ? "done" : "edit"}
         </button>
-        {editing && <span className="text-[10px] text-ink-ghost">tap one to remove it</span>}
+        {editing && !row && <span className="text-[10px] text-ink-ghost">tap one to remove it</span>}
       </div>
 
       {editing && hidden.length > 0 && (

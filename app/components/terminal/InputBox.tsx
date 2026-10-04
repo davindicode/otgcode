@@ -236,24 +236,22 @@ const TMUX_GROUPS: { label: string; keys: QuickKey[] }[] = [
 ];
 
 const TMUX_TAB = "__tmux__";
-const TEXT_TAB = "__text__";
-const STICKY_TAB = "__sticky__";
-const CODE_TAB = "__code__";
-const GIT_TAB = "__git__";
+const KB_TAB = "__keyboard__";
 
-/** The git drawer's form line, chosen the way a combo set is. */
+/**
+ * What the keyboard's bottom row is showing. One list, because a modifier set,
+ * a coding CLI and git are all "a bar of keys with something above it" — they
+ * were four tabs duplicating the same two rows.
+ */
+type KbMode = "keys" | ComboSet | `cli:${string}` | "git";
+
+/** The git form line, chosen the way a combo modifier is. */
 type GitForm = "commit" | "config";
 const GIT_FORMS: { id: GitForm; label: string }[] = [
   { id: "commit", label: "commit" },
   { id: "config", label: "config" },
 ];
 const CD_TAB = "__cd__";
-
-interface TmuxSession {
-  name: string;
-  windows: number;
-  attached: boolean;
-}
 
 /**
  * The command-line helpers for one terminal or tmux tab.
@@ -278,18 +276,11 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const addSlash = useWorkspaceStore((s) => s.addSlash);
   const removeSlash = useWorkspaceStore((s) => s.removeSlash);
   const restoreSlash = useWorkspaceStore((s) => s.restoreSlash);
-  const [comboSet, setComboSet] = useState<ComboSet>("letters");
   const [tmuxGroup, setTmuxGroup] = useState(TMUX_GROUPS[0].label);
-  const [toolVersions, setToolVersions] = useState<{
-    claude: string | null;
-    codex: string | null;
-    opencode: string | null;
-  }>({ claude: null, codex: null, opencode: null });
-  const toolVersionsFetched = useRef(false);
   const [cdDirs, setCdDirs] = useState<string[]>([]);
   const [cdLoading, setCdLoading] = useState(false);
-  const [stickyMode, setStickyMode] = useState<StickyMode>("ctrl");
-  const [codeVendorIdx, setCodeVendorIdx] = useState(0);
+  const [stickyMode, setStickyMode] = useState<StickyMode>("none");
+  const [kbMode, setKbMode] = useState<KbMode>("keys");
   const [gitForm, setGitForm] = useState<GitForm>("commit");
   const [gitCommitMsg, setGitCommitMsg] = useState("");
   const [gitConfigName, setGitConfigName] = useState("");
@@ -412,16 +403,48 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   });
 
-  // Fetch tool versions (re-fetch each time a tool tab is opened to catch new installs)
-  const fetchToolVersions = async () => {
-    try {
-      const res = await fetch("/api/tool-versions");
-      const data = await res.json();
-      setToolVersions(data);
-    } catch {}
-  };
+  const modeLabel = stickyMode === "none" ? "" : (STICKY_MODES.find((m) => m.id === stickyMode)?.label ?? "");
 
-  const modeLabel = STICKY_MODES.find((m) => m.id === stickyMode)?.label ?? "";
+  const KB_MODES: { id: KbMode; label: string }[] = [
+    { id: "keys", label: "keys" },
+    ...COMBO_SETS.map((set) => ({ id: set as KbMode, label: set })),
+    ...CLI_VENDORS.map((v) => ({ id: `cli:${v.name}` as KbMode, label: v.name })),
+    { id: "git", label: "git" },
+  ];
+  const comboSet = COMBO_SETS.includes(kbMode as ComboSet) ? (kbMode as ComboSet) : null;
+  const vendor = kbMode.startsWith("cli:") ? CLI_VENDORS.find((v) => `cli:${v.name}` === kbMode) : undefined;
+
+  /** The bottom row's keys for the current combo set, modifier already applied. */
+  const comboKeys = (): { label: string; seq: string; title: string }[] => {
+    if (comboSet === "numbers") {
+      return "0123456789"
+        .split("")
+        .map((ch) => ({ label: ch, seq: comboSequence(ch, stickyMode), title: `${modeLabel}${ch}` }));
+    }
+    if (comboSet === "letters") {
+      return "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((ch) => ({
+        // Unmodified, the key sends lowercase, so it says lowercase.
+        label: stickyMode === "none" ? ch.toLowerCase() : ch,
+        seq: comboSequence(ch, stickyMode),
+        title: `${modeLabel}${ch}`,
+      }));
+    }
+    if (comboSet === "nav" || comboSet === "function") {
+      return (comboSet === "nav" ? NAV_COMBO_KEYS : FN_COMBO_KEYS).map((key) => ({
+        label: key.label,
+        seq: comboSequence(key.label, stickyMode),
+        title: `${modeLabel}${key.title}`,
+      }));
+    }
+    if (comboSet === "symbols") {
+      return SYMBOL_COMBO_KEYS.map((key) => ({
+        label: key.label,
+        seq: comboSequence(key.label, stickyMode),
+        title: `${modeLabel}${key.label} — ${key.title}`,
+      }));
+    }
+    return [];
+  };
 
   const toggleGroup = (id: string) => {
     if (activeGroup === id) {
@@ -429,7 +452,6 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     } else {
       setActiveGroup(id);
       if (id === CD_TAB) fetchDirs();
-      if (id === CODE_TAB) fetchToolVersions();
     }
   };
 
@@ -505,7 +527,6 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   // Popup action buttons — same raised treatment as Send, tinted by role.
   const keyBtn =
     "px-2 py-0.5 text-[11px] relief text-ink-muted hover:text-ink rounded-control whitespace-nowrap select-none touch-manipulation";
-  const actionBtn = "px-2.5 py-1 text-[11px] relief rounded-control whitespace-nowrap select-none touch-manipulation";
 
   // The drawer is the same for a terminal tab and a tmux tab now, so there is
   // no per-mode tab set to work out.
@@ -535,7 +556,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
 
   // Resolve which key group to show in the popup
   const activeStandardGroup =
-    drawerGroup && ![TMUX_TAB, TEXT_TAB, STICKY_TAB, CODE_TAB, GIT_TAB, CD_TAB].includes(drawerGroup)
+    drawerGroup && ![TMUX_TAB, KB_TAB, CD_TAB].includes(drawerGroup)
       ? TERMINAL_GROUPS.find((g) => g.label === drawerGroup)
       : null;
 
@@ -572,12 +593,9 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
           {tmuxSession
             ? tabBtn(TMUX_TAB, "tmux", `Controls for session "${tmuxSession}"`, false, "app")
             : tabBtn(CD_TAB, "cd", "Change directory", !sessionId)}
-          {tabBtn(TEXT_TAB, "text", "Type a command or message", !sessionId)}
+          {tabBtn(KB_TAB, "keyboard", "Type, and the keys a terminal needs", !sessionId)}
           {/* Shell actions (blue), always in the same order */}
           {TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !sessionId))}
-          {tabBtn(STICKY_TAB, "combos", "Modifier key combinations")}
-          {tabBtn(CODE_TAB, "code", "Coding CLI launchers & keys", !sessionId, "cli")}
-          {tabBtn(GIT_TAB, "git", "Git actions", !sessionId, "cli")}
         </div>
       </div>
 
@@ -698,245 +716,17 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
             </div>
           )}
 
-          {drawerGroup === STICKY_TAB && (
+          {/*
+            The keyboard. Three fixed rows: what you type, what qualifies it,
+            and the keys themselves. A modifier set, a coding CLI and git were
+            three tabs each repeating that shape, so they are modes of one tab
+            instead — and every row stays one line high, scrolling sideways,
+            so opening the keyboard never changes how much terminal you can see.
+          */}
+          {drawerGroup === KB_TAB && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-              {/* Which keys to show. Letters and digits alone were 36 buttons;
-                  the named keys would have pushed that past 60. */}
-              <div className="mb-1.5 flex flex-wrap items-center gap-1">
-                {COMBO_SETS.map((set) => (
-                  <button
-                    key={set}
-                    type="button"
-                    onClick={() => setComboSet(set)}
-                    className={`px-2 py-0.5 text-[10px] rounded-control border transition-colors select-none ${
-                      comboSet === set
-                        ? "relief-accent border-blue-500 text-white"
-                        : "border-line bg-raised text-ink-faint hover:text-ink"
-                    }`}
-                  >
-                    {set}
-                  </button>
-                ))}
-              </div>
-
-              {/* The modifier is the prefix for everything to its right. */}
-              <div className="flex items-start gap-1.5 border-t border-line/50 pt-1.5">
-                <DropUpSelect value={stickyMode} options={STICKY_MODES} onChange={setStickyMode} />
-                <div className="flex min-w-0 flex-wrap gap-1">
-                  {comboSet === "numbers" &&
-                    "0123456789".split("").map((ch) => (
-                      <button
-                        key={ch}
-                        {...repeatProps(comboSequence(ch, stickyMode))}
-                        disabled={!sessionId}
-                        title={`${modeLabel}${ch}`}
-                        className={keyBtn}
-                      >
-                        {ch}
-                      </button>
-                    ))}
-
-                  {comboSet === "letters" &&
-                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((ch) => (
-                      <button
-                        key={ch}
-                        {...repeatProps(comboSequence(ch, stickyMode))}
-                        disabled={!sessionId}
-                        title={`${modeLabel}${ch}`}
-                        className={keyBtn}
-                      >
-                        {ch}
-                      </button>
-                    ))}
-
-                  {(comboSet === "nav" || comboSet === "function") &&
-                    (comboSet === "nav" ? NAV_COMBO_KEYS : FN_COMBO_KEYS).map((key) => (
-                      <button
-                        key={key.label}
-                        {...repeatProps(comboSequence(key.label, stickyMode))}
-                        disabled={!sessionId}
-                        title={`${modeLabel}${key.title}`}
-                        className={keyBtn}
-                      >
-                        {key.label}
-                      </button>
-                    ))}
-
-                  {comboSet === "symbols" &&
-                    SYMBOL_COMBO_KEYS.map((key) => (
-                      <button
-                        key={key.label}
-                        {...repeatProps(comboSequence(key.label, stickyMode))}
-                        disabled={!sessionId}
-                        title={`${modeLabel}${key.label} — ${key.title}`}
-                        className={keyBtn}
-                      >
-                        {key.label}
-                      </button>
-                    ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Vim popup: commands when inside, file opener when outside */}
-
-          {/* Tmux popup: commands when inside, sessions when outside */}
-
-          {/* Code tab: common keys + selected vendor panel */}
-          {drawerGroup === CODE_TAB &&
-            (() => {
-              const vendor = CLI_VENDORS[codeVendorIdx] || CLI_VENDORS[0];
-              const prefix = `${vendor.name}:`;
-              // Slash commands are per CLI: claude's set is not codex's.
-              const slashChips: Chip[] = [
-                ...vendor.slashCmds
-                  .filter((c) => !hiddenSlash.includes(prefix + c.label))
-                  .map((c) => ({ label: c.label, command: c.command, title: c.title })),
-                ...customSlash
-                  .filter((c) => c.vendor === vendor.name)
-                  .map((c) => ({ label: c.label, command: `${c.command}\n`, title: c.command, custom: true })),
-              ];
-              const hiddenSlashLabels = hiddenSlash
-                .filter((k) => k.startsWith(prefix))
-                .map((k) => k.slice(prefix.length));
-
-              return (
-                <div className="scrollbar-none border-b border-line/50 bg-panel px-2 py-1.5 max-h-64 overflow-y-auto">
-                  {/* Selected CLI on the left; its launchers and keys beside it. */}
-                  <div className="flex items-start gap-1.5">
-                    <DropUpSelect
-                      value={vendor.name}
-                      options={CLI_VENDORS.map((v) => ({ id: v.name, label: v.name }))}
-                      onChange={(name) => setCodeVendorIdx(CLI_VENDORS.findIndex((v) => v.name === name))}
-                    />
-                    <div className="flex flex-wrap gap-1 min-w-0">
-                      {/* Launchers (purple) */}
-                      {vendor.launch.map((cmd) => (
-                        <button
-                          key={`${vendor.name}-${cmd.label}`}
-                          onClick={() => {
-                            if (sessionId) sendInput(sessionId, cmd.command);
-                          }}
-                          disabled={!sessionId}
-                          title={cmd.title}
-                          className="px-2 py-0.5 text-[11px] relief text-purple-300 hover:text-purple-100 rounded-control whitespace-nowrap select-none"
-                        >
-                          {cmd.label}
-                        </button>
-                      ))}
-                      {/* Key combos: the ones every CLI shares, then this one's
-                          own, as a single group — they are the same kind of
-                          thing and were split across two rows for no reason. */}
-                      {[...CODE_COMMON_KEYS, ...vendor.keys].map((qk) => (
-                        <button
-                          key={`${vendor.name}-${qk.label}`}
-                          {...repeatProps(qk.key)}
-                          disabled={!sessionId}
-                          title={qk.title}
-                          className={keyBtn}
-                        >
-                          {qk.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Slash commands, customisable per CLI. */}
-                  <div className="mt-1.5 border-t border-line/50 pt-1.5">
-                    <CommandChips
-                      chips={slashChips}
-                      hidden={hiddenSlashLabels}
-                      disabled={!sessionId}
-                      chipClass="px-2 py-0.5 text-[11px] relief text-cyan-300 hover:text-cyan-100 rounded-control whitespace-nowrap select-none"
-                      dialogTitle={`Add ${vendor.name} slash command`}
-                      dialogHint={`Sent to ${vendor.name} when tapped. Saved for ${vendor.name} only.`}
-                      commandPlaceholder="/review"
-                      onRun={(command) => sessionId && sendInput(sessionId, command)}
-                      onAdd={(label, command) => addSlash({ vendor: vendor.name, label, command })}
-                      onRemove={(label, isCustom) => removeSlash(vendor.name, label, isCustom)}
-                      onRestore={(label) => restoreSlash(vendor.name, label)}
-                    />
-                  </div>
-                </div>
-              );
-            })()}
-
-          {/* Git tab: quick actions + commit + config */}
-          {drawerGroup === GIT_TAB && (
-            <div className="scrollbar-none border-b border-line/50 bg-panel px-2 py-1.5 max-h-48 overflow-y-auto">
-              {/* Git quick actions */}
-              <div className="flex flex-wrap gap-1 mb-1.5">
-                {GIT_QUICK_CMDS.map((cmd) => (
-                  <button
-                    key={cmd.label}
-                    onClick={() => {
-                      if (sessionId) sendInput(sessionId, cmd.command);
-                    }}
-                    disabled={!sessionId}
-                    title={cmd.title}
-                    className={keyBtn}
-                  >
-                    {cmd.label}
-                  </button>
-                ))}
-              </div>
-              {/* One form line, picked by the selector, rather than a line each.
-              Keeps the drawer short and leaves room for more forms later. */}
-              <div className="flex items-center gap-1.5 border-t border-line/50 pt-1.5">
-                <DropUpSelect value={gitForm} options={GIT_FORMS} onChange={setGitForm} />
-                {gitForm === "commit" ? (
-                  <>
-                    <input
-                      value={gitCommitMsg}
-                      onChange={(e) => setGitCommitMsg(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && commitGit()}
-                      placeholder="commit message..."
-                      className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
-                    />
-                    <button
-                      onClick={commitGit}
-                      disabled={!gitCommitMsg.trim() || !sessionId}
-                      className="px-2 py-0.5 text-[11px] relief-accent relief-success text-white rounded-control shrink-0"
-                    >
-                      Commit
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <input
-                      value={gitConfigName}
-                      onChange={(e) => setGitConfigName(e.target.value)}
-                      placeholder="user.name"
-                      className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
-                    />
-                    <input
-                      value={gitConfigEmail}
-                      onChange={(e) => setGitConfigEmail(e.target.value)}
-                      placeholder="user.email"
-                      className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
-                    />
-                    <button
-                      onClick={setGitIdentity}
-                      disabled={!sessionId || (!gitConfigName.trim() && !gitConfigEmail.trim())}
-                      className="px-2 py-0.5 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors shrink-0"
-                    >
-                      Set
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Text input — now the "text" tab's drawer rather than a pinned row, so
-          an unselected input area collapses to just the tab strip. */}
-          {drawerGroup === TEXT_TAB && (
-            <>
-              <div className="flex gap-2 px-2 py-2">
-                {/* One line, always. It used to grow to three and the bar
-                under it moved with every newline; long input scrolls inside
-                the field instead, with the scrollbar hidden. */}
+              {/* 1. The input itself. */}
+              <div className="flex gap-2 pb-1.5">
                 <textarea
                   ref={textareaRef}
                   value={text}
@@ -945,8 +735,6 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                   rows={1}
                   className="field scrollbar-none flex-1 resize-none overflow-y-auto rounded-panel px-3 py-2 text-[16px] leading-5"
                 />
-                {/* A glyph rather than the word: the composer is narrow on a
-                phone and the text area is what should get the width. */}
                 <button
                   onClick={handleSend}
                   disabled={!text || !sessionId}
@@ -960,43 +748,169 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                 </button>
               </div>
 
-              {/* Nav keys travel with the text input. */}
-              <div className="flex items-center gap-1 px-2 pt-1 pb-2 overflow-x-auto scrollbar-none">
-                {NAV_KEYS.map((qk) => (
-                  <button
-                    key={qk.label}
-                    {...repeatProps(qk.key)}
-                    disabled={!sessionId}
-                    title={qk.title}
-                    className={`${keyBtn} text-[10px] px-1.5`}
-                  >
-                    {qk.label}
-                  </button>
-                ))}
-                {NAV_TAIL.map((qk) => (
-                  <button
-                    key={qk.label}
-                    {...repeatProps(qk.key)}
-                    disabled={!sessionId}
-                    title={qk.title}
-                    className={`${keyBtn} text-[10px] px-1.5`}
-                  >
-                    {qk.label}
-                  </button>
-                ))}
-                {NAV_ARROWS.map((qk) => (
-                  <button
-                    key={qk.label}
-                    {...repeatProps(qk.key)}
-                    disabled={!sessionId}
-                    title={qk.title}
-                    className={`${keyBtn} text-[10px] px-1.5`}
-                  >
-                    {qk.label}
-                  </button>
-                ))}
+              {/* 2. The mode, and whatever qualifies it. The mode selector is
+                  pinned left and anything the mode adds sits to its right. */}
+              <div className="flex items-center gap-1.5 border-t border-line/50 pt-1.5">
+                <DropUpSelect value={kbMode} options={KB_MODES} onChange={setKbMode} />
+
+                {comboSet && (
+                  <>
+                    <span className="shrink-0 text-[10px] text-ink-ghost">combo mode:</span>
+                    <DropUpSelect value={stickyMode} options={STICKY_MODES} onChange={setStickyMode} />
+                  </>
+                )}
+
+                {vendor &&
+                  (() => {
+                    const prefix = `${vendor.name}:`;
+                    const slashChips: Chip[] = [
+                      ...vendor.slashCmds
+                        .filter((c) => !hiddenSlash.includes(prefix + c.label))
+                        .map((c) => ({ label: c.label, command: c.command, title: c.title })),
+                      ...customSlash
+                        .filter((c) => c.vendor === vendor.name)
+                        .map((c) => ({ label: c.label, command: `${c.command}\n`, title: c.command, custom: true })),
+                    ];
+                    return (
+                      <div className="min-w-0 flex-1">
+                        <CommandChips
+                          layout="row"
+                          chips={slashChips}
+                          hidden={hiddenSlash.filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length))}
+                          disabled={!sessionId}
+                          chipClass="px-2 py-0.5 text-[11px] relief text-cyan-300 hover:text-cyan-100 rounded-control whitespace-nowrap select-none"
+                          dialogTitle={`Add ${vendor.name} slash command`}
+                          dialogHint={`Sent to ${vendor.name} when tapped. Saved for ${vendor.name} only.`}
+                          commandPlaceholder="/review"
+                          onRun={(command) => sessionId && sendInput(sessionId, command)}
+                          onAdd={(label, command) => addSlash({ vendor: vendor.name, label, command })}
+                          onRemove={(label, isCustom) => removeSlash(vendor.name, label, isCustom)}
+                          onRestore={(label) => restoreSlash(vendor.name, label)}
+                        />
+                      </div>
+                    );
+                  })()}
+
+                {kbMode === "git" && (
+                  <>
+                    <DropUpSelect value={gitForm} options={GIT_FORMS} onChange={setGitForm} />
+                    {gitForm === "commit" ? (
+                      <>
+                        <input
+                          value={gitCommitMsg}
+                          onChange={(e) => setGitCommitMsg(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && commitGit()}
+                          placeholder="commit message..."
+                          className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
+                        />
+                        <button
+                          onClick={commitGit}
+                          disabled={!gitCommitMsg.trim() || !sessionId}
+                          className="shrink-0 rounded-control relief-accent relief-success px-2 py-0.5 text-[11px] text-white"
+                        >
+                          Commit
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          value={gitConfigName}
+                          onChange={(e) => setGitConfigName(e.target.value)}
+                          placeholder="user.name"
+                          className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
+                        />
+                        <input
+                          value={gitConfigEmail}
+                          onChange={(e) => setGitConfigEmail(e.target.value)}
+                          placeholder="user.email"
+                          className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
+                        />
+                        <button
+                          onClick={setGitIdentity}
+                          disabled={!sessionId || (!gitConfigName.trim() && !gitConfigEmail.trim())}
+                          className="shrink-0 rounded-control relief-accent px-2 py-0.5 text-[11px] text-white transition-colors disabled:bg-control disabled:text-ink-faint"
+                        >
+                          Set
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
               </div>
-            </>
+
+              {/* 3. The keys. One line, scrolled sideways — never taller. */}
+              <div className="mt-1.5 flex items-center gap-1 overflow-x-auto scrollbar-none border-t border-line/50 pt-1.5">
+                {kbMode === "keys" &&
+                  [...NAV_KEYS, ...NAV_TAIL, ...NAV_ARROWS].map((qk) => (
+                    <button
+                      key={qk.label}
+                      {...repeatProps(qk.key)}
+                      disabled={!sessionId}
+                      title={qk.title}
+                      className={`${keyBtn} shrink-0 px-1.5 text-[10px]`}
+                    >
+                      {qk.label}
+                    </button>
+                  ))}
+
+                {comboSet &&
+                  comboKeys().map((key) => (
+                    <button
+                      key={key.label}
+                      {...repeatProps(key.seq)}
+                      disabled={!sessionId}
+                      title={key.title}
+                      className={`${keyBtn} shrink-0`}
+                    >
+                      {key.label}
+                    </button>
+                  ))}
+
+                {vendor && (
+                  <>
+                    {vendor.launch.map((cmd) => (
+                      <button
+                        key={`${vendor.name}-${cmd.label}`}
+                        onClick={() => {
+                          if (sessionId) sendInput(sessionId, cmd.command);
+                        }}
+                        disabled={!sessionId}
+                        title={cmd.title}
+                        className="shrink-0 whitespace-nowrap rounded-control relief select-none px-2 py-0.5 text-[11px] text-purple-300 hover:text-purple-100"
+                      >
+                        {cmd.label}
+                      </button>
+                    ))}
+                    {[...CODE_COMMON_KEYS, ...vendor.keys].map((qk) => (
+                      <button
+                        key={`${vendor.name}-${qk.label}`}
+                        {...repeatProps(qk.key)}
+                        disabled={!sessionId}
+                        title={qk.title}
+                        className={`${keyBtn} shrink-0`}
+                      >
+                        {qk.label}
+                      </button>
+                    ))}
+                  </>
+                )}
+
+                {kbMode === "git" &&
+                  GIT_QUICK_CMDS.map((cmd) => (
+                    <button
+                      key={cmd.label}
+                      onClick={() => {
+                        if (sessionId) sendInput(sessionId, cmd.command);
+                      }}
+                      disabled={!sessionId}
+                      title={cmd.title}
+                      className={`${keyBtn} shrink-0`}
+                    >
+                      {cmd.label}
+                    </button>
+                  ))}
+              </div>
+            </div>
           )}
         </div>
       </div>
