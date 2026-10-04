@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { COMBO_SETS, comboSequence, FN_COMBO_KEYS, MODIFIER_PARAM, NAV_COMBO_KEYS } from "./combos";
+import { COMBO_SETS, comboSequence, FN_COMBO_KEYS, MAIN_COMBO_KEYS, MODIFIER_PARAM, type NamedKey } from "./combos";
+
+/** Reads a key's own sequence, failing loudly if it is a character key. */
+function seqLookup(set: NamedKey[]) {
+  return (label: string, modifier: number) => {
+    const key = set.find((k) => k.label === label);
+    if (!key?.seq) throw new Error(`"${label}" has no sequence of its own`);
+    return key.seq(modifier);
+  };
+}
 
 const seq = (label: string, mode: Parameters<typeof comboSequence>[1]) => comboSequence(label, mode);
 
@@ -14,41 +23,41 @@ describe("modifier parameters", () => {
 });
 
 describe("arrow and navigation keys", () => {
-  const find = (label: string) => NAV_COMBO_KEYS.find((k) => k.label === label);
+  const seqOf = seqLookup(MAIN_COMBO_KEYS);
 
   it("encodes arrows as CSI 1;<mod><final>", () => {
-    expect(find("↑")?.seq(5)).toBe("\x1b[1;5A");
-    expect(find("↓")?.seq(5)).toBe("\x1b[1;5B");
-    expect(find("→")?.seq(5)).toBe("\x1b[1;5C");
-    expect(find("←")?.seq(5)).toBe("\x1b[1;5D");
+    expect(seqOf("↑", 5)).toBe("\x1b[1;5A");
+    expect(seqOf("↓", 5)).toBe("\x1b[1;5B");
+    expect(seqOf("→", 5)).toBe("\x1b[1;5C");
+    expect(seqOf("←", 5)).toBe("\x1b[1;5D");
   });
 
   it("uses H and F for Home and End", () => {
-    expect(find("Home")?.seq(3)).toBe("\x1b[1;3H");
-    expect(find("End")?.seq(3)).toBe("\x1b[1;3F");
+    expect(seqOf("Home", 3)).toBe("\x1b[1;3H");
+    expect(seqOf("End", 3)).toBe("\x1b[1;3F");
   });
 
   it("puts the tilde keys' code first", () => {
-    expect(find("PgUp")?.seq(5)).toBe("\x1b[5;5~");
-    expect(find("PgDn")?.seq(5)).toBe("\x1b[6;5~");
-    expect(find("Ins")?.seq(5)).toBe("\x1b[2;5~");
-    expect(find("Del")?.seq(5)).toBe("\x1b[3;5~");
+    expect(seqOf("PgUp", 5)).toBe("\x1b[5;5~");
+    expect(seqOf("PgDn", 5)).toBe("\x1b[6;5~");
+    expect(seqOf("Ins", 5)).toBe("\x1b[2;5~");
+    expect(seqOf("Del", 5)).toBe("\x1b[3;5~");
   });
 });
 
 describe("function keys", () => {
-  const find = (label: string) => FN_COMBO_KEYS.find((k) => k.label === label);
+  const seqOf = seqLookup(FN_COMBO_KEYS);
 
   it("uses the SS3 finals for F1-F4", () => {
-    expect(find("F1")?.seq(5)).toBe("\x1b[1;5P");
-    expect(find("F4")?.seq(5)).toBe("\x1b[1;5S");
+    expect(seqOf("F1", 5)).toBe("\x1b[1;5P");
+    expect(seqOf("F4", 5)).toBe("\x1b[1;5S");
   });
 
   it("uses tilde codes for F5 and up, skipping 16 and 22 as VT does", () => {
-    expect(find("F5")?.seq(5)).toBe("\x1b[15;5~");
-    expect(find("F6")?.seq(5)).toBe("\x1b[17;5~");
-    expect(find("F11")?.seq(5)).toBe("\x1b[23;5~");
-    expect(find("F12")?.seq(5)).toBe("\x1b[24;5~");
+    expect(seqOf("F5", 5)).toBe("\x1b[15;5~");
+    expect(seqOf("F6", 5)).toBe("\x1b[17;5~");
+    expect(seqOf("F11", 5)).toBe("\x1b[23;5~");
+    expect(seqOf("F12", 5)).toBe("\x1b[24;5~");
   });
 });
 
@@ -107,7 +116,7 @@ describe("the none modifier", () => {
   });
 });
 
-describe("the nav set after absorbing the always-present row", () => {
+describe("the main set after absorbing the always-present row", () => {
   it("sends the plain control character with no modifier", () => {
     expect(comboSequence("Enter", "none")).toBe("\r");
     expect(comboSequence("Bksp", "none")).toBe("\x7f");
@@ -127,8 +136,8 @@ describe("the nav set after absorbing the always-present row", () => {
     }
   });
 
-  it("opens on nav", () => {
-    expect(COMBO_SETS[0]).toBe("nav");
+  it("opens on main", () => {
+    expect(COMBO_SETS[0]).toBe("main");
   });
 });
 
@@ -167,5 +176,30 @@ describe("the shift modifier", () => {
     expect(comboSequence("A", "alt")).toBe("\x1ba");
     expect(comboSequence("A", "alt+shift")).toBe("\x1bA");
     expect(comboSequence("←", "ctrl")).toBe("\x1b[1;5D");
+  });
+});
+
+describe("the main set's order", () => {
+  const labels = MAIN_COMBO_KEYS.map((k) => k.label);
+  const at = (label: string) => labels.indexOf(label);
+
+  it("leads with confirm, cancel and the cursor", () => {
+    expect(labels.slice(0, 8)).toEqual(["Enter", "Bksp", "Esc", "Tab", "←", "→", "↑", "↓"]);
+  });
+
+  it("puts answering a prompt, then paging, ahead of Home/End", () => {
+    expect(at("Y")).toBeLessThan(at("PgUp"));
+    expect(at("PgUp")).toBeLessThan(at("Home"));
+    expect(at("PgDn")).toBeLessThan(at("Home"));
+  });
+
+  it("leaves the rare keys last", () => {
+    expect(labels.slice(-2)).toEqual(["Ins", "Del"]);
+  });
+
+  it("applies a modifier to y/n the way it does to any letter", () => {
+    expect(comboSequence("Y", "none")).toBe("y");
+    expect(comboSequence("Y", "shift")).toBe("Y");
+    expect(comboSequence("N", "ctrl")).toBe("\x0e");
   });
 });

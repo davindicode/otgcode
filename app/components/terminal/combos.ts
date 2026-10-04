@@ -77,7 +77,16 @@ export function getStickyKey(ch: string, mode: StickyMode): string {
  * Home/End take a CSI parameter, the tilde keys carry theirs before the `~`,
  * and F1–F4 are the SS3 letters while F5 up are tilde keys.
  */
-export type NamedKey = { label: string; title: string; seq: (m: number) => string };
+/**
+ * A key in one of the sets. Either it has a sequence of its own, or it is a
+ * plain character and the modifier is applied the way it is for any letter —
+ * which lets y and n sit in the set by usefulness rather than being appended
+ * somewhere else.
+ */
+export type NamedKey = { label: string; title: string } & (
+  | { seq: (m: number) => string; char?: never }
+  | { char: string; seq?: never }
+);
 
 // m === 1 is unmodified, which has its own shorter canonical form — `CSI D`,
 // not `CSI 1;1 D`. Terminals accept both, but programs that pattern-match on
@@ -100,10 +109,14 @@ const csiU = (code: number, plain: string) => (m: number) => (m === 1 ? plain : 
  * that row — differing only by Ins/Del. One set, and the modifier applies to
  * all of it.
  */
-export const NAV_COMBO_KEYS: NamedKey[] = [
+export const MAIN_COMBO_KEYS: NamedKey[] = [
+  // Ordered by how often a hand reaches for it, not by keyboard geography:
+  // confirm and cancel, then moving the cursor, then answering the prompts a
+  // coding CLI puts up, then paging through its output or tmux's scrollback.
+  // Home/End/Ins/Del are real but rare, so they sit at the far end.
   { label: "Enter", title: "Enter / confirm", seq: csiU(13, "\r") },
   { label: "Bksp", title: "Backspace", seq: csiU(127, "\x7f") },
-  { label: "Esc", title: "Escape", seq: csiU(27, "\x1b") },
+  { label: "Esc", title: "Escape / cancel", seq: csiU(27, "\x1b") },
   // Shift+Tab is back-tab, `CSI Z` — older and universally understood, where
   // the generic `CSI 9;2u` would reach almost nothing. It is what cycles
   // permission modes in Claude Code and reverse-completes in a shell.
@@ -112,10 +125,12 @@ export const NAV_COMBO_KEYS: NamedKey[] = [
   { label: "→", title: "Right", seq: csi("C") },
   { label: "↑", title: "Up", seq: csi("A") },
   { label: "↓", title: "Down", seq: csi("B") },
-  { label: "Home", title: "Home", seq: csi("H") },
-  { label: "End", title: "End", seq: csi("F") },
+  { label: "Y", title: "Yes — approve / confirm", char: "Y" },
+  { label: "N", title: "No — deny / decline", char: "N" },
   { label: "PgUp", title: "Page up", seq: tilde(5) },
   { label: "PgDn", title: "Page down", seq: tilde(6) },
+  { label: "Home", title: "Home", seq: csi("H") },
+  { label: "End", title: "End", seq: csi("F") },
   { label: "Ins", title: "Insert", seq: tilde(2) },
   { label: "Del", title: "Delete", seq: tilde(3) },
 ];
@@ -153,15 +168,17 @@ export const SYMBOL_COMBO_KEYS: { label: string; title: string; ch: string; ctrl
   { label: "/", title: "Undo (readline)", ch: "/" },
 ];
 
-// nav first: it is the set the keyboard opens on.
-export const COMBO_SETS = ["nav", "numbers", "letters", "function", "symbols"] as const;
+// main first: it is the set the keyboard opens on, and the one that covers
+// what a terminal needs before it needs characters.
+export const COMBO_SETS = ["main", "numbers", "letters", "function", "symbols"] as const;
 export type ComboSet = (typeof COMBO_SETS)[number];
 
 /** Sequence for a labelled key in one of the combo sets. */
 export function comboSequence(label: string, mode: StickyMode): string {
   const symbol = SYMBOL_COMBO_KEYS.find((k) => k.label === label);
   if (symbol) return mode === "ctrl" && symbol.ctrl ? symbol.ctrl : getStickyKey(symbol.ch, mode);
-  const named = [...NAV_COMBO_KEYS, ...FN_COMBO_KEYS].find((k) => k.label === label);
-  if (named) return named.seq(MODIFIER_PARAM[mode]);
+  const named = [...MAIN_COMBO_KEYS, ...FN_COMBO_KEYS].find((k) => k.label === label);
+  // Narrowed by which half of the union is present, not by a flag.
+  if (named) return named.seq ? named.seq(MODIFIER_PARAM[mode]) : getStickyKey(named.char, mode);
   return getStickyKey(label, mode);
 }

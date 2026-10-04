@@ -10,7 +10,7 @@ import {
   type ComboSet,
   comboSequence,
   FN_COMBO_KEYS,
-  NAV_COMBO_KEYS,
+  MAIN_COMBO_KEYS,
   STICKY_MODES,
   type StickyMode,
   SYMBOL_COMBO_KEYS,
@@ -258,7 +258,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const [cdDirs, setCdDirs] = useState<string[]>([]);
   const [cdLoading, setCdLoading] = useState(false);
   const [stickyMode, setStickyMode] = useState<StickyMode>("none");
-  const [kbMode, setKbMode] = useState<KbMode>("nav");
+  const [kbMode, setKbMode] = useState<KbMode>("main");
   const [gitForm, setGitForm] = useState<GitForm>("commit");
   const [gitCommitMsg, setGitCommitMsg] = useState("");
   const [gitConfigName, setGitConfigName] = useState("");
@@ -414,26 +414,12 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
         title: sentLabel(`${modeLabel}${ch}`, comboSequence(ch, stickyMode)),
       }));
     }
-    if (comboSet === "nav" || comboSet === "function") {
-      const keys = (comboSet === "nav" ? NAV_COMBO_KEYS : FN_COMBO_KEYS).map((key) => ({
+    if (comboSet === "main" || comboSet === "function") {
+      return (comboSet === "main" ? MAIN_COMBO_KEYS : FN_COMBO_KEYS).map((key) => ({
         label: key.label,
         seq: comboSequence(key.label, stickyMode),
-        title: `${modeLabel}${key.title}`,
+        title: sentLabel(`${modeLabel}${key.title}`, comboSequence(key.label, stickyMode)),
       }));
-      if (comboSet !== "nav") return keys;
-      // y/n answer the prompts coding CLIs and tmux put up, so they belong
-      // with nav. Through the letter path, so a modifier still applies.
-      return [
-        ...keys,
-        ...[
-          { ch: "Y", title: "Yes — approve / confirm" },
-          { ch: "N", title: "No — deny / decline" },
-        ].map(({ ch, title }) => ({
-          label: ch,
-          seq: comboSequence(ch, stickyMode),
-          title: `${modeLabel}${title}`,
-        })),
-      ];
     }
     if (comboSet === "symbols") {
       return SYMBOL_COMBO_KEYS.map((key) => ({
