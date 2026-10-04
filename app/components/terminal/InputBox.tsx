@@ -31,7 +31,7 @@ interface QuickKeyGroup {
 
 const TERMINAL_GROUPS: QuickKeyGroup[] = [
   {
-    label: "cmds",
+    label: "commands",
     title: "Common commands (executed immediately)",
     keys: [
       { label: "ls", key: "ls\n", title: "List files" },
@@ -560,7 +560,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
       ? TERMINAL_GROUPS.find((g) => g.label === drawerGroup)
       : null;
 
-  const isCmdsGroup = activeStandardGroup?.label === "cmds";
+  const isCmdsGroup = activeStandardGroup?.label === "commands";
   // Built-ins the user removed drop out; their own commands are appended.
   const visibleCommands: Chip[] = !activeStandardGroup
     ? []
@@ -586,16 +586,16 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
       {/* Tab bar */}
       <div className="border-b border-line/50 overflow-x-auto scrollbar-none" style={{ minWidth: 0 }}>
         <div className="flex items-center gap-1 px-2 py-1 w-max">
-          {/* First slot belongs to whatever the tab *is*: a tmux session's own
-          controls, or the working directory of a shell. cd has no meaning on a
-          tmux tab — the pane's directory is tmux's business — so it is absent
-          there rather than present and failing. */}
-          {tmuxSession
-            ? tabBtn(TMUX_TAB, "tmux", `Controls for session "${tmuxSession}"`, false, "app")
-            : tabBtn(CD_TAB, "cd", "Change directory", !sessionId)}
           {tabBtn(KB_TAB, "keyboard", "Type, and the keys a terminal needs", !sessionId)}
-          {/* Shell actions (blue), always in the same order */}
           {TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !sessionId))}
+          {/* Last slot belongs to whatever the tab *is*: a tmux session's own
+          controls, or the working directory of a shell. Moving between
+          directories has no meaning on a tmux tab — the pane's directory is
+          tmux's business — so it is absent there rather than present and
+          failing. */}
+          {tmuxSession
+            ? tabBtn(TMUX_TAB, "tmux session", `Controls for session "${tmuxSession}"`, false, "app")
+            : tabBtn(CD_TAB, "navigate", "Move to another directory", !sessionId)}
         </div>
       </div>
 
@@ -626,7 +626,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
           {drawerGroup === CD_TAB && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-[11px] text-ink-faint">cd</span>
+                <span className="shrink-0 text-[11px] text-ink-faint">navigate</span>
                 <span
                   className="text-[10px] text-ink-ghost overflow-hidden text-ellipsis whitespace-nowrap flex-1"
                   title={cdCwd}
