@@ -619,7 +619,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
               {cdLoading ? (
                 <span className="text-[11px] text-ink-faint">Loading...</span>
               ) : (
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                <div className="chip-rows flex flex-wrap gap-1">
                   <button
                     onClick={() => handleCdTo("..")}
                     disabled={!sessionId}
@@ -802,7 +802,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                 .map((k) => k.slice(prefix.length));
 
               return (
-                <div className="border-b border-line/50 bg-panel px-2 py-1.5 max-h-64 overflow-y-auto">
+                <div className="scrollbar-none border-b border-line/50 bg-panel px-2 py-1.5 max-h-64 overflow-y-auto">
                   {/* Selected CLI on the left; its launchers and keys beside it. */}
                   <div className="flex items-start gap-1.5">
                     <DropUpSelect
@@ -864,7 +864,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
 
           {/* Git tab: quick actions + commit + config */}
           {drawerGroup === GIT_TAB && (
-            <div className="border-b border-line/50 bg-panel px-2 py-1.5 max-h-48 overflow-y-auto">
+            <div className="scrollbar-none border-b border-line/50 bg-panel px-2 py-1.5 max-h-48 overflow-y-auto">
               {/* Git quick actions */}
               <div className="flex flex-wrap gap-1 mb-1.5">
                 {GIT_QUICK_CMDS.map((cmd) => (

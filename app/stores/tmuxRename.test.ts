@@ -30,6 +30,7 @@ function seedTmuxTab(session: string) {
         error: null,
         outputBuffer: [],
         tmuxSession: session,
+        gen: 1,
         cdCwd: "",
       },
     },

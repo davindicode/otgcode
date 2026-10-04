@@ -17,6 +17,14 @@ interface TerminalSession {
   outputBuffer: string[];
   /** Set when this terminal *is* a tmux session rather than a shell. */
   tmuxSession?: string;
+  /**
+   * Which socket connection this session's pty was asked for. Compared against
+   * the current one to decide what needs recreating, because `status` is a
+   * belief about the server that can be wrong — and a session believed
+   * connected with no pty behind it is a tab where nothing works and nothing
+   * says why.
+   */
+  gen: number;
   cdCwd: string;
 }
 
@@ -33,6 +41,8 @@ interface TerminalState {
   sendInput: (sessionId: string, data: string) => void;
   resizeTerminal: (sessionId: string, rows: number, cols: number) => void;
   closeSession: (sessionId: string) => void;
+  /** Ask for a new pty for a session whose own has gone. */
+  restartSession: (sessionId: string) => void;
   setActiveSession: (sessionId: string) => void;
   /** `tmuxSession` moves with the name for a tmux tab: the two are the same thing. */
   renameSession: (sessionId: string, name: string, tmuxSession?: string) => void;
@@ -42,6 +52,61 @@ interface TerminalState {
 }
 
 let socketInitialized = false;
+
+/**
+ * Bumped on every socket connection. A session carries the generation its pty
+ * was requested in; anything older has no pty on the server, because the
+ * server kills them when their socket goes.
+ */
+let generation = 0;
+
+/** Asks the server for this session's pty, and records that we did. */
+function requestPty(
+  sessionId: string,
+  get: () => TerminalState,
+  set: (partial: Partial<TerminalState>) => void,
+  cwd?: string,
+): void {
+  const socket = getSocket();
+  const session = get().sessions[sessionId];
+  if (!session || !socket.connected) return;
+
+  set({
+    sessions: { ...get().sessions, [sessionId]: { ...session, status: "connecting", gen: generation } },
+  });
+
+  socket.emit("create_terminal", {
+    sessionId,
+    cwd: cwd || get().defaultCwd || undefined,
+    // The whole point of a tmux tab: reconnecting re-attaches rather than
+    // leaving you in a fresh shell outside the session.
+    tmuxSession: session.tmuxSession,
+    // The pane has been on screen since before the drop, so its size is known
+    // here. Spawning the pty at it means tmux's first paint already fills the
+    // pane, instead of drawing 80x24 and waiting for a resize to repaint it.
+    cols: session.terminal?.cols,
+    rows: session.terminal?.rows,
+  });
+}
+
+/**
+ * Everything a departing pty can leave switched on in the terminal.
+ *
+ * A full-screen program — opencode, an editor, tmux — runs on the alternate
+ * screen with a scroll region, a hidden cursor and its own attributes. Killing
+ * its pty sends none of the sequences that would undo that, so the next shell
+ * drew its prompt inside the dead program's frame. Scrollback is deliberately
+ * kept: this resets modes, it does not wipe what you were looking at.
+ */
+const RESET_MODES = [
+  "\x1b[?1049l", // leave the alternate screen, back to the normal buffer
+  "\x1b[!p", // soft reset: scroll region, origin mode, character sets
+  "\x1b[?25h", // show the cursor, which a TUI may have hidden
+  "\x1b[0m", // drop colours and attributes
+  "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l", // mouse reporting
+  "\x1b[?1004l", // focus reporting
+  "\x1b[?2004l", // bracketed paste
+].join("");
 
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   sessions: {},
@@ -57,33 +122,17 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     const socket = getSocket();
 
     socket.on("connect", () => {
+      generation += 1;
       set({ socketConnected: true });
       usePresenceStore.getState().clear();
 
-      // On reconnect, re-create all existing sessions (server killed PTYs on disconnect)
-      const { sessions } = get();
-      for (const session of Object.values(sessions)) {
-        if (session.status !== "connected") {
-          set({
-            sessions: {
-              ...get().sessions,
-              [session.id]: { ...get().sessions[session.id], status: "connecting" },
-            },
-          });
-          socket.emit("create_terminal", {
-            sessionId: session.id,
-            cwd: get().defaultCwd || undefined,
-            // The whole point of a tmux tab: reconnecting re-attaches rather
-            // than leaving you in a fresh shell outside the session.
-            tmuxSession: session.tmuxSession,
-            // The pane has been on screen since before the drop, so its size
-            // is known here. Spawning the PTY at it means tmux's first paint
-            // already fills the pane, instead of drawing 80x24 and waiting for
-            // a resize to repaint the rest.
-            cols: session.terminal?.cols,
-            rows: session.terminal?.rows,
-          });
-        }
+      // The server kills a socket's ptys when it goes, so every session from an
+      // earlier connection needs a new one. Keying this on the generation
+      // rather than on `status` is what makes it reliable: a session left
+      // marked "connected" across a drop used to be skipped here, leaving a tab
+      // that looked fine, ignored every keystroke, and never redrew.
+      for (const session of Object.values(get().sessions)) {
+        if (session.gen !== generation) requestPty(session.id, get, set);
       }
     });
 
@@ -93,10 +142,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const { sessions } = get();
       const updated: Record<string, (typeof sessions)[string]> = {};
       for (const [id, session] of Object.entries(sessions)) {
-        // Tmux and full-screen editors can leave xterm input modes enabled.
-        // Disable mouse/focus/paste reporting without clearing scrollback; the
-        // replacement PTY is a plain shell and must not inherit those modes.
-        session.terminal?.write("\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1004l\x1b[?1006l\x1b[?2004l");
+        session.terminal?.write(RESET_MODES);
         updated[id] = { ...session, status: "disconnected" };
       }
       set({ sessions: updated });
@@ -240,17 +286,25 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           error: null,
           outputBuffer: [],
           tmuxSession,
+          // Not this generation yet: until the pty is asked for, the connect
+          // handler is the one that should ask.
+          gen: -1,
           cdCwd: "",
         },
       },
       activeSessionId: sessionId,
     });
 
-    // Socket.IO buffers emits while offline. Avoid buffering this create because
-    // the connect handler owns recreation and would otherwise create it twice.
-    if (socket.connected) {
-      socket.emit("create_terminal", { sessionId, cwd: cwd || get().defaultCwd || undefined, tmuxSession });
-    }
+    // Socket.IO buffers emits made while offline, which would create this twice
+    // once the connect handler also asks. Leave it to that handler instead.
+    if (socket.connected) requestPty(sessionId, get, set, cwd);
+  },
+
+  restartSession: (sessionId) => {
+    const session = get().sessions[sessionId];
+    if (!session) return;
+    session.terminal?.write("\r\n\x1b[2;37mReconnecting…\x1b[0m\r\n");
+    requestPty(sessionId, get, set);
   },
 
   registerTerminal: (sessionId, terminal, fitAddon) => {

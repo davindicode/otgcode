@@ -302,6 +302,29 @@ body {
   display: none;
 }
 
+/*
+ * A wrapping grid of chips, capped at three rows and scrolled beyond that.
+ *
+ * These lists are open-ended — the folders in a directory, the commands and
+ * slash commands you add — so without a cap a directory with hundreds of
+ * entries pushes the composer, and the terminal with it, off the screen.
+ *
+ * A row is an 11px chip on Tailwind's 1.5 line-height plus its py-0.5, and
+ * gap-1 sits between rows. Fixed px rather than rem because the chip text is
+ * a fixed px size, so a rem cap would drift away from the rows it measures.
+ * No scrollbar, like the rest of the composer.
+ */
+.chip-rows {
+  --chip-row: 21px; /* 11px x 1.5, + 2px padding top and bottom */
+  max-height: calc(3 * var(--chip-row) + 2 * 4px); /* three rows, two gutters */
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.chip-rows::-webkit-scrollbar {
+  display: none;
+}
+
 /* Prose styling for markdown/notebook preview */
 .prose {
   color: var(--t-ink-muted);

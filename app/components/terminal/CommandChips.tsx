@@ -63,7 +63,7 @@ export default function CommandChips({
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="chip-rows flex flex-wrap items-center gap-1">
         {chips.map((chip) => (
           <button
             key={chip.label}
@@ -101,7 +101,7 @@ export default function CommandChips({
       </div>
 
       {editing && hidden.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+        <div className="chip-rows mt-1.5 flex flex-wrap items-center gap-1">
           <span className="text-[10px] text-ink-ghost">removed:</span>
           {hidden.map((label) => (
             <button
