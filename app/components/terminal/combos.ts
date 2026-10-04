@@ -19,7 +19,7 @@ export const COMBO_MODES: { id: ComboMode; label: string }[] = [
 // xterm's modifier parameter, used by every CSI sequence below. 1 is "no
 // modifier", which the builders turn into the plain form of the key rather
 // than a `1;1` sequence no terminal emits.
-export const MODIFIER_PARAM: Record<ComboMode, number> = {
+const MODIFIER_PARAM: Record<ComboMode, number> = {
   none: 1,
   shift: 2,
   ctrl: 5,
@@ -83,7 +83,7 @@ function comboChar(ch: string, mode: ComboMode): string {
  * which lets y and n sit in the set by usefulness rather than being appended
  * somewhere else.
  */
-export type NamedKey = { label: string; title: string } & (
+type NamedKey = { label: string; title: string } & (
   | { seq: (m: number) => string; char?: never }
   | { char: string; seq?: never }
 );

@@ -215,8 +215,8 @@ export function isRequestAuthenticated(cookieHeader: string | undefined | null):
 // and combined with scrypt's cost it caps guessing at a few tries a minute.
 // ---------------------------------------------------------------------------
 
-export const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
-export const MAX_BACKOFF_MS = 5000;
+const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const MAX_BACKOFF_MS = 5000;
 
 export interface LoginThrottle {
   /** How long to stall this attempt before answering. */

@@ -124,6 +124,12 @@ export function getPtyPid(sessionId: string): number | null {
   return session.process.pid;
 }
 
+/**
+ * Every live session id. Nothing in the app needs this — the one caller is the
+ * test, which uses it to observe that create and kill did what they claim and
+ * to clean up between cases. Kept for that: the ownership rules it checks are
+ * what stop a reconnect from killing the pty it just replaced.
+ */
 export function getSessionIds(): string[] {
   return Array.from(sessions.keys());
 }

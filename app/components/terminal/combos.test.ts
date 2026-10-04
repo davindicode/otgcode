@@ -1,63 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { COMBO_SETS, comboSequence, FN_COMBO_KEYS, MAIN_COMBO_KEYS, MODIFIER_PARAM, type NamedKey } from "./combos";
-
-/** Reads a key's own sequence, failing loudly if it is a character key. */
-function seqLookup(set: NamedKey[]) {
-  return (label: string, modifier: number) => {
-    const key = set.find((k) => k.label === label);
-    if (!key?.seq) throw new Error(`"${label}" has no sequence of its own`);
-    return key.seq(modifier);
-  };
-}
+import { COMBO_SETS, comboSequence, MAIN_COMBO_KEYS } from "./combos";
 
 const seq = (label: string, mode: Parameters<typeof comboSequence>[1]) => comboSequence(label, mode);
 
-describe("modifier parameters", () => {
-  // xterm's scheme: 1 + bitmask of shift(1) alt(2) ctrl(4).
-  it("matches the xterm modifier encoding", () => {
-    expect(MODIFIER_PARAM.ctrl).toBe(5);
-    expect(MODIFIER_PARAM["ctrl+shift"]).toBe(6);
-    expect(MODIFIER_PARAM.alt).toBe(3);
-    expect(MODIFIER_PARAM["alt+shift"]).toBe(4);
-  });
-});
-
 describe("arrow and navigation keys", () => {
-  const seqOf = seqLookup(MAIN_COMBO_KEYS);
-
   it("encodes arrows as CSI 1;<mod><final>", () => {
-    expect(seqOf("↑", 5)).toBe("\x1b[1;5A");
-    expect(seqOf("↓", 5)).toBe("\x1b[1;5B");
-    expect(seqOf("→", 5)).toBe("\x1b[1;5C");
-    expect(seqOf("←", 5)).toBe("\x1b[1;5D");
+    expect(comboSequence("↑", "ctrl")).toBe("\x1b[1;5A");
+    expect(comboSequence("↓", "ctrl")).toBe("\x1b[1;5B");
+    expect(comboSequence("→", "ctrl")).toBe("\x1b[1;5C");
+    expect(comboSequence("←", "ctrl")).toBe("\x1b[1;5D");
   });
 
   it("uses H and F for Home and End", () => {
-    expect(seqOf("Home", 3)).toBe("\x1b[1;3H");
-    expect(seqOf("End", 3)).toBe("\x1b[1;3F");
+    expect(comboSequence("Home", "alt")).toBe("\x1b[1;3H");
+    expect(comboSequence("End", "alt")).toBe("\x1b[1;3F");
   });
 
   it("puts the tilde keys' code first", () => {
-    expect(seqOf("PgUp", 5)).toBe("\x1b[5;5~");
-    expect(seqOf("PgDn", 5)).toBe("\x1b[6;5~");
-    expect(seqOf("Ins", 5)).toBe("\x1b[2;5~");
-    expect(seqOf("Del", 5)).toBe("\x1b[3;5~");
+    expect(comboSequence("PgUp", "ctrl")).toBe("\x1b[5;5~");
+    expect(comboSequence("PgDn", "ctrl")).toBe("\x1b[6;5~");
+    expect(comboSequence("Ins", "ctrl")).toBe("\x1b[2;5~");
+    expect(comboSequence("Del", "ctrl")).toBe("\x1b[3;5~");
   });
 });
 
 describe("function keys", () => {
-  const seqOf = seqLookup(FN_COMBO_KEYS);
-
   it("uses the SS3 finals for F1-F4", () => {
-    expect(seqOf("F1", 5)).toBe("\x1b[1;5P");
-    expect(seqOf("F4", 5)).toBe("\x1b[1;5S");
+    expect(comboSequence("F1", "ctrl")).toBe("\x1b[1;5P");
+    expect(comboSequence("F4", "ctrl")).toBe("\x1b[1;5S");
   });
 
   it("uses tilde codes for F5 and up, skipping 16 and 22 as VT does", () => {
-    expect(seqOf("F5", 5)).toBe("\x1b[15;5~");
-    expect(seqOf("F6", 5)).toBe("\x1b[17;5~");
-    expect(seqOf("F11", 5)).toBe("\x1b[23;5~");
-    expect(seqOf("F12", 5)).toBe("\x1b[24;5~");
+    expect(comboSequence("F5", "ctrl")).toBe("\x1b[15;5~");
+    expect(comboSequence("F6", "ctrl")).toBe("\x1b[17;5~");
+    expect(comboSequence("F11", "ctrl")).toBe("\x1b[23;5~");
+    expect(comboSequence("F12", "ctrl")).toBe("\x1b[24;5~");
   });
 });
 
