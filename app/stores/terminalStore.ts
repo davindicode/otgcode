@@ -17,6 +17,8 @@ interface TerminalSession {
   outputBuffer: string[];
   /** Set when this terminal *is* a tmux session rather than a shell. */
   tmuxSession?: string;
+  /** tmux's own id for it, which a rename does not change. */
+  tmuxSessionId?: string;
   /**
    * Which socket connection this session's pty was asked for. Compared against
    * the current one to decide what needs recreating, because `status` is a
@@ -36,7 +38,7 @@ interface TerminalState {
   defaultCwd: string;
 
   initSocket: () => void;
-  createSession: (sessionId: string, name?: string, cwd?: string, tmuxSession?: string) => void;
+  createSession: (sessionId: string, name?: string, cwd?: string, tmuxSession?: string, tmuxSessionId?: string) => void;
   registerTerminal: (sessionId: string, terminal: Terminal, fitAddon: FitAddon) => void;
   sendInput: (sessionId: string, data: string) => void;
   resizeTerminal: (sessionId: string, rows: number, cols: number) => void;
@@ -45,7 +47,7 @@ interface TerminalState {
   restartSession: (sessionId: string) => void;
   setActiveSession: (sessionId: string) => void;
   /** `tmuxSession` moves with the name for a tmux tab: the two are the same thing. */
-  renameSession: (sessionId: string, name: string, tmuxSession?: string) => void;
+  renameSession: (sessionId: string, name: string, tmuxSession?: string, tmuxSessionId?: string) => void;
   setFontSize: (size: number) => void;
   setDefaultCwd: (cwd: string) => void;
   setCdCwd: (sessionId: string, cwd: string) => void;
@@ -81,6 +83,9 @@ function requestPty(
     // The whole point of a tmux tab: reconnecting re-attaches rather than
     // leaving you in a fresh shell outside the session.
     tmuxSession: session.tmuxSession,
+    // Found again by id rather than by name, so a session renamed while this
+    // tab was away is re-attached instead of being recreated empty.
+    tmuxSessionId: session.tmuxSessionId,
     // The pane has been on screen since before the drop, so its size is known
     // here. Spawning the pty at it means tmux's first paint already fills the
     // pane, instead of drawing 80x24 and waiting for a resize to repaint it.
@@ -270,7 +275,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     });
   },
 
-  createSession: (sessionId, name, cwd, tmuxSession) => {
+  createSession: (sessionId, name, cwd, tmuxSession, tmuxSessionId) => {
     const { sessions } = get();
     const socket = getSocket();
 
@@ -286,6 +291,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           error: null,
           outputBuffer: [],
           tmuxSession,
+          tmuxSessionId,
           // Not this generation yet: until the pty is asked for, the connect
           // handler is the one that should ask.
           gen: -1,
@@ -375,7 +381,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     }
   },
 
-  renameSession: (sessionId, name, tmuxSession) => {
+  renameSession: (sessionId, name, tmuxSession, tmuxSessionId) => {
     const { sessions } = get();
     const session = sessions[sessionId];
     if (!session) return;
@@ -384,7 +390,12 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         ...sessions,
         // Reconnecting re-attaches by this name, so a stale one would land the
         // tab in a brand new session beside the one it was showing.
-        [sessionId]: { ...session, name, ...(tmuxSession ? { tmuxSession } : {}) },
+        [sessionId]: {
+          ...session,
+          name,
+          ...(tmuxSession ? { tmuxSession } : {}),
+          ...(tmuxSessionId ? { tmuxSessionId } : {}),
+        },
       },
     });
   },

@@ -6,6 +6,8 @@ interface TmuxSession {
   name: string;
   windows: number;
   attached: boolean;
+  /** tmux's own id, carried into the tab so a rename cannot lose it. */
+  id?: string;
 }
 
 /**
@@ -51,8 +53,8 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [load, onClose]);
 
-  const attach = (session: string) => {
-    openTmux(session);
+  const attach = (session: string, tmuxSessionId?: string) => {
+    openTmux(session, { tmuxSessionId });
     onClose();
   };
 
@@ -123,7 +125,7 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
               {sessions.map((s) => (
                 <span key={s.name} className="relief flex items-center rounded-control">
                   <button
-                    onClick={() => attach(s.name)}
+                    onClick={() => attach(s.name, s.id)}
                     disabled={busy}
                     title={`Attach to ${s.name}`}
                     className="py-0.5 pl-2 pr-1 text-[11px] text-ink-muted hover:text-ink"

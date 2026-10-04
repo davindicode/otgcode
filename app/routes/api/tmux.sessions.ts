@@ -15,18 +15,23 @@ export async function loader({ request }: Route.LoaderArgs) {
   const version = getTmuxVersion();
 
   try {
-    const output = execSync("tmux list-sessions -F '#{session_name}:#{session_windows}:#{session_attached}'", {
-      encoding: "utf-8",
-      timeout: 3000,
-    }).trim();
+    // The id goes with the name so a tab can be opened knowing both: a rename
+    // does not change the id, which is how the tab finds its session again.
+    const output = execSync(
+      "tmux list-sessions -F '#{session_name}:#{session_windows}:#{session_attached}:#{session_id}'",
+      {
+        encoding: "utf-8",
+        timeout: 3000,
+      },
+    ).trim();
 
     if (!output) {
       return Response.json({ sessions: [], version });
     }
 
     const sessions = output.split("\n").map((line) => {
-      const [name, windows, attached] = line.split(":");
-      return { name, windows: parseInt(windows, 10), attached: attached === "1" };
+      const [name, windows, attached, id] = line.split(":");
+      return { name, windows: parseInt(windows, 10), attached: attached === "1", id };
     });
 
     return Response.json({ sessions, version });

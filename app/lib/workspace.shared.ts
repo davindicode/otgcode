@@ -22,6 +22,8 @@ export interface WorkspaceTab {
   openedFrom: string;
   /** tmux: the session this tab is attached to. */
   tmuxSession: string;
+  /** tmux tabs: tmux's own id for the session, stable across renames. */
+  tmuxSessionId: string;
 }
 
 /** A command button the user added to the cmds group. */
@@ -110,6 +112,8 @@ function tabs(value: unknown): WorkspaceTab[] {
       path,
       openedFrom: str(tab.openedFrom),
       tmuxSession,
+      // Optional: a tab saved before ids were recorded still reopens, by name.
+      tmuxSessionId: str(tab.tmuxSessionId),
     });
   }
   return out;

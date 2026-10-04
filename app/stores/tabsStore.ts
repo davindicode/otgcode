@@ -27,6 +27,12 @@ export interface Tab {
   openedFrom?: string;
   /** tmux tabs only: the session this tab is attached to. */
   tmuxSession?: string;
+  /**
+   * tmux tabs only: tmux's own id for that session, learned once it is
+   * running. A rename does not change it, so it is how a tab finds its session
+   * again after being renamed while disconnected.
+   */
+  tmuxSessionId?: string;
 }
 
 interface TabsState {
@@ -36,7 +42,7 @@ interface TabsState {
   openTerminal: (opts?: { id?: string; title?: string; cwd?: string }) => string;
   openExplorer: (opts?: { id?: string; title?: string; cwd?: string }) => string;
   /** Attach a tab to a tmux session, or focus the tab already on it. */
-  openTmux: (session: string, opts?: { id?: string }) => string;
+  openTmux: (session: string, opts?: { id?: string; tmuxSessionId?: string }) => string;
   /** Close every tab attached to a session that no longer exists. */
   closeTmuxTabs: (session: string) => void;
   /**
@@ -120,7 +126,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return tabId;
   },
 
-  openTmux: (session, { id } = {}) => {
+  openTmux: (session, { id, tmuxSessionId } = {}) => {
     const existing = get().tabs.find((t) => t.kind === "tmux" && t.tmuxSession === session);
     if (existing) {
       set({ activeId: existing.id });
@@ -128,9 +134,9 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       return existing.id;
     }
     const tabId = id ?? nextId("tmux");
-    useTerminalStore.getState().createSession(tabId, session, undefined, session);
+    useTerminalStore.getState().createSession(tabId, session, undefined, session, tmuxSessionId);
     set((s) => ({
-      tabs: [...s.tabs, { id: tabId, kind: "tmux", title: session, tmuxSession: session }],
+      tabs: [...s.tabs, { id: tabId, kind: "tmux", title: session, tmuxSession: session, tmuxSessionId }],
       activeId: tabId,
     }));
     return tabId;
@@ -142,7 +148,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
     // The server resolves this from the tab's own tmux client, so it is what
     // tmux has now — not what the tab was opened with.
-    let place: { tmuxSession?: string | null; tmuxWindow?: string | null };
+    let place: { tmuxSession?: string | null; tmuxSessionId?: string | null; tmuxWindow?: string | null };
     try {
       const res = await fetch(`/api/terminal/cwd?sessionId=${encodeURIComponent(id)}`);
       place = await res.json();
@@ -154,9 +160,12 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     // client is gone. Leave the tab alone rather than guessing.
     if (!name) return null;
 
-    if (name !== tab.tmuxSession) {
-      set((st) => ({ tabs: st.tabs.map((t) => (t.id === id ? { ...t, title: name, tmuxSession: name } : t)) }));
-      useTerminalStore.getState().renameSession(id, name, name);
+    const tmuxSessionId = place.tmuxSessionId ?? tab.tmuxSessionId;
+    if (name !== tab.tmuxSession || tmuxSessionId !== tab.tmuxSessionId) {
+      set((st) => ({
+        tabs: st.tabs.map((t) => (t.id === id ? { ...t, title: name, tmuxSession: name, tmuxSessionId } : t)),
+      }));
+      useTerminalStore.getState().renameSession(id, name, name, tmuxSessionId);
     }
     return { name, window: place.tmuxWindow ?? null };
   },
@@ -257,8 +266,16 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         useTerminalStore.getState().createSession(tab.id, tab.title, tab.cwd || undefined);
         tabs.push({ id: tab.id, kind: "terminal", title: tab.title });
       } else if (tab.kind === "tmux" && tab.tmuxSession) {
-        useTerminalStore.getState().createSession(tab.id, tab.title, undefined, tab.tmuxSession);
-        tabs.push({ id: tab.id, kind: "tmux", title: tab.title, tmuxSession: tab.tmuxSession });
+        useTerminalStore
+          .getState()
+          .createSession(tab.id, tab.title, undefined, tab.tmuxSession, tab.tmuxSessionId || undefined);
+        tabs.push({
+          id: tab.id,
+          kind: "tmux",
+          title: tab.title,
+          tmuxSession: tab.tmuxSession,
+          tmuxSessionId: tab.tmuxSessionId || undefined,
+        });
       } else if (tab.kind === "explorer") {
         useFileStore.getState().createSession(tab.id, tab.title, tab.cwd);
         tabs.push({ id: tab.id, kind: "explorer", title: tab.title });
@@ -299,6 +316,7 @@ export function toWorkspaceTabs(tabs: Tab[]): WorkspaceTab[] {
     title: tab.title,
     openedFrom: tab.openedFrom ?? "",
     tmuxSession: tab.tmuxSession ?? "",
+    tmuxSessionId: tab.tmuxSessionId ?? "",
     cwd:
       tab.kind === "explorer"
         ? (files[tab.id]?.cwd ?? "")

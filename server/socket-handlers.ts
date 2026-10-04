@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import type { Server, Socket } from "socket.io";
 import { createPty, killPty, resizePty, writePty } from "./pty-manager.js";
 
@@ -5,6 +6,8 @@ interface CreateTerminal {
   sessionId: string;
   cwd?: string;
   tmuxSession?: string;
+  /** tmux's own session id (`$7`), which survives a rename. */
+  tmuxSessionId?: string;
   /** The pane's measured size, when it has one — see `dimension`. */
   cols?: number;
   rows?: number;
@@ -17,6 +20,27 @@ interface CreateTerminal {
  */
 function dimension(value: unknown): number | undefined {
   return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 1000 ? value : undefined;
+}
+
+/**
+ * How to get back into a tab's tmux session.
+ *
+ * By id when we have one and it still exists, because a session renamed while
+ * this tab was disconnected cannot be recognised any other way — attaching by
+ * the old name would silently create a second, empty session beside the real
+ * one. By name otherwise, with `-A` so a first connection creates it. An id
+ * does not survive a tmux server restart, which the existence check catches.
+ */
+function tmuxArgs(name: string, id?: string): string[] {
+  if (id && /^\$\d{1,10}$/.test(id)) {
+    try {
+      execFileSync("tmux", ["has-session", "-t", id], { timeout: 3000, stdio: "ignore" });
+      return ["attach-session", "-t", id];
+    } catch {
+      // Gone, or a different tmux server than the one that issued it.
+    }
+  }
+  return ["new", "-A", "-s", name];
 }
 
 export function registerSocketHandlers(io: Server): void {
@@ -39,7 +63,7 @@ export function registerSocketHandlers(io: Server): void {
       // attaches. `new -A` attaches if the session exists and creates it
       // otherwise, so a reconnect lands back in the same session instead of a
       // bare shell outside it.
-      const tmux = tmuxSession ? { shell: "tmux", args: ["new", "-A", "-s", tmuxSession] } : {};
+      const tmux = tmuxSession ? { shell: "tmux", args: tmuxArgs(tmuxSession, data.tmuxSessionId) } : {};
 
       createPty(sessionId, socket.id, {
         ...tmux,

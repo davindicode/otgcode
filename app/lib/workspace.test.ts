@@ -17,6 +17,7 @@ const tab = (over: Partial<WorkspaceTab> = {}): WorkspaceTab => ({
   path: "",
   openedFrom: "",
   tmuxSession: "",
+  tmuxSessionId: "",
   ...over,
 });
 
