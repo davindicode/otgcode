@@ -71,6 +71,10 @@
     "vitest": "^4.1.8"
   },
   "pnpm": {
+    "onlyBuiltDependencies_comment": "node-pty ships prebuilt binaries for macOS and Windows only, so on Linux it compiles pty.node at install time. pnpm >= 10 skips a dependency's build scripts unless it is listed here, and install still exits 0 — the failure only surfaces later as 'Failed to load native module: pty.node'.",
+    "onlyBuiltDependencies": [
+      "node-pty"
+    ],
     "comment": "Version-scoped overrides bump only the vulnerable major of transitive deps to a patched release, leaving other resolved majors (e.g. path-to-regexp@0.1.x, used by other tooling) untouched.",
     "overrides": {
       "dompurify@3": "^3.4.11",

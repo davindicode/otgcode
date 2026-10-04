@@ -31,10 +31,12 @@ STEP_LOG="$(mktemp)"
 
 show_cursor() { [ "$TTY" = 1 ] && printf '\033[?25h' || true; }
 
+# The server starts its own tunnel after it is listening and stops it on
+# SIGINT/SIGTERM, which it receives with us from the foreground process group.
+# A `pkill -f cloudflared` here killed tunnels this script never started —
+# other projects', other users' — on any shared machine.
 cleanup() {
   show_cursor
-  printf '\n  %sShutting down tunnels%s\n' "$DIM" "$RESET"
-  pkill -f 'cloudflared.*tunnel' 2>/dev/null || true
   rm -f "$STEP_LOG"
 }
 trap cleanup EXIT
@@ -67,6 +69,8 @@ run_step() {
     printf '  %s%s%s %s\n\n' "$RED" "$MARK_BAD" "$RESET" "$label"
     sed 's/^/    /' "$STEP_LOG"
     printf '\n'
+    # STEP_SOFT lets the caller print advice of its own before giving up.
+    [ "${STEP_SOFT:-0}" = 1 ] && return "$rc"
     exit "$rc"
   fi
 
@@ -86,10 +90,25 @@ note_warn() { printf '  %s!%s %s\n' "$YELLOW" "$RESET" "$1"; }
 # ---------------------------------------------------------------------------
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
-IS_WINDOWS=false
-if echo "$OS" | grep -qi "mingw\|msys\|cygwin"; then
-  IS_WINDOWS=true
-fi
+
+die() { printf '  %s%s%s %s\n\n' "$RED" "$MARK_BAD" "$RESET" "$1"; shift; printf '%b' "$@"; printf '\n'; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# Supported: Linux, macOS, and Windows through WSL2. Git Bash and MSYS get far
+# enough to look like they work and then fail on the native module, so stop here
+# rather than halfway through a build.
+case "$OS" in
+  mingw*|msys*|cygwin*)
+    die "Native Windows is not supported." \
+      "  Run OTG Code inside WSL2: ${CYAN}https://learn.microsoft.com/windows/wsl/install${RESET}\n" \
+      "  ${DIM}Install Node and pnpm inside WSL2 — not the Windows ones — and clone into\n" \
+      "  the WSL filesystem rather than /mnt/c.${RESET}\n" ;;
+esac
+
+have node || die "Node.js is not installed." "  ${DIM}OTG Code needs Node 20 or newer: https://nodejs.org${RESET}\n"
+NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)
+[ "$NODE_MAJOR" -ge 20 ] 2>/dev/null || die "Node $(node -v 2>/dev/null) is too old." "  ${DIM}OTG Code needs Node 20 or newer.${RESET}\n"
+have pnpm || die "pnpm is not installed." "  ${DIM}Install it with: npm install -g pnpm${RESET}  ${DIM}(pnpm 10 or newer)${RESET}\n"
 
 if [ -f .env ]; then
   set -a
@@ -116,6 +135,76 @@ if [ "$OS" = "darwin" ]; then
     -exec xattr -d com.apple.quarantine {} 2>/dev/null \; || true
 fi
 
+# ---------------------------------------------------------------------------
+# Native modules
+#
+# node-pty ships prebuilt binaries for macOS and Windows only, so everywhere
+# else it compiles pty.node during install — and pnpm >= 10 skips a dependency's
+# build scripts unless it is allowlisted (pnpm.onlyBuiltDependencies in
+# package.json, which is now set). `pnpm install` exits 0 either way, so without
+# this check the first sign of trouble was the server dying several steps later
+# with "Failed to load native module: pty.node".
+#
+# Loading it is also the cheapest check that an *existing* binary still matches
+# this machine: one built for another Node ABI (after an nvm switch) or another
+# architecture (a node_modules shared over NFS) fails to load, and gets rebuilt
+# here rather than at the first terminal the user opens.
+# ---------------------------------------------------------------------------
+# The brace group's own redirect also swallows the shell's "Segmentation fault"
+# notice: a pty.node built by a mismatched node-gyp crashes this probe rather
+# than throwing, and a core-dump line in the middle of a tidy checklist reads
+# far worse than the ✗ and the advice that follow it.
+pty_loads() { { node -e 'require("node-pty")'; } >/dev/null 2>&1; }
+
+# Compiles with a current node-gyp rather than going through `pnpm rebuild`.
+# That would re-run node-pty's own install script, which takes whatever
+# `node-gyp` is on PATH — and a distro package can be years old: Debian's
+# node-gyp 9.3.0 builds a pty.node against Node 24 that segfaults on every
+# load (measured here: 0/10, against 10/10 for the same source under 12.4.0).
+# A rebuild that produces a broken binary is worse than no rebuild, because it
+# looks like it worked.
+pty_rebuild() {
+  local dir
+  dir=$(node -e 'console.log(require("path").dirname(require.resolve("node-pty/package.json")))' 2>/dev/null) || return 1
+  [ -d "$dir" ] || return 1
+  (cd "$dir" && npx --yes node-gyp rebuild 2>&1) || true
+  pty_loads
+}
+
+toolchain_hint() {
+  printf '  %sCompiling it needs a C/C++ toolchain and Python:%s\n' "$DIM" "$RESET"
+  if   [ -f /etc/debian_version ];                               then printf '    sudo apt install -y build-essential python3\n'
+  elif [ -f /etc/alpine-release ];                               then printf '    sudo apk add build-base python3 linux-headers\n'
+  elif [ -f /etc/arch-release ];                                 then printf '    sudo pacman -S --needed base-devel python\n'
+  elif [ -f /etc/fedora-release ] || [ -f /etc/redhat-release ]; then printf '    sudo dnf group install -y "Development Tools"\n'
+  elif [ "$OS" = darwin ];                                       then printf '    xcode-select --install\n'
+  else                                                                printf '    gcc, g++, make and python3, from your package manager\n'
+  fi
+  printf '\n  %sNo root here? A toolchain in your own prefix works too:%s\n' "$DIM" "$RESET"
+  printf '    conda install -c conda-forge gxx make    %s# or: module load gcc%s\n' "$DIM" "$RESET"
+}
+
+if pty_loads; then
+  note_ok "Native modules" "node-pty ready"
+else
+  # Say what is missing before spending a minute failing to compile.
+  if ! { have cc || have gcc || have clang; } || ! have make || ! have python3; then
+    printf '  %s%s%s %s\n\n' "$RED" "$MARK_BAD" "$RESET" "Native modules"
+    printf '  node-pty has no prebuilt binary for %s/%s, and this machine cannot compile one.\n\n' "$OS" "$ARCH"
+    toolchain_hint
+    printf '\n'
+    exit 1
+  fi
+  STEP_SOFT=1
+  if ! run_step "Native modules" pty_rebuild; then
+    printf '  %sThe compile above failed, so the terminal would not have worked.%s\n\n' "$DIM" "$RESET"
+    toolchain_hint
+    printf '\n'
+    exit 1
+  fi
+  STEP_SOFT=0
+fi
+
 run_step "Production build" pnpm run build
 
 # ---------------------------------------------------------------------------
@@ -128,9 +217,6 @@ if command -v lsof &>/dev/null; then
 elif command -v ss &>/dev/null; then
   PID=$(ss -tlnp "sport = :$PORT" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -1)
   if [ -n "$PID" ]; then FREED=true; kill "$PID" 2>/dev/null || true; fi
-elif [ "$IS_WINDOWS" = true ]; then
-  PID=$(netstat -ano 2>/dev/null | grep "LISTENING" | grep ":$PORT " | awk '{print $5}' | head -1)
-  if [ -n "$PID" ]; then FREED=true; taskkill //F //PID "$PID" 2>/dev/null || true; fi
 fi
 if [ "$FREED" = true ]; then
   sleep 1
@@ -147,8 +233,6 @@ if command -v cloudflared &>/dev/null; then
   CF_CMD="cloudflared"
 elif [ -f "$(pwd)/.bin/cloudflared" ]; then
   CF_CMD="$(pwd)/.bin/cloudflared"
-elif [ -f "$(pwd)/.bin/cloudflared.exe" ]; then
-  CF_CMD="$(pwd)/.bin/cloudflared.exe"
 fi
 
 if [ -z "$CF_CMD" ]; then
@@ -172,20 +256,13 @@ if [ -z "$CF_CMD" ]; then
       esac
       curl -sL -o "$INSTALL_DIR/cloudflared" "$CF_URL"
       chmod +x "$INSTALL_DIR/cloudflared"
-    elif [ "$IS_WINDOWS" = true ]; then
-      case "$ARCH" in
-        x86_64) CF_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" ;;
-        *)      CF_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-386.exe" ;;
-      esac
-      curl -sL -o "$INSTALL_DIR/cloudflared.exe" "$CF_URL"
     else
       return 1
     fi
   }
 
-  if fetch_cloudflared >/dev/null 2>&1; then
-    [ -f "$INSTALL_DIR/cloudflared" ] && CF_CMD="$INSTALL_DIR/cloudflared"
-    [ -f "$INSTALL_DIR/cloudflared.exe" ] && CF_CMD="$INSTALL_DIR/cloudflared.exe"
+  if fetch_cloudflared >/dev/null 2>&1 && [ -f "$INSTALL_DIR/cloudflared" ]; then
+    CF_CMD="$INSTALL_DIR/cloudflared"
   fi
 
   if [ -z "$CF_CMD" ]; then

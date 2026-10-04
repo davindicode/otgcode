@@ -43,7 +43,7 @@ One pane with a single tab strip, VS Code style. Tabs come in four kinds — **T
 Install it to a home screen and it runs standalone like a native app; the layout, open tabs and your preferences are saved on the host, so a refresh or a reconnect from another device puts you back where you were.
 
 ### Terminal
-- Multi-session tabs (renamable), xterm.js with configurable font size
+- Terminal and tmux tabs (renamable), xterm.js at the font size set in Settings
 - **Quick action tab groups** — color-coded action tabs (blue) and app tabs (green):
   - **cmds** — common shell commands (ls, top, df, free, nvidia-smi, etc.)
   - **cd** — visual directory picker with server-side CWD detection (works inside tmux)
@@ -51,9 +51,8 @@ Install it to a home screen and it runs standalone like a native app; the layout
   - **code** — coding CLI launchers (Claude Code, Codex, OpenCode) with vendor selector, permission presets, and slash commands
   - **git** — quick actions (status, log, diff, add, fetch, pull, push, stash, branch), commit with message input, git config setup (user.name/email)
 - **Always-visible nav keys** below input — Enter, Bksp, arrows, Esc, Tab, PgUp/PgDn
-- **Context-aware tabs** — editor mode (nano/vim) disables action tabs; tmux mode hides nano/vim; plain terminal shows everything
 - System info popup with OS, kernel, CPU, memory, GPU details
-- Tool version detection (nano, vim, tmux, claude, codex, opencode)
+- Tool version detection (tmux, claude, codex, opencode)
 
 ### File Explorer
 - Multi-session tabs (renamable), breadcrumb + editable path navigation
@@ -85,9 +84,50 @@ Install it to a home screen and it runs standalone like a native app; the layout
 
 ### Settings & Preferences
 - **Dark and light themes** — one semantic colour token set drives the whole UI, including the terminal and code editor palettes; resolved server-side so there is no flash of the wrong theme on load
-- **Terminal font size**, adjustable from Settings or the terminal tab bar
+- **Terminal and editor font sizes**, adjustable from Settings
 - **Saved on the host, not in the browser** — `~/.otgcode/workspace.json` keeps the theme, font size, and every open tab with its directory or file. Preferences save themselves as you change them and follow you across refreshes, reconnects and devices
 - **Installable** — web app manifest, standalone display, maskable icons and iOS safe-area handling
+
+## Requirements
+
+| Platform | Status |
+|----------|--------|
+| Linux (x64 / arm64) | Supported — needs a C/C++ toolchain, see below |
+| macOS (Intel / Apple Silicon) | Supported — ships prebuilt binaries, no toolchain needed |
+| Windows | Through [WSL2](https://learn.microsoft.com/windows/wsl/install) only |
+
+Native Windows is not supported. `start.sh` stops with a pointer to WSL2 if you run it under Git Bash, MSYS or Cygwin.
+
+- **Node.js** 20 or newer
+- **pnpm** 10 or newer — `npm install -g pnpm`
+- **A C/C++ toolchain and Python 3** on Linux, and anywhere else `node-pty` has no prebuilt binary. It compiles `pty.node` from source there, and without it the terminal cannot start:
+
+  | | |
+  |---|---|
+  | Debian / Ubuntu | `sudo apt install -y build-essential python3` |
+  | Fedora / RHEL | `sudo dnf group install -y "Development Tools"` |
+  | Alpine | `sudo apk add build-base python3 linux-headers` |
+  | Arch | `sudo pacman -S --needed base-devel python` |
+  | macOS | `xcode-select --install` |
+
+- **cloudflared** — `start.sh` downloads it to `.bin/` for Linux and macOS (x64/arm64) if it isn't already on your PATH.
+
+`./start.sh` checks all of this up front and says exactly what to install, rather than failing later at the first terminal you open.
+
+<details>
+<summary><strong>Windows: running under WSL2</strong></summary>
+
+1. Install WSL2 and a distro — `wsl --install -d Ubuntu` in an admin PowerShell, then reboot.
+2. Open the Ubuntu shell. Everything below happens **inside** WSL: the Windows copies of Node and pnpm will not work, because `pty.node` is a Linux binary.
+3. Install Node, a toolchain and pnpm inside WSL:
+   ```bash
+   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+   sudo apt install -y nodejs build-essential python3
+   npm install -g pnpm
+   ```
+4. Clone into the **WSL filesystem** (`~/otgcode`), not `/mnt/c`. A checkout on the Windows drive is slow and breaks file watching.
+5. Run `./start.sh`. The tunnel URL works from any device; from the Windows host's own browser `http://localhost:7777` reaches it too, since WSL2 forwards localhost.
+</details>
 
 ## Quick Start
 
@@ -105,7 +145,7 @@ cp .env.example .env
 ./start.sh
 ```
 
-The `start.sh` script installs dependencies if needed, builds the app, starts the server, and launches a Cloudflare Quick Tunnel — printing a public URL you can open on any device. On macOS it also clears Gatekeeper quarantine flags on node-pty binaries. If `cloudflared` is not found in your PATH, the script auto-downloads it to `.bin/` (supports macOS, Linux, and Windows on x64/arm64).
+The `start.sh` script installs dependencies if needed, builds the app, starts the server, and launches a Cloudflare Quick Tunnel — printing a public URL you can open on any device. On macOS it also clears Gatekeeper quarantine flags on node-pty binaries. Before building, it verifies Node, pnpm and that node-pty's native module actually loads, rebuilding it if it does not. If `cloudflared` is not found in your PATH, the script downloads it to `.bin/` (macOS and Linux, x64/arm64).
 
 > [!WARNING]
 > **Keep the tunnel URL private.** Anyone who opens it gets a terminal on the host as the user that launched OTG Code, plus read/write access to that user's files. By default the URL is the only thing protecting it. For a second layer, turn on the **access password** in Settings (the cog in the header, top right) — it puts a login in front of the app and is enforced server-side on the API, the localhost proxy and the terminal socket.
@@ -141,6 +181,51 @@ ipconfig /flushdns
 # To revert: Set-DnsClientServerAddress -InterfaceAlias "Wi-Fi" -ResetServerAddresses
 ```
 </details>
+
+## Troubleshooting
+
+### `Failed to load native module: pty.node`
+
+`node-pty` never compiled. It ships prebuilt binaries for macOS and Windows only, so everywhere else it builds `pty.node` during install — and **pnpm 10 and newer skip a dependency's build scripts unless the package is allowlisted**, while `pnpm install` still exits 0. OTG Code allowlists it:
+
+```json
+"pnpm": { "onlyBuiltDependencies": ["node-pty"] }
+```
+
+A fresh `pnpm install` therefore compiles it. If the compile failed, or you are on an older checkout, `./start.sh` catches it at the **Native modules** step and rebuilds. By hand:
+
+```bash
+cd node_modules/.pnpm/node-pty@*/node_modules/node-pty
+npx --yes node-gyp rebuild
+```
+
+Install `build-essential` (or your platform's equivalent from [Requirements](#requirements)) and `python3` first.
+
+### The terminal crashes the server, or `pty.node` segfaults instead of erroring
+
+A `pty.node` built by an outdated `node-gyp` can bind to the wrong Node ABI and crash on every load rather than failing cleanly. Debian and Ubuntu ship `node-gyp` 9.x as `/usr/bin/node-gyp`, which does exactly this against Node 24. Rebuild with a current one:
+
+```bash
+cd node_modules/.pnpm/node-pty@*/node_modules/node-pty
+npx --yes node-gyp rebuild     # fetches a current node-gyp, ignoring /usr/bin/node-gyp
+```
+
+This is why `start.sh` repairs with `npx node-gyp` rather than `pnpm rebuild`: the latter re-runs node-pty's own install script, which takes whichever `node-gyp` is on PATH.
+
+### After switching Node versions, or on a `node_modules` shared between machines
+
+`pty.node` is compiled for one Node ABI and one architecture. An `nvm` switch across major versions, or a checkout shared over NFS between hosts, leaves a binary that no longer loads. `start.sh` notices on every run — loading the module *is* the check — and rebuilds it. By hand it is the same `node-gyp rebuild`.
+
+### No root on the machine
+
+OTG Code itself needs no `sudo`; only installing a compiler does. On a shared or HPC machine, bring your own toolchain instead:
+
+```bash
+conda install -c conda-forge gxx make    # or, on many clusters: module load gcc
+```
+
+Then re-run `./start.sh`.
+
 
 ## Scripts
 
@@ -182,21 +267,15 @@ The `/proxy/:port` reverse proxy is how localhost previews work — no extra tun
 
 React Router v7, Express, Socket.IO, node-pty, xterm.js, Monaco Editor, Zustand, Tailwind CSS v4, TypeScript
 
-## Requirements
-
-- **Node.js** 20+
-- **pnpm** (package manager)
-- **C compiler** for node-pty on Linux (`apt install build-essential`)
-- **cloudflared** (auto-installed by `start.sh` if not found) for remote access via Cloudflare tunnel
-
 ## Known Limitations
 
-- **tmux state sync is button-driven.** The terminal toolbar tracks whether
-  you're in tmux only when you attach/detach via the in-app buttons. If you run
-  `tmux attach` / `tmux new` / `detach` (or `exit`) manually in the terminal, the
-  UI won't reflect it. Robust sync is possible via server-side process inspection
-  (see the tracked issue) but is deferred. The same applies to nano/vim mode
-  detection.
+- **tmux controls belong to tmux tabs.** A tmux tab *is* its session, so its
+  controls are always correct. Running `tmux attach` by hand inside a plain
+  **terminal** tab still works, but that tab keeps a terminal's controls — use
+  `+` → tmux session to get the session controls.
+- **The code editor loads from a CDN.** Monaco is fetched from jsDelivr at
+  runtime rather than bundled, so the editor needs internet access even though
+  everything else works offline.
 
 ## License
 
