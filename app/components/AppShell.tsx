@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuthStore } from "~/stores/authStore";
+import { usePresenceStore } from "~/stores/presenceStore";
 import { toWorkspaceTabs, useTabsStore } from "~/stores/tabsStore";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
@@ -8,6 +9,7 @@ import FilesPage from "./files/FilesPage";
 import Header from "./Header";
 import PasswordGate from "./PasswordGate";
 import PasswordSetup from "./PasswordSetup";
+import SessionGate from "./SessionGate";
 import TabBar from "./TabBar";
 import Toaster from "./Toaster";
 import InputBox from "./terminal/InputBox";
@@ -62,6 +64,7 @@ export default function AppShell() {
   const hydrateWorkspace = useWorkspaceStore((s) => s.hydrate);
   const [workspaceReady, setWorkspaceReady] = useState(false);
 
+  const sessionStatus = usePresenceStore((s) => s.status);
   const tabs = useTabsStore((s) => s.tabs);
   const activeId = useTabsStore((s) => s.activeId);
 
@@ -105,6 +108,9 @@ export default function AppShell() {
 
   if (locked) return <PasswordGate />;
   if (!configured) return <PasswordSetup />;
+  // Another device holds the session, or took it. Nothing here can work until
+  // that is resolved, so don't render an app that would fight it.
+  if (sessionStatus !== "ok") return <SessionGate />;
 
   return (
     <div className="app-shell bg-app text-ink">

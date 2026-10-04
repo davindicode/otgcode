@@ -7,6 +7,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { Server as SocketIOServer } from "socket.io";
 import { authGate, gateSocketIO, mountAuthRoutes } from "./auth-routes.js";
+import { gatePresence } from "./presence.js";
 import { mountProxy } from "./proxy.js";
 import { registerSocketHandlers } from "./socket-handlers.js";
 
@@ -25,6 +26,8 @@ async function main() {
     cors: { origin: "*" },
   });
   gateSocketIO(io);
+  // One device at a time; a second is told, and can take over.
+  gatePresence(io);
   registerSocketHandlers(io);
 
   // Optional access password — same gate as production so dev behaves the same.

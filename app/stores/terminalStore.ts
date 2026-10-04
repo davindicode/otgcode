@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { DEFAULT_FONT_SIZE } from "~/lib/constants";
 import { getSocket } from "~/lib/socket";
 import { useAuthStore } from "./authStore";
+import { usePresenceStore } from "./presenceStore";
 import { useWorkspaceStore } from "./workspaceStore";
 
 interface TerminalSession {
@@ -57,6 +58,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
     socket.on("connect", () => {
       set({ socketConnected: true });
+      usePresenceStore.getState().clear();
 
       // On reconnect, re-create all existing sessions (server killed PTYs on disconnect)
       const { sessions } = get();
@@ -100,11 +102,28 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       set({ sessions: updated });
     });
 
-    // The server rejects the handshake when the access password is on and the
-    // session cookie is missing or stale (expired, or invalidated by a password
-    // change). Surface the lock screen instead of retrying forever.
-    socket.on("connect_error", (err: Error) => {
-      if (err?.message === "unauthorized") useAuthStore.getState().lock();
+    // Two handshake refusals, both of which retrying cannot fix, so each
+    // replaces the app with something actionable instead of a spinner:
+    // "unauthorized" is a missing or stale session cookie (expired, or
+    // invalidated by a password change), and "busy" is another device holding
+    // the single app session.
+    socket.on("connect_error", (err: Error & { data?: { since?: number } }) => {
+      if (err?.message === "unauthorized") {
+        useAuthStore.getState().lock();
+        return;
+      }
+      if (err?.message === "busy") {
+        usePresenceStore.getState().setBusy(err.data?.since ?? null);
+        // Stop the automatic retries; the user decides whether to take over.
+        socket.disconnect();
+      }
+    });
+
+    // Another device took the session. Stand down rather than reconnecting
+    // into a tug of war over it.
+    socket.on("displaced", () => {
+      usePresenceStore.getState().setDisplaced();
+      socket.disconnect();
     });
 
     socket.on("terminal_ready", (data: { sessionId: string }) => {

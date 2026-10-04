@@ -11,6 +11,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { isPasswordEnabled } from "./auth.js";
 import { authGate, gateSocketIO, mountAuthRoutes } from "./auth-routes.js";
 import { dim, localAddresses } from "./cli.js";
+import { gatePresence } from "./presence.js";
 import { mountProxy } from "./proxy.js";
 import { registerSocketHandlers } from "./socket-handlers.js";
 import { startTunnel, stopTunnel } from "./tunnel.js";
@@ -45,6 +46,8 @@ async function main() {
   });
   // Reject unauthenticated sockets before any handler can create a PTY.
   gateSocketIO(io);
+  // One device at a time; a second is told, and can take over.
+  gatePresence(io);
   registerSocketHandlers(io);
 
   // Remove default request size limits for uploads
