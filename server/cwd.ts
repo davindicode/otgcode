@@ -50,14 +50,15 @@ function findDeepestDescendant(pid: number, depth = 0): number {
   return findDeepestDescendant(children[children.length - 1], depth + 1);
 }
 
-/** Every client on the tmux server, with the pane each is looking at. */
-function listTmuxClients(): { tty: string; session: string; cwd: string }[] {
+/** Every client on the tmux server, with what each is looking at. */
+function listTmuxClients(): { tty: string; session: string; window: string; cwd: string }[] {
   try {
     // TMUX is dropped so this describes the whole server rather than the
     // session the app itself may have been started from.
     const env = { ...process.env };
     delete env.TMUX;
-    const out = execFileSync("tmux", ["list-clients", "-F", "#{client_tty}\t#{session_name}\t#{pane_current_path}"], {
+    const format = "#{client_tty}\t#{session_name}\t#{window_index}\t#{pane_current_path}";
+    const out = execFileSync("tmux", ["list-clients", "-F", format], {
       encoding: "utf-8",
       timeout: 2000,
       env,
@@ -67,8 +68,8 @@ function listTmuxClients(): { tty: string; session: string; cwd: string }[] {
       .split("\n")
       .filter(Boolean)
       .map((line) => {
-        const [tty, session, cwd] = line.split("\t");
-        return { tty, session, cwd };
+        const [tty, session, window, cwd] = line.split("\t");
+        return { tty, session, window, cwd };
       })
       .filter((client) => client.tty && client.cwd);
   } catch {
@@ -77,7 +78,15 @@ function listTmuxClients(): { tty: string; session: string; cwd: string }[] {
   }
 }
 
-function detectCwd(sessionId: string | undefined): { cwd: string; tmuxSession: string | null } {
+interface TerminalPlace {
+  cwd: string;
+  /** Present only for a tab attached to tmux. */
+  tmuxSession: string | null;
+  /** The window that tab's client is on, which its controls report. */
+  tmuxWindow: string | null;
+}
+
+function detectCwd(sessionId: string | undefined): TerminalPlace {
   if (sessionId) {
     const ptyPid = getPtyPid(sessionId);
     if (ptyPid) {
@@ -102,17 +111,17 @@ function detectCwd(sessionId: string | undefined): { cwd: string; tmuxSession: s
         const tty = readTty(candidate);
         if (!tty || !tty.startsWith("/dev/")) continue;
         const match = listTmuxClients().find((client) => client.tty === tty);
-        if (match) return { cwd: match.cwd, tmuxSession: match.session || null };
+        if (match) return { cwd: match.cwd, tmuxSession: match.session || null, tmuxWindow: match.window || null };
       }
 
       // No tmux client: walk to the deepest descendant of the PTY and read its cwd.
       try {
         const cwd = readlinkSync(`/proc/${findDeepestDescendant(ptyPid)}/cwd`);
-        if (cwd) return { cwd, tmuxSession: null };
+        if (cwd) return { cwd, tmuxSession: null, tmuxWindow: null };
       } catch {}
       try {
         const cwd = readlinkSync(`/proc/${ptyPid}/cwd`);
-        if (cwd) return { cwd, tmuxSession: null };
+        if (cwd) return { cwd, tmuxSession: null, tmuxWindow: null };
       } catch {}
     }
   }
@@ -121,7 +130,7 @@ function detectCwd(sessionId: string | undefined): { cwd: string; tmuxSession: s
   // answer available. The caller only asks for terminal tabs, so there is no
   // tmux fallback here — a tmux pane's directory is answered above, from that
   // client specifically, rather than from whichever pane tmux has focused.
-  return { cwd: process.env.DEFAULT_CWD || process.env.HOME || "/", tmuxSession: null };
+  return { cwd: process.env.DEFAULT_CWD || process.env.HOME || "/", tmuxSession: null, tmuxWindow: null };
 }
 
 export function mountCwdRoute(app: Express): void {

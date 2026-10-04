@@ -55,13 +55,16 @@ function tmuxStderr(err: unknown): string {
 function tmuxFailure(err: unknown, fallback: string): string {
   const stderr = tmuxStderr(err);
   if (/duplicate session/i.test(stderr)) return "A session with that name already exists";
+  // tmux says "can't find window" for a missing window and "can't find
+  // session" for a missing session; without this the first reads as the second.
+  if (/window/i.test(stderr)) return fallback;
   if (/(can't find|no such|not found)/i.test(stderr)) return "That session no longer exists";
   // tmux's own wording beats a generic sentence when we have it.
   return stderr.replace(/^\w+:\s*/, "") || fallback;
 }
 
 /**
- * Rename or kill a session. Done here rather than by typing tmux commands into
+ * Rename a session, select one of its windows, or kill it. Done here rather than by typing tmux commands into
  * some terminal: the picker is not attached to one, and the session being acted
  * on may well be the one the user is sitting in.
  */
@@ -69,7 +72,12 @@ export async function action({ request }: Route.ActionArgs) {
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
-  const { op, name, to } = (await request.json()) as { op?: string; name?: string; to?: string };
+  const { op, name, to, window } = (await request.json()) as {
+    op?: string;
+    name?: string;
+    to?: string;
+    window?: string;
+  };
   // Session names come from the client, so pass them as arguments rather than
   // through a shell.
   if (!name || !SESSION_NAME.test(name)) {
@@ -92,6 +100,25 @@ export async function action({ request }: Route.ActionArgs) {
       return Response.json({ ok: true, name: target });
     } catch (err) {
       return Response.json({ error: tmuxFailure(err, `Could not rename "${name}"`) }, { status: 400 });
+    }
+  }
+
+  if (op === "select-window") {
+    // Run as a command rather than sent as keystrokes. tmux's own command
+    // prompt cannot be driven by a burst of keys — it needs a real typist —
+    // and prefix-and-digit only reaches windows 0 to 9. This reaches any
+    // index, and does not care what the user's prefix is bound to.
+    if (!window || !/^\d{1,4}$/.test(window)) {
+      return Response.json({ error: "Window must be a number" }, { status: 400 });
+    }
+    try {
+      execFileSync("tmux", ["select-window", "-t", `${name}:${window}`], {
+        timeout: 3000,
+        stdio: ["ignore", "ignore", "pipe"],
+      });
+      return Response.json({ ok: true });
+    } catch (err) {
+      return Response.json({ error: tmuxFailure(err, `No window ${window}`) }, { status: 400 });
     }
   }
 

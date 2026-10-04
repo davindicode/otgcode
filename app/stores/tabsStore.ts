@@ -40,9 +40,12 @@ interface TabsState {
   /** Close every tab attached to a session that no longer exists. */
   closeTmuxTabs: (session: string) => void;
   /**
-   * Re-read the real name of every tmux tab's session, which may have been
-   * renamed from inside tmux rather than through the tab.
+   * Re-read what tmux says about one tmux tab, correcting its name if the
+   * session was renamed from inside tmux, and reporting the window its client
+   * is on. Null when tmux could not be asked.
    */
+  syncTmuxTab: (id: string) => Promise<{ name: string; window: string | null } | null>;
+  /** The same for every tmux tab, for when the picker is about to list them. */
   syncTmuxNames: () => Promise<void>;
   /** Opens the file, or focuses its tab if it is already open. */
   openViewer: (path: string, fromTabId?: string) => string;
@@ -133,34 +136,36 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return tabId;
   },
 
-  syncTmuxNames: async () => {
-    const tabs = get().tabs.filter((t) => t.kind === "tmux" && t.tmuxSession);
-    if (tabs.length === 0) return;
+  syncTmuxTab: async (id) => {
+    const tab = get().tabs.find((t) => t.id === id);
+    if (tab?.kind !== "tmux" || !tab.tmuxSession) return null;
 
-    // The server resolves this from the tab's own tmux client, so it is the
-    // name tmux has now — not the one the tab was opened with.
-    const named = await Promise.all(
-      tabs.map(async (tab) => {
-        try {
-          const res = await fetch(`/api/terminal/cwd?sessionId=${encodeURIComponent(tab.id)}`);
-          const data = (await res.json()) as { tmuxSession?: string | null };
-          return { id: tab.id, name: data.tmuxSession ?? null };
-        } catch {
-          return { id: tab.id, name: null };
-        }
-      }),
-    );
+    // The server resolves this from the tab's own tmux client, so it is what
+    // tmux has now — not what the tab was opened with.
+    let place: { tmuxSession?: string | null; tmuxWindow?: string | null };
+    try {
+      const res = await fetch(`/api/terminal/cwd?sessionId=${encodeURIComponent(id)}`);
+      place = await res.json();
+    } catch {
+      return null;
+    }
+    const name = place.tmuxSession;
+    // No name means tmux could not be asked — a dropped connection, or the
+    // client is gone. Leave the tab alone rather than guessing.
+    if (!name) return null;
 
-    for (const { id, name } of named) {
-      const tab = get().tabs.find((t) => t.id === id);
-      // A null name means tmux could not be asked — a dropped connection, or
-      // the client is gone. Leave the tab as it is rather than guessing.
-      if (!name || !tab || tab.tmuxSession === name) continue;
-      set((st) => ({
-        tabs: st.tabs.map((t) => (t.id === id ? { ...t, title: name, tmuxSession: name } : t)),
-      }));
+    if (name !== tab.tmuxSession) {
+      set((st) => ({ tabs: st.tabs.map((t) => (t.id === id ? { ...t, title: name, tmuxSession: name } : t)) }));
       useTerminalStore.getState().renameSession(id, name, name);
     }
+    return { name, window: place.tmuxWindow ?? null };
+  },
+
+  syncTmuxNames: async () => {
+    const ids = get()
+      .tabs.filter((t) => t.kind === "tmux" && t.tmuxSession)
+      .map((t) => t.id);
+    await Promise.all(ids.map((id) => get().syncTmuxTab(id)));
   },
 
   closeTmuxTabs: (session) => {

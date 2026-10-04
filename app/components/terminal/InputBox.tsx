@@ -167,15 +167,14 @@ const DRAWER_MS = 280;
 // switch: the tab is bound to one session and choosing one happens in the +
 // picker. No detach either — closing the tab detaches, and the session keeps
 // running, which is the whole point of it.
-/** Getting out of, or confirming, whatever tmux view a control opened. */
-const TMUX_EXIT_KEYS: QuickKey[] = [
-  { label: "Esc", key: "\x1b", title: "Leave the tmux list / prompt" },
+/**
+ * General tmux control, kept in the top line rather than in a group: every
+ * group can open a list or a prompt, and Esc is the way back out of all of
+ * them. Which group is selected should not decide whether you can leave.
+ */
+const TMUX_GENERAL_KEYS: QuickKey[] = [
+  { label: "Esc", key: "\x1b", title: "Leave a tmux list, prompt or copy mode" },
   { label: "Enter", key: "\r", title: "Confirm" },
-];
-
-const TMUX_SESSION_KEYS: QuickKey[] = [
-  { label: "$ rename", key: "\x02$", title: "Rename this session" },
-  { label: ": cmd", key: "\x02:", title: "tmux command prompt" },
 ];
 
 // Grouped by what each control acts on, one group shown at a time.
@@ -186,32 +185,49 @@ const TMUX_GROUPS: { label: string; keys: QuickKey[] }[] = [
       { label: "c new", key: "\x02c", title: "New window" },
       { label: "n next", key: "\x02n", title: "Next window" },
       { label: "p prev", key: "\x02p", title: "Previous window" },
-      { label: "0", key: "\x020", title: "Window 0" },
-      { label: "1", key: "\x021", title: "Window 1" },
-      { label: "2", key: "\x022", title: "Window 2" },
-      { label: "3", key: "\x023", title: "Window 3" },
-      { label: "4", key: "\x024", title: "Window 4" },
-      { label: "5", key: "\x025", title: "Window 5" },
-      { label: ", rename", key: "\x02,", title: "Rename window" },
-      { label: "& kill", key: "\x02&", title: "Kill window" },
-      { label: "w list", key: "\x02w", title: "List windows" },
+      { label: "l last", key: "\x02l", title: "Last window used" },
+      { label: ", rename", key: "\x02,", title: "Rename this window" },
+      { label: "& kill", key: "\x02&", title: "Kill this window" },
+      { label: "w list", key: "\x02w", title: "List windows — Esc to leave" },
     ],
   },
   {
     label: "panes",
     keys: [
-      { label: '" hsplit', key: '\x02"', title: "Split horizontal" },
-      { label: "% vsplit", key: "\x02%", title: "Split vertical" },
-      { label: "o pane", key: "\x02o", title: "Next pane" },
-      { label: "z zoom", key: "\x02z", title: "Toggle zoom pane" },
-      { label: "x kill", key: "\x02x", title: "Kill pane" },
+      { label: '" hsplit', key: '\x02"', title: "Split horizontally" },
+      { label: "% vsplit", key: "\x02%", title: "Split vertically" },
+      // Directional selection is the only way around a split layout that does
+      // not involve counting, and a phone has no prefix-and-arrow to press.
+      { label: "←", key: "\x02\x1b[D", title: "Select the pane to the left" },
+      { label: "→", key: "\x02\x1b[C", title: "Select the pane to the right" },
+      { label: "↑", key: "\x02\x1b[A", title: "Select the pane above" },
+      { label: "↓", key: "\x02\x1b[B", title: "Select the pane below" },
+      { label: "o next", key: "\x02o", title: "Next pane in order" },
+      { label: "; last", key: "\x02;", title: "Last pane used" },
+      { label: "q nums", key: "\x02q", title: "Show pane numbers — type one to select it" },
+      { label: "space", key: "\x02 ", title: "Next layout" },
+      { label: "z zoom", key: "\x02z", title: "Toggle zoom on this pane" },
+      { label: "x kill", key: "\x02x", title: "Kill this pane" },
     ],
   },
   {
     label: "copy",
     keys: [
-      { label: "[ scroll", key: "\x02[", title: "Scroll/copy mode (Esc to exit)" },
-      { label: "] paste", key: "\x02]", title: "Paste from tmux buffer" },
+      { label: "[ scroll", key: "\x02[", title: "Enter copy mode to scroll back" },
+      // No prefix on these three: inside copy mode they are the keys
+      // themselves, and the main set's arrows and paging work there too.
+      { label: "/ search", key: "/", title: "Search backward — inside copy mode" },
+      { label: "? fwd", key: "?", title: "Search forward — inside copy mode" },
+      { label: "q quit", key: "q", title: "Leave copy mode" },
+      { label: "] paste", key: "\x02]", title: "Paste the tmux buffer" },
+    ],
+  },
+  {
+    label: "session",
+    keys: [
+      { label: "$ rename", key: "\x02$", title: "Rename this session" },
+      { label: ": cmd", key: "\x02:", title: "tmux command prompt — Esc to leave" },
+      { label: "? keys", key: "\x02?", title: "List tmux key bindings — Esc to leave" },
     ],
   },
 ];
@@ -263,6 +279,9 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const [comboMode, setComboMode] = useState<ComboMode>("none");
   const [kbMode, setKbMode] = useState<KbMode>("main");
   const [gitForm, setGitForm] = useState<GitForm>("commit");
+  /** Which window this tab's tmux client is on, as tmux reports it. */
+  const [tmuxWindow, setTmuxWindow] = useState<string | null>(null);
+  const [windowTarget, setWindowTarget] = useState("");
   const [gitCommitMsg, setGitCommitMsg] = useState("");
   const [gitConfigName, setGitConfigName] = useState("");
   const [gitConfigEmail, setGitConfigEmail] = useState("");
@@ -434,16 +453,50 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     return [];
   };
 
-  // tmux's `$ rename` prompt completes whenever the user finishes typing, with
-  // nothing for the app to observe — so while the tmux controls are open, the
-  // real name is re-read. Bounded to that: the drawer is not open for long.
+  // Both the name and the window move without telling us: tmux's rename prompt
+  // finishes whenever the user finishes typing, and the window changes from the
+  // keys below or from inside the pane. So while the tmux controls are open,
+  // ask. Bounded to that: the drawer is not open for long.
   useEffect(() => {
-    if (drawerGroup !== TMUX_TAB || !tmuxSession) return;
-    const syncTmuxNames = useTabsStore.getState().syncTmuxNames;
-    syncTmuxNames();
-    const id = setInterval(syncTmuxNames, 3000);
-    return () => clearInterval(id);
-  }, [drawerGroup, tmuxSession]);
+    if (drawerGroup !== TMUX_TAB || !sessionId || !tmuxSession) return;
+    let live = true;
+    const sync = async () => {
+      const place = await useTabsStore.getState().syncTmuxTab(sessionId);
+      if (live) setTmuxWindow(place?.window ?? null);
+    };
+    sync();
+    const id = setInterval(sync, 3000);
+    return () => {
+      live = false;
+      clearInterval(id);
+    };
+  }, [drawerGroup, sessionId, tmuxSession]);
+
+  /**
+   * Any window index. Asks the server to run `select-window` rather than
+   * typing into tmux's command prompt, which cannot be driven by a burst of
+   * keystrokes, and rather than prefix-and-digit, which stops at 9.
+   */
+  const goToWindow = async () => {
+    const index = windowTarget.trim();
+    if (!tmuxSession || !/^\d{1,4}$/.test(index)) return;
+    try {
+      const res = await fetch("/api/tmux/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "select-window", name: tmuxSession, window: index }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (data.error) {
+        showToast(data.error);
+        return;
+      }
+      setWindowTarget("");
+      setTmuxWindow(index);
+    } catch {
+      showToast("Could not reach the server");
+    }
+  };
 
   const toggleGroup = (id: string) => {
     if (activeGroup === id) {
@@ -663,36 +716,22 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
 
           {drawerGroup === TMUX_TAB && tmuxSession && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-              <div className="flex flex-wrap items-center gap-1">
+              {/* Where you are, how to get out, and how to get somewhere —
+                  none of which should depend on the group below. */}
+              <div onPointerDown={dragScroll} className="flex items-center gap-1 overflow-x-auto scrollbar-none">
                 <span className="shrink-0 text-[10px] text-ink-faint">
                   session <span className="font-medium text-blue-300">{tmuxSession}</span>
+                  {tmuxWindow !== null && (
+                    <>
+                      {" "}
+                      · window <span className="font-medium text-blue-300">{tmuxWindow}</span>
+                    </>
+                  )}
                 </span>
-                <span aria-hidden="true" className="mx-0.5 select-none text-ink-ghost">
+                <span aria-hidden="true" className="mx-0.5 shrink-0 select-none text-ink-ghost">
                   |
                 </span>
-                {TMUX_SESSION_KEYS.map((qk) => (
-                  <button
-                    key={qk.label}
-                    {...repeatProps(qk.key)}
-                    disabled={!sessionId}
-                    title={qk.title}
-                    className={keyBtn}
-                  >
-                    {qk.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-1.5 flex items-start gap-1.5 border-t border-line/50 pt-1.5">
-                <DropUpSelect
-                  value={tmuxGroup}
-                  options={TMUX_GROUPS.map((g) => ({ id: g.label, label: g.label }))}
-                  onChange={setTmuxGroup}
-                />
-                {/* Fixed, whichever group is showing: `w list`, `: cmd` and the
-                    rename prompt all open a tmux view that Esc is the way out
-                    of, and Enter the way to confirm. */}
-                {TMUX_EXIT_KEYS.map((qk) => (
+                {TMUX_GENERAL_KEYS.map((qk) => (
                   <button
                     key={qk.label}
                     {...repeatProps(qk.key)}
@@ -706,14 +745,46 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                 <span aria-hidden="true" className="mx-0.5 shrink-0 select-none text-ink-ghost">
                   |
                 </span>
-                <div className="flex min-w-0 flex-wrap gap-1">
+                {/* Any index, not just the ones that fit on a row of buttons.
+                    tmux's prefix-and-digit only reaches 0-9; this goes through
+                    select-window, so window 12 is as reachable as window 2. */}
+                <span className="shrink-0 text-[10px] text-ink-ghost">go to</span>
+                <input
+                  value={windowTarget}
+                  onChange={(e) => setWindowTarget(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  onKeyDown={(e) => e.key === "Enter" && goToWindow()}
+                  inputMode="numeric"
+                  placeholder="#"
+                  aria-label="Window index"
+                  className="field w-12 shrink-0 px-2 py-0.5 text-[11px]"
+                />
+                <button
+                  onClick={goToWindow}
+                  disabled={!windowTarget || !sessionId}
+                  title="Select that window"
+                  className={`${keyBtn} shrink-0`}
+                >
+                  Go
+                </button>
+              </div>
+
+              <div className="mt-1.5 flex items-start gap-1.5 border-t border-line/50 pt-1.5">
+                <DropUpSelect
+                  value={tmuxGroup}
+                  options={TMUX_GROUPS.map((g) => ({ id: g.label, label: g.label }))}
+                  onChange={setTmuxGroup}
+                />
+                <div
+                  onPointerDown={dragScroll}
+                  className="flex min-w-0 items-center gap-1 overflow-x-auto scrollbar-none"
+                >
                   {(TMUX_GROUPS.find((g) => g.label === tmuxGroup) ?? TMUX_GROUPS[0]).keys.map((qk) => (
                     <button
                       key={qk.label}
                       {...repeatProps(qk.key)}
                       disabled={!sessionId}
                       title={qk.title}
-                      className={keyBtn}
+                      className={`${keyBtn} shrink-0`}
                     >
                       {qk.label}
                     </button>
