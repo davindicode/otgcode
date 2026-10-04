@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { watchForExpiredSession } from "~/lib/api";
 import { useAuthStore } from "~/stores/authStore";
 import { usePresenceStore } from "~/stores/presenceStore";
 import { toWorkspaceTabs, useTabsStore } from "~/stores/tabsStore";
@@ -69,6 +70,9 @@ export default function AppShell() {
   const activeId = useTabsStore((s) => s.activeId);
 
   useEffect(() => {
+    // Installed before anything fetches, so an expiry noticed by any request
+    // shows the lock screen rather than a toast nobody can act on.
+    watchForExpiredSession();
     refreshAuth();
   }, [refreshAuth]);
 

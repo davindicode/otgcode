@@ -1,11 +1,11 @@
 /**
- * Key sequences for the combos drawer: a modifier plus a key, in the encoding
+ * Key sequences for the keyboard: a modifier plus a key, in the encoding
  * terminals actually expect. Pure, so the sequences are checked by tests
  * rather than by pressing every button in a shell.
  */
-export type StickyMode = "none" | "shift" | "ctrl" | "ctrl+shift" | "alt" | "alt+shift";
+export type ComboMode = "none" | "shift" | "ctrl" | "ctrl+shift" | "alt" | "alt+shift";
 
-export const STICKY_MODES: { id: StickyMode; label: string }[] = [
+export const COMBO_MODES: { id: ComboMode; label: string }[] = [
   // The default: these sets double as a plain character keyboard, which is
   // what you want on a phone before you want a modifier.
   { id: "none", label: "none" },
@@ -19,7 +19,7 @@ export const STICKY_MODES: { id: StickyMode; label: string }[] = [
 // xterm's modifier parameter, used by every CSI sequence below. 1 is "no
 // modifier", which the builders turn into the plain form of the key rather
 // than a `1;1` sequence no terminal emits.
-export const MODIFIER_PARAM: Record<StickyMode, number> = {
+export const MODIFIER_PARAM: Record<ComboMode, number> = {
   none: 1,
   shift: 2,
   ctrl: 5,
@@ -48,7 +48,7 @@ const SHIFTED_DIGITS: Record<string, string> = {
   "0": ")",
 };
 
-export function getStickyKey(ch: string, mode: StickyMode): string {
+function comboChar(ch: string, mode: ComboMode): string {
   const isLetter = ch >= "A" && ch <= "Z";
   switch (mode) {
     case "none":
@@ -174,11 +174,11 @@ export const COMBO_SETS = ["main", "numbers", "letters", "function", "symbols"] 
 export type ComboSet = (typeof COMBO_SETS)[number];
 
 /** Sequence for a labelled key in one of the combo sets. */
-export function comboSequence(label: string, mode: StickyMode): string {
+export function comboSequence(label: string, mode: ComboMode): string {
   const symbol = SYMBOL_COMBO_KEYS.find((k) => k.label === label);
-  if (symbol) return mode === "ctrl" && symbol.ctrl ? symbol.ctrl : getStickyKey(symbol.ch, mode);
+  if (symbol) return mode === "ctrl" && symbol.ctrl ? symbol.ctrl : comboChar(symbol.ch, mode);
   const named = [...MAIN_COMBO_KEYS, ...FN_COMBO_KEYS].find((k) => k.label === label);
   // Narrowed by which half of the union is present, not by a flag.
-  if (named) return named.seq ? named.seq(MODIFIER_PARAM[mode]) : getStickyKey(named.char, mode);
-  return getStickyKey(label, mode);
+  if (named) return named.seq ? named.seq(MODIFIER_PARAM[mode]) : comboChar(named.char, mode);
+  return comboChar(label, mode);
 }

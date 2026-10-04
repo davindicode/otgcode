@@ -23,7 +23,7 @@ export interface Holder {
 export type ClaimResult = { ok: true; displaced: string | null } | { ok: false; holder: Holder };
 
 /** How long a displaced socket has to receive the reason before it is closed. */
-export const DISPLACE_GRACE_MS = 50;
+const DISPLACE_GRACE_MS = 50;
 
 let holder: Holder | null = null;
 
@@ -72,6 +72,13 @@ export function gatePresence(io: SocketIOServer): void {
     const auth = socket.handshake.auth ?? {};
     const raw = typeof auth.deviceId === "string" ? auth.deviceId : "";
     const deviceId = /^[\w-]{1,64}$/.test(raw) ? raw : "";
+
+    // A holder is released when its socket disconnects, which Socket.IO is
+    // reliable about — but the lock is the only way into the app, so it does
+    // not get to depend on that. If the holding socket is no longer on the
+    // server, the lock is stale and nobody should have to take it over.
+    const held = activeSession();
+    if (held && !io.sockets.sockets.has(held.socketId)) releaseSession(held.socketId);
 
     const result = claimSession(deviceId, socket.id, { takeover: auth.takeover === true });
 

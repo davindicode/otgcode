@@ -37,13 +37,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     shell: run("echo $SHELL") || run("echo %COMSPEC%") || null,
     node: process.version,
     tmux: run("tmux -V")?.replace(/^tmux\s+/i, "") || null,
-    nano:
-      os === "darwin"
-        ? run("which nano")
-          ? "pico"
-          : null
-        : run("nano --version")?.match(/nano\s+([\d.]+)/i)?.[1] || (run("which nano") ? "installed" : null),
-    vim: run("vim --version").match(/Vi IMproved\s+([\d.]+)/)?.[1] || null,
     git: run("git --version")?.replace(/^git version\s+/i, "") || null,
     python:
       run("python3 --version")?.replace(/^Python\s+/i, "") ||

@@ -1,18 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiJson } from "~/lib/api";
 import { shellQuote } from "~/lib/shell";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { showToast } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
 import CommandChips, { type Chip } from "./CommandChips";
 import {
+  COMBO_MODES,
   COMBO_SETS,
+  type ComboMode,
   type ComboSet,
   comboSequence,
   FN_COMBO_KEYS,
   MAIN_COMBO_KEYS,
-  STICKY_MODES,
-  type StickyMode,
   SYMBOL_COMBO_KEYS,
 } from "./combos";
 import DropUpSelect from "./DropUpSelect";
@@ -50,10 +49,7 @@ const TERMINAL_GROUPS: QuickKeyGroup[] = [
   },
 ];
 
-// Always-visible nav keys (shown below text input)
-// Common key combos shared across all coding CLIs
-// (y/n live in NAV_TAIL — always-visible below the input — since they're also
-// useful for tmux confirms and other action contexts.)
+// Keys every coding CLI shares, shown with that CLI's own.
 const CODE_COMMON_KEYS: QuickKey[] = [
   { label: "Ctrl+C", key: "\x03", title: "Cancel / interrupt / quit" },
   { label: "Ctrl+L", key: "\x0c", title: "Clear screen (Claude/Codex) / View logs (OpenCode)" },
@@ -257,7 +253,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const [tmuxGroup, setTmuxGroup] = useState(TMUX_GROUPS[0].label);
   const [cdDirs, setCdDirs] = useState<string[]>([]);
   const [cdLoading, setCdLoading] = useState(false);
-  const [stickyMode, setStickyMode] = useState<StickyMode>("none");
+  const [comboMode, setComboMode] = useState<ComboMode>("none");
   const [kbMode, setKbMode] = useState<KbMode>("main");
   const [gitForm, setGitForm] = useState<GitForm>("commit");
   const [gitCommitMsg, setGitCommitMsg] = useState("");
@@ -381,7 +377,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   });
 
-  const modeLabel = stickyMode === "none" ? "" : (STICKY_MODES.find((m) => m.id === stickyMode)?.label ?? "");
+  const modeLabel = comboMode === "none" ? "" : (COMBO_MODES.find((m) => m.id === comboMode)?.label ?? "");
 
   const KB_MODES: { id: KbMode; label: string }[] = [
     ...COMBO_SETS.map((set) => ({ id: set as KbMode, label: set })),
@@ -400,31 +396,31 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     if (comboSet === "numbers") {
       return "0123456789".split("").map((ch) => ({
         label: ch,
-        seq: comboSequence(ch, stickyMode),
-        title: sentLabel(`${modeLabel}${ch}`, comboSequence(ch, stickyMode)),
+        seq: comboSequence(ch, comboMode),
+        title: sentLabel(`${modeLabel}${ch}`, comboSequence(ch, comboMode)),
       }));
     }
     if (comboSet === "letters") {
       return "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((ch) => ({
         // Labelled with the key, like a keyboard: `A` sends `a` unmodified.
         label: ch,
-        seq: comboSequence(ch, stickyMode),
+        seq: comboSequence(ch, comboMode),
         // A key labelled `A` that sends `a` is worth spelling out; a control
         // code is not, so only a printable result is named.
-        title: sentLabel(`${modeLabel}${ch}`, comboSequence(ch, stickyMode)),
+        title: sentLabel(`${modeLabel}${ch}`, comboSequence(ch, comboMode)),
       }));
     }
     if (comboSet === "main" || comboSet === "function") {
       return (comboSet === "main" ? MAIN_COMBO_KEYS : FN_COMBO_KEYS).map((key) => ({
         label: key.label,
-        seq: comboSequence(key.label, stickyMode),
-        title: sentLabel(`${modeLabel}${key.title}`, comboSequence(key.label, stickyMode)),
+        seq: comboSequence(key.label, comboMode),
+        title: sentLabel(`${modeLabel}${key.title}`, comboSequence(key.label, comboMode)),
       }));
     }
     if (comboSet === "symbols") {
       return SYMBOL_COMBO_KEYS.map((key) => ({
         label: key.label,
-        seq: comboSequence(key.label, stickyMode),
+        seq: comboSequence(key.label, comboMode),
         title: `${modeLabel}${key.label} — ${key.title}`,
       }));
     }
@@ -449,20 +445,14 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
       let targetDir = dir;
       if (!targetDir) {
         try {
-          const cwdData = await apiJson<{ cwd?: string }>(`/api/terminal/cwd?sessionId=${sessionId}`);
-          if (cwdData?.cwd) targetDir = cwdData.cwd;
+          const cwdData = await (await fetch(`/api/terminal/cwd?sessionId=${sessionId}`)).json();
+          if (cwdData.cwd) targetDir = cwdData.cwd;
         } catch {}
       }
       const query = targetDir ? `?dir=${encodeURIComponent(targetDir)}&showHidden=false` : "?showHidden=false";
-      const data = await apiJson<{
-        dir: string;
-        entries?: { name: string; isDirectory: boolean }[];
-        error?: string;
-      }>(`/api/files/list${query}`);
-      // null means the session expired and the lock screen is already up.
-      if (!data) {
-        return;
-      } else if (data.error) {
+      const res = await fetch(`/api/files/list${query}`);
+      const data = await res.json();
+      if (data.error) {
         showToast(data.error);
       } else if (useTerminalStore.getState().sessions[sessionId]) {
         // Drop the result if the tab was closed while we were fetching.
@@ -498,7 +488,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   // --- Styles ---
   const tabBase = "px-2.5 py-0.5 text-[11px] rounded-control whitespace-nowrap shrink-0 select-none touch-manipulation";
   const tabDisabled = `${tabBase} bg-disabled text-ink-ghost cursor-not-allowed`;
-  // Action tabs (cmds, cd, code, sticky) — blue. `relief` supplies the raised
+  // Action tabs (keyboard, commands, navigate) — blue. `relief` supplies the raised
   // body; the tinted fill underneath only shows through on the active one.
   // Native terminal tabs (text, cmds, cd, combos) — blue
   const actionTabOff = `${tabBase} relief text-tab-action-ink`;
@@ -653,7 +643,6 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
             </div>
           )}
 
-          {/* Sticky modifier popup */}
           {drawerGroup === TMUX_TAB && tmuxSession && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
               <div className="flex flex-wrap items-center gap-1">
@@ -739,7 +728,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                 {comboSet && (
                   <>
                     <span className="shrink-0 text-[10px] text-ink-ghost">combo mode:</span>
-                    <DropUpSelect value={stickyMode} options={STICKY_MODES} onChange={setStickyMode} />
+                    <DropUpSelect value={comboMode} options={COMBO_MODES} onChange={setComboMode} />
                   </>
                 )}
 
