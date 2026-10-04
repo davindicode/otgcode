@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiJson } from "~/lib/api";
+import { shellQuote } from "~/lib/shell";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { showToast } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
@@ -186,10 +188,6 @@ const GIT_QUICK_CMDS: { label: string; title: string; command: string }[] = [
 // Matches the .drawer transition in app.css.
 const DRAWER_MS = 280;
 
-// Grow to three lines, then scroll inside the field: 3 × leading-5, plus the
-// field's py-2 and its 1px borders.
-const TEXTAREA_MAX_PX = 3 * 20 + 16 + 2;
-
 // Controls for the session a tmux tab is attached to. No session list or
 // switch: the tab is bound to one session and choosing one happens in the +
 // picker. No detach either — closing the tab detaches, and the session keeps
@@ -242,6 +240,13 @@ const TEXT_TAB = "__text__";
 const STICKY_TAB = "__sticky__";
 const CODE_TAB = "__code__";
 const GIT_TAB = "__git__";
+
+/** The git drawer's form line, chosen the way a combo set is. */
+type GitForm = "commit" | "config";
+const GIT_FORMS: { id: GitForm; label: string }[] = [
+  { id: "commit", label: "commit" },
+  { id: "config", label: "config" },
+];
 const CD_TAB = "__cd__";
 
 interface TmuxSession {
@@ -285,6 +290,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const [cdLoading, setCdLoading] = useState(false);
   const [stickyMode, setStickyMode] = useState<StickyMode>("ctrl");
   const [codeVendorIdx, setCodeVendorIdx] = useState(0);
+  const [gitForm, setGitForm] = useState<GitForm>("commit");
   const [gitCommitMsg, setGitCommitMsg] = useState("");
   const [gitConfigName, setGitConfigName] = useState("");
   const [gitConfigEmail, setGitConfigEmail] = useState("");
@@ -314,15 +320,22 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     if (!sessionId || !text) return;
     sendInput(sessionId, text + "\n");
     setText("");
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
     textareaRef.current?.focus();
   };
 
-  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setText(e.target.value);
-    const ta = e.target;
-    ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, TEXTAREA_MAX_PX)}px`;
+  const commitGit = () => {
+    const message = gitCommitMsg.trim();
+    if (!sessionId || !message) return;
+    sendInput(sessionId, `git commit -m ${shellQuote(message)}\n`);
+    setGitCommitMsg("");
+  };
+
+  const setGitIdentity = () => {
+    if (!sessionId) return;
+    if (gitConfigName.trim())
+      sendInput(sessionId, `git config --global user.name ${shellQuote(gitConfigName.trim())}\n`);
+    if (gitConfigEmail.trim())
+      sendInput(sessionId, `git config --global user.email ${shellQuote(gitConfigEmail.trim())}\n`);
   };
 
   const handleQuickKey = useCallback(
@@ -429,15 +442,20 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
       let targetDir = dir;
       if (!targetDir) {
         try {
-          const cwdRes = await fetch(`/api/terminal/cwd?sessionId=${sessionId}&inTmux=${!!tmuxSession}`);
-          const cwdData = await cwdRes.json();
-          if (cwdData.cwd) targetDir = cwdData.cwd;
+          const cwdData = await apiJson<{ cwd?: string }>(`/api/terminal/cwd?sessionId=${sessionId}`);
+          if (cwdData?.cwd) targetDir = cwdData.cwd;
         } catch {}
       }
       const query = targetDir ? `?dir=${encodeURIComponent(targetDir)}&showHidden=false` : "?showHidden=false";
-      const res = await fetch(`/api/files/list${query}`);
-      const data = await res.json();
-      if (data.error) {
+      const data = await apiJson<{
+        dir: string;
+        entries?: { name: string; isDirectory: boolean }[];
+        error?: string;
+      }>(`/api/files/list${query}`);
+      // null means the session expired and the lock screen is already up.
+      if (!data) {
+        return;
+      } else if (data.error) {
         showToast(data.error);
       } else if (useTerminalStore.getState().sessions[sessionId]) {
         // Drop the result if the tab was closed while we were fetching.
@@ -458,7 +476,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const handleCdTo = (dir: string) => {
     if (!sessionId) return;
     const absPath = dir === ".." ? cdCwd.replace(/\/[^/]+$/, "") || "/" : `${cdCwd}/${dir}`;
-    sendInput(sessionId, `cd '${absPath}'\n`);
+    sendInput(sessionId, `cd ${shellQuote(absPath)}\n`);
     fetchDirs(absPath);
   };
 
@@ -547,11 +565,16 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
       {/* Tab bar */}
       <div className="border-b border-line/50 overflow-x-auto scrollbar-none" style={{ minWidth: 0 }}>
         <div className="flex items-center gap-1 px-2 py-1 w-max">
-          {tmuxSession && tabBtn(TMUX_TAB, "tmux", `Controls for session "${tmuxSession}"`, false, "app")}
+          {/* First slot belongs to whatever the tab *is*: a tmux session's own
+          controls, or the working directory of a shell. cd has no meaning on a
+          tmux tab — the pane's directory is tmux's business — so it is absent
+          there rather than present and failing. */}
+          {tmuxSession
+            ? tabBtn(TMUX_TAB, "tmux", `Controls for session "${tmuxSession}"`, false, "app")
+            : tabBtn(CD_TAB, "cd", "Change directory", !sessionId)}
           {tabBtn(TEXT_TAB, "text", "Type a command or message", !sessionId)}
-          {/* Native terminal tabs (blue) — always in same order, hidden in editor mode */}
+          {/* Shell actions (blue), always in the same order */}
           {TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !sessionId))}
-          {tabBtn(CD_TAB, "cd", "Change directory", !sessionId)}
           {tabBtn(STICKY_TAB, "combos", "Modifier key combinations")}
           {tabBtn(CODE_TAB, "code", "Coding CLI launchers & keys", !sessionId, "cli")}
           {tabBtn(GIT_TAB, "git", "Git actions", !sessionId, "cli")}
@@ -858,64 +881,50 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                   </button>
                 ))}
               </div>
-              {/* Git commit with message input */}
-              <div className="flex items-center gap-1.5 mb-1.5 border-t border-line/50 pt-1.5">
-                <span className="text-[10px] text-ink-ghost shrink-0">commit</span>
-                <input
-                  value={gitCommitMsg}
-                  onChange={(e) => setGitCommitMsg(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && gitCommitMsg.trim() && sessionId) {
-                      const escaped = gitCommitMsg.replace(/'/g, "'\\''");
-                      sendInput(sessionId, `git commit -m '${escaped}'\n`);
-                      setGitCommitMsg("");
-                    }
-                  }}
-                  placeholder="commit message..."
-                  className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
-                />
-                <button
-                  onClick={() => {
-                    if (sessionId && gitCommitMsg.trim()) {
-                      const escaped = gitCommitMsg.replace(/'/g, "'\\''");
-                      sendInput(sessionId, `git commit -m '${escaped}'\n`);
-                      setGitCommitMsg("");
-                    }
-                  }}
-                  disabled={!gitCommitMsg.trim() || !sessionId}
-                  className="px-2 py-0.5 text-[11px] relief-accent relief-success text-white rounded-control shrink-0"
-                >
-                  Commit
-                </button>
-              </div>
-              {/* Git config (name + email) */}
+              {/* One form line, picked by the selector, rather than a line each.
+              Keeps the drawer short and leaves room for more forms later. */}
               <div className="flex items-center gap-1.5 border-t border-line/50 pt-1.5">
-                <span className="text-[10px] text-ink-ghost shrink-0">config</span>
-                <input
-                  value={gitConfigName}
-                  onChange={(e) => setGitConfigName(e.target.value)}
-                  placeholder="user.name"
-                  className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
-                />
-                <input
-                  value={gitConfigEmail}
-                  onChange={(e) => setGitConfigEmail(e.target.value)}
-                  placeholder="user.email"
-                  className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
-                />
-                <button
-                  onClick={() => {
-                    if (!sessionId) return;
-                    if (gitConfigName.trim())
-                      sendInput(sessionId, `git config --global user.name '${gitConfigName.trim()}'\n`);
-                    if (gitConfigEmail.trim())
-                      sendInput(sessionId, `git config --global user.email '${gitConfigEmail.trim()}'\n`);
-                  }}
-                  disabled={!sessionId || (!gitConfigName.trim() && !gitConfigEmail.trim())}
-                  className="px-2 py-0.5 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors shrink-0"
-                >
-                  Set
-                </button>
+                <DropUpSelect value={gitForm} options={GIT_FORMS} onChange={setGitForm} />
+                {gitForm === "commit" ? (
+                  <>
+                    <input
+                      value={gitCommitMsg}
+                      onChange={(e) => setGitCommitMsg(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && commitGit()}
+                      placeholder="commit message..."
+                      className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
+                    />
+                    <button
+                      onClick={commitGit}
+                      disabled={!gitCommitMsg.trim() || !sessionId}
+                      className="px-2 py-0.5 text-[11px] relief-accent relief-success text-white rounded-control shrink-0"
+                    >
+                      Commit
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      value={gitConfigName}
+                      onChange={(e) => setGitConfigName(e.target.value)}
+                      placeholder="user.name"
+                      className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
+                    />
+                    <input
+                      value={gitConfigEmail}
+                      onChange={(e) => setGitConfigEmail(e.target.value)}
+                      placeholder="user.email"
+                      className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
+                    />
+                    <button
+                      onClick={setGitIdentity}
+                      disabled={!sessionId || (!gitConfigName.trim() && !gitConfigEmail.trim())}
+                      className="px-2 py-0.5 text-[11px] relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors shrink-0"
+                    >
+                      Set
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -925,14 +934,16 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
           {drawerGroup === TEXT_TAB && (
             <>
               <div className="flex gap-2 px-2 py-2">
+                {/* One line, always. It used to grow to three and the bar
+                under it moved with every newline; long input scrolls inside
+                the field instead, with the scrollbar hidden. */}
                 <textarea
                   ref={textareaRef}
                   value={text}
-                  onChange={handleInput}
+                  onChange={(e) => setText(e.target.value)}
                   placeholder="Type anything... (Enter for newline)"
                   rows={1}
-                  className="field scrollbar-none flex-1 resize-none rounded-panel px-3 py-2 text-[16px] leading-5"
-                  style={{ maxHeight: TEXTAREA_MAX_PX }}
+                  className="field scrollbar-none flex-1 resize-none overflow-y-auto rounded-panel px-3 py-2 text-[16px] leading-5"
                 />
                 {/* A glyph rather than the word: the composer is narrow on a
                 phone and the text area is what should get the width. */}

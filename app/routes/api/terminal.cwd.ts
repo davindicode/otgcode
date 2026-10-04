@@ -81,17 +81,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
   }
 
-  let tmuxSession: string | null = null;
-  if (url.searchParams.get("inTmux") === "true") {
-    try {
-      tmuxSession =
-        execFileSync("tmux", ["display-message", "-p", "#{session_name}"], {
-          encoding: "utf-8",
-          timeout: 2000,
-        }).trim() || null;
-    } catch {
-      // No tmux server, or nothing attached.
-    }
-  }
-  return Response.json({ cwd: process.env.DEFAULT_CWD || process.env.HOME || "/", tmuxSession });
+  // No pty, or nothing readable from it: the configured default is the best
+  // answer available. The caller only asks for terminal tabs, so there is no
+  // tmux fallback here — a tmux pane's directory is answered above, from that
+  // client specifically, rather than from whichever pane tmux has focused.
+  return Response.json({ cwd: process.env.DEFAULT_CWD || process.env.HOME || "/", tmuxSession: null });
 }
