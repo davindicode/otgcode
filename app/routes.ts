@@ -12,9 +12,7 @@ export default [
   route("api/files/mkdir", "routes/api/files.mkdir.ts"),
   route("api/files/move", "routes/api/files.move.ts"),
   route("api/tmux/sessions", "routes/api/tmux.sessions.ts"),
-  route("api/tool-versions", "routes/api/tool-versions.ts"),
   route("api/system-info", "routes/api/system-info.ts"),
-  route("api/terminal/cwd", "routes/api/terminal.cwd.ts"),
   route("api/workspace", "routes/api/workspace.ts"),
   route("api/ping", "routes/api/ping.ts"),
 ] satisfies RouteConfig;

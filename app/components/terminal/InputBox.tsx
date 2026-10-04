@@ -588,14 +588,12 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
         <div className="flex items-center gap-1 px-2 py-1 w-max">
           {tabBtn(KB_TAB, "keyboard", "Type, and the keys a terminal needs", !sessionId)}
           {TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !sessionId))}
-          {/* Last slot belongs to whatever the tab *is*: a tmux session's own
-          controls, or the working directory of a shell. Moving between
-          directories has no meaning on a tmux tab — the pane's directory is
-          tmux's business — so it is absent there rather than present and
-          failing. */}
-          {tmuxSession
-            ? tabBtn(TMUX_TAB, "tmux session", `Controls for session "${tmuxSession}"`, false, "app")
-            : tabBtn(CD_TAB, "navigate", "Move to another directory", !sessionId)}
+          {/* navigate works on a tmux tab too: the server resolves the pane
+          that tab's own tmux client is looking at, so it follows you between
+          windows. A tmux tab then also gets its session's controls, last
+          because they act on the session rather than on a directory. */}
+          {tabBtn(CD_TAB, "navigate", "Move to another directory", !sessionId)}
+          {tmuxSession && tabBtn(TMUX_TAB, "tmux session", `Controls for session "${tmuxSession}"`, false, "app")}
         </div>
       </div>
 

@@ -11,6 +11,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { isPasswordEnabled } from "./auth.js";
 import { authGate, gateSocketIO, mountAuthRoutes } from "./auth-routes.js";
 import { dim, localAddresses } from "./cli.js";
+import { mountCwdRoute } from "./cwd.js";
 import { gatePresence } from "./presence.js";
 import { mountProxy } from "./proxy.js";
 import { registerSocketHandlers } from "./socket-handlers.js";
@@ -58,6 +59,8 @@ async function main() {
   // the app is locked, and ahead of the auth router so that changing the
   // password still requires a valid session once one is set.
   app.use(authGate);
+  // Reads the live pty table, so it lives here rather than in a route.
+  mountCwdRoute(app);
   mountAuthRoutes(app);
 
   // Streaming file upload (handles large files without buffering into memory)

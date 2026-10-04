@@ -7,6 +7,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { Server as SocketIOServer } from "socket.io";
 import { authGate, gateSocketIO, mountAuthRoutes } from "./auth-routes.js";
+import { mountCwdRoute } from "./cwd.js";
 import { gatePresence } from "./presence.js";
 import { mountProxy } from "./proxy.js";
 import { registerSocketHandlers } from "./socket-handlers.js";
@@ -32,6 +33,8 @@ async function main() {
 
   // Optional access password — same gate as production so dev behaves the same.
   app.use(authGate);
+  // Reads the live pty table, so it lives here rather than in a route.
+  mountCwdRoute(app);
   mountAuthRoutes(app);
 
   // Streaming file upload (handles large files without buffering into memory)
