@@ -8,6 +8,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Drag a tab to reorder it.** A mouse picks a tab up once it has moved too
+  far to be a click; a finger needs a short hold first, so a swipe still
+  scrolls the strip. The order is saved with everything else.
+- **Renaming a tmux tab renames the session.** The title was only ever a
+  label, so the session kept its old name — the picker still listed it, and a
+  reconnect attached by it. tmux also rewrites `.` and `:` in a session name,
+  so the tab now shows the name tmux settled on rather than the one that was
+  typed, and the two cannot drift.
+- **Each terminal and tmux tab keeps its own bottom-bar state** — open group,
+  typed text, chosen CLI, commit message. One shared bar carried your
+  half-written command between sessions, and could leave the tmux group open on
+  a tab with no tmux behind it.
+
+### Changed
+- **A fresh start opens on an empty board.** Installing used to spawn a shell
+  before you had asked for anything; the first tab is now yours to pick with
+  `+`, and closing every tab stays that way across a reload.
+- The bottom bar's Send button is a glyph rather than the word, giving the text
+  area back that width on a phone, and it sits at the bottom once the box has
+  grown to several lines.
+- **Filesystem errors say what actually went wrong.** Pasting a file path into
+  the explorer's folder field reported `ENOTDIR: not a directory, scandir
+  '/long/path/TODO.md'`; it now says `"TODO.md" is a file, not a folder`, and a
+  missing folder, a permission problem or a full disk each read as themselves.
+  One mapping covers every file operation, and a path that runs *through* a
+  file is distinguished from one that is a file.
+- **Platform support is a statement rather than a half-implementation**: Linux,
+  macOS, and Windows through WSL2. `start.sh` had partial Windows handling that
+  got far enough to look like it worked and then failed on the native module,
+  so Git Bash, MSYS and Cygwin now stop immediately pointing at WSL2. The
+  README gained a support matrix, per-distro prerequisites, a WSL2 walkthrough
+  and a troubleshooting section.
+
+### Fixed
+- **A reconnected tmux tab painted only the top of the pane**, leaving the rest
+  blank until something resized it — opening a bottom-bar group, usually. The
+  pty was always created at 80x24 and resized afterwards; a shell hides that by
+  reflowing at its next prompt, but tmux paints a whole screen the moment it
+  attaches. It is now created at the size the pane already knows, so the first
+  paint fills it.
+- **A restored explorer tab claimed `Empty directory`.** The workspace file
+  keeps a tab's path but not its listing, which has to be read fresh — and the
+  one condition that skipped that read was having a saved path. A path that has
+  since been deleted now falls back to the default directory instead of opening
+  on an error.
+- **`./start.sh` on Linux crashed at startup with `Failed to load native
+  module: pty.node`.** node-pty ships binaries for macOS and Windows only and
+  compiles elsewhere, but pnpm 10 skips a dependency's build scripts unless it
+  is allowlisted — while still exiting 0, so the failure surfaced several steps
+  later as a stack trace. node-pty is allowlisted now, `node-gyp` is a pinned
+  devDependency because pnpm (unlike npm) supplies none, and a `Native modules`
+  step loads the module to check: a compile that runs is not the same as one
+  that worked, and an outdated distro node-gyp produces a `pty.node` that
+  segfaults on every load. That same check catches a binary built for another
+  Node version or another machine, so an nvm switch or a `node_modules` shared
+  over NFS repairs itself.
+- A missing toolchain now stops with the install command for your distro — and
+  a note for machines where `sudo` is not an option — rather than a page of
+  compiler output.
+- **`start.sh` no longer kills cloudflared tunnels it did not start.** Its exit
+  trap ran `pkill -f cloudflared`, which on a shared machine reached other
+  projects' and other users' tunnels. The server owns its tunnel and stops it
+  on Ctrl+C, so the trap is gone.
+
+### Security
+- Patched `engine.io` and `socket.io-parser`, both of which sit on the pre-auth
+  path of a tunnel anyone with the URL can reach: the Socket.IO gate is
+  namespace middleware, so it runs after the Engine.IO handshake and after a
+  frame has been parsed. Three advisories land there — polling-transport
+  connection exhaustion, a protocol-revision mismatch on upgrade, and
+  zero-attachment memory exhaustion. The remaining dependency alerts were
+  checked against this app and do not reach it.
+
+<!-- earlier in this cycle -->
+
+### Added
 - **A password is the default on a fresh install.** First start asks you to set
   one before the app opens. Declining takes a second step that repeats the
   tunnel warning — anyone with the URL gets a terminal as you — and says a

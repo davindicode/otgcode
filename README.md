@@ -12,10 +12,13 @@
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status: alpha">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen" alt="Node >= 20">
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20WSL2-lightgrey" alt="Platform: Linux, macOS, WSL2">
   <img src="https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/React_Router-v7-red?logo=reactrouter&logoColor=white" alt="React Router">
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome">
 </p>
+
+Every release is described in [CHANGELOG.md](CHANGELOG.md).
 
 ## Features
 
@@ -38,30 +41,38 @@
 </table>
 
 
-One pane with a single tab strip, VS Code style. Tabs come in four kinds — **Terminal**, **tmux session**, **Explorer**, and the **viewer/editor** tabs that open when you pick a file in an explorer. A tmux tab *is* its session: it runs tmux rather than a shell, so a reconnect re-attaches instead of dropping you into a shell outside it. `+` asks which kind to create; file tabs are spawned by the explorer, so an explorer always stays a file browser. Each tab's controls sit in the bottom bar and change with the tab. Localhost previews, system info and settings live in popups under the header icons. Every tab stays mounted in the DOM with CSS visibility toggling, preserving terminal state and WebSocket connections across switches. Everything routes through a single Cloudflare Quick Tunnel.
+One pane with a single tab strip, VS Code style. Tabs come in four kinds — **Terminal**, **tmux session**, **Explorer**, and the **viewer/editor** tabs that open when you pick a file in an explorer. A tmux tab *is* its session: it runs tmux rather than a shell, so a reconnect re-attaches instead of dropping you into a shell outside it. `+` asks which kind to create; file tabs are spawned by the explorer, so an explorer always stays a file browser, and a file opens next to the explorer it came from. **Drag a tab to reorder it** — by hold-and-drag on a phone, so a swipe still scrolls the strip.
+
+Each tab's controls sit in the bottom bar and change with the tab. Localhost previews, system info and settings live in popups under the header icons. Every tab stays mounted in the DOM with CSS visibility toggling, preserving terminal state and WebSocket connections across switches. A fresh start opens on an empty board rather than a shell you did not ask for. Everything routes through a single Cloudflare Quick Tunnel.
 
 Install it to a home screen and it runs standalone like a native app; the layout, open tabs and your preferences are saved on the host, so a refresh or a reconnect from another device puts you back where you were.
 
-### Terminal
-- Terminal and tmux tabs (renamable), xterm.js at the font size set in Settings
-- **Quick action tab groups** — color-coded action tabs (blue) and app tabs (green):
-  - **cmds** — common shell commands (ls, top, df, free, nvidia-smi, etc.)
-  - **cd** — visual directory picker with server-side CWD detection (works inside tmux)
-  - **Ctrl+** — sticky modifier combos (Ctrl, Ctrl+Shift, Alt, Alt+Shift) with full A-Z and 0-9
-  - **code** — coding CLI launchers (Claude Code, Codex, OpenCode) with vendor selector, permission presets, and slash commands
-  - **git** — quick actions (status, log, diff, add, fetch, pull, push, stash, branch), commit with message input, git config setup (user.name/email)
-- **Always-visible nav keys** below input — Enter, Bksp, arrows, Esc, Tab, PgUp/PgDn
-- System info popup with OS, kernel, CPU, memory, GPU details
+### Terminal & tmux
+- Terminal tabs run your shell. **tmux tabs run tmux** (`tmux new -A`), so a dropped phone or a closed laptop re-attaches to the same session instead of landing in a fresh shell beside it
+- Picking **tmux session** from `+` opens a picker: attach to a running session, start a new one, or kill one. Closing a tmux tab detaches; the session keeps running
+- **Renaming a tmux tab renames the session.** The tab title, tmux itself, and the name a reconnect attaches by are one value, so the picker and the strip can never disagree
+- **Composer tabs** under the terminal, coloured by what they drive — session (green), shell (blue), CLI (purple):
+  - **tmux** — in-session controls grouped by sector: windows (new, next, prev, 0–5, rename, kill, list), panes (split, cycle, zoom, kill) and copy mode. Only present on a tmux tab, so tmux keys can never be typed into a plain shell
+  - **text** — the input area and send, with nav keys alongside: Enter, Bksp, arrows, Esc, Tab, PgUp/PgDn, and y/n for CLI prompts
+  - **cmds** — common shell commands (ls, top, df, free, nvidia-smi…), plus **your own**: add, edit and remove, saved on the host
+  - **cd** — directory picker with server-side CWD detection, so it follows you inside tmux too
+  - **combos** — sticky modifiers (Ctrl, Ctrl+Shift, Alt, Alt+Shift) over five sets: numbers, letters, nav, function and symbol keys
+  - **code** — Claude Code, Codex and OpenCode launchers with permission presets, and **slash commands you can add per CLI**, kept separately for each
+  - **git** — status, log, diff, add, fetch, pull, push, stash, branch, commit with a message, and `user.name` / `user.email` setup
+- **Every tab keeps its own composer state** — switching tabs leaves your half-typed command, open group and chosen CLI where they were, rather than carrying them to another session
+- System info popup with OS, kernel, CPU, memory, GPU, and connection latency to the host
 - Tool version detection (tmux, claude, codex, opencode)
 
 ### File Explorer
-- Multi-session tabs (renamable), breadcrumb + editable path navigation
-- Create, rename, delete files and folders; file info dialog; hidden files toggle
+- Explorer tabs (renamable), breadcrumb and editable path navigation
+- Create, rename, delete files and folders; multi-select for bulk download or delete; file info dialog; hidden files toggle
+- **Move mode** — pick an entry, browse to where it belongs, drop it there. Refuses to overwrite, to move a folder into itself, or to move something onto where it already is, and copies instead of renaming across filesystems
 - Context menu (right-click / long-press), selectable/scrollable file paths
 - Drag-and-drop file upload with progress tracking and per-file cancel
 - Chunked upload for large files (>80 MB) to bypass Cloudflare's 100 MB request limit
+- Failures say what actually went wrong — `"TODO.md" is a file, not a folder`, `No such folder "saves"`, `Permission denied` — rather than relaying an errno and a syscall name
 - **Built-in viewers & editors:**
-  - **Code Editor** — Monaco with syntax highlighting, configurable font size, word wrap
+  - **Code Editor** — Monaco with syntax highlighting and word wrap. **Ctrl/Cmd+S saves** instead of opening the browser's save dialog, undo/redo have buttons for phones, and Edit / Plain / Preview is a dropdown so the path still fits beside it
   - **Markdown Preview** — GitHub-flavored with prose styling
   - **Jupyter Notebook** — cells with type badges, rendered markdown, code, and outputs
   - **HTML Preview** — live rendered in sandboxed iframe
@@ -71,10 +82,11 @@ Install it to a home screen and it runs standalone like a native app; the layout
   - **Audio Player** — mp3, wav, ogg, flac, aac, m4a
 
 ### Security
-- **Optional access password** — off by default; turn it on from the Settings cog in the header to require a login before anything loads
+- **Access password, set up on first run.** A fresh install asks for one before the app opens; declining takes a deliberate second step that repeats what the tunnel exposes. Either way the choice is remembered, and you can change it later from the Settings cog
 - Enforced on the server for every request, the localhost proxy (HTTP + WebSocket) and the Socket.IO handshake — not just the UI
 - Salted **scrypt** hash stored in `~/.otgcode/config.json` (mode 600); sessions are signed HttpOnly cookies, and changing or removing the password signs every device out
 - Failed logins back off exponentially rather than locking out, so a stranger with the URL can't deny you access to your own machine
+- **Stay signed in until I close the browser** on the login screen. Nothing is written to disk either way, so closing the browser always ends the session; unticked, it also expires after 30 minutes so coming back later asks again
 
 ### Localhost Preview
 - Port list in a popup under the globe icon in the header — compact, no panel of its own
@@ -85,18 +97,22 @@ Install it to a home screen and it runs standalone like a native app; the layout
 ### Settings & Preferences
 - **Dark and light themes** — one semantic colour token set drives the whole UI, including the terminal and code editor palettes; resolved server-side so there is no flash of the wrong theme on load
 - **Terminal and editor font sizes**, adjustable from Settings
-- **Saved on the host, not in the browser** — `~/.otgcode/workspace.json` keeps the theme, font size, and every open tab with its directory or file. Preferences save themselves as you change them and follow you across refreshes, reconnects and devices
+- **Saved on the host, not in the browser** — `~/.otgcode/workspace.json` keeps the theme, both font sizes, your custom commands and slash commands, and every open tab in order with its directory, file or tmux session. Preferences save themselves as you change them and follow you across refreshes, reconnects and devices
+- Errors arrive as toasts rather than inline text that shifts the layout
 - **Installable** — web app manifest, standalone display, maskable icons and iOS safe-area handling
 
 ## Requirements
 
 | Platform | Status |
 |----------|--------|
-| Linux (x64 / arm64) | Supported — needs a C/C++ toolchain, see below |
-| macOS (Intel / Apple Silicon) | Supported — ships prebuilt binaries, no toolchain needed |
+| Linux x64 | Supported — needs a C/C++ toolchain, see below |
+| Linux arm64 (Raspberry Pi, Graviton) | Supported, same toolchain path, less travelled |
+| macOS (Intel / Apple Silicon) | Supported — nothing to compile, no toolchain needed |
 | Windows | Through [WSL2](https://learn.microsoft.com/windows/wsl/install) only |
 
-Native Windows is not supported. `start.sh` stops with a pointer to WSL2 if you run it under Git Bash, MSYS or Cygwin.
+Native Windows is not supported: the terminal rests on a Linux/macOS pty. `start.sh` stops with a pointer to WSL2 if you run it under Git Bash, MSYS or Cygwin, rather than getting halfway through a build first.
+
+macOS needs no setup beyond Node and pnpm — `node-pty` ships a binary for it, and `start.sh` clears the Gatekeeper quarantine flag on it for you.
 
 - **Node.js** 20 or newer
 - **pnpm** 10 or newer — `npm install -g pnpm`
@@ -108,7 +124,7 @@ Native Windows is not supported. `start.sh` stops with a pointer to WSL2 if you 
   | Fedora / RHEL | `sudo dnf group install -y "Development Tools"` |
   | Alpine | `sudo apk add build-base python3 linux-headers` |
   | Arch | `sudo pacman -S --needed base-devel python` |
-  | macOS | `xcode-select --install` |
+  | macOS | `xcode-select --install`, only if a prebuilt binary is ever missing |
 
 - **cloudflared** — `start.sh` downloads it to `.bin/` for Linux and macOS (x64/arm64) if it isn't already on your PATH.
 
@@ -132,23 +148,24 @@ Native Windows is not supported. `start.sh` stops with a pointer to WSL2 if you 
 ## Quick Start
 
 ```bash
-# Clone and install
 git clone https://github.com/davindicode/otgcode.git
 cd otgcode
-pnpm install
 
-# Create .env
+# Optional: port, shell and starting directory
 cp .env.example .env
-# Edit .env to set OTG_PORT, DEFAULT_SHELL, DEFAULT_CWD
 
-# Production with Cloudflare tunnel (all-in-one)
+# Install, build, start, and open a Cloudflare tunnel
 ./start.sh
 ```
 
-The `start.sh` script installs dependencies if needed, builds the app, starts the server, and launches a Cloudflare Quick Tunnel — printing a public URL you can open on any device. On macOS it also clears Gatekeeper quarantine flags on node-pty binaries. Before building, it verifies Node, pnpm and that node-pty's native module actually loads, rebuilding it if it does not. If `cloudflared` is not found in your PATH, the script downloads it to `.bin/` (macOS and Linux, x64/arm64).
+On Windows, run those inside WSL2 — see [Requirements](#requirements). First start asks you to set an access password before the app opens.
+
+`start.sh` installs dependencies, builds the app, starts the server and opens a Cloudflare Quick Tunnel, printing a public URL you can open on any device, with the LAN addresses beside it for when you are on the same network. Before building it checks Node, pnpm, and that node-pty's native module actually loads — rebuilding it if not — so a missing toolchain is reported with the command to fix it rather than crashing at the first terminal. On macOS it clears the Gatekeeper quarantine flag on node-pty's binary. If `cloudflared` is not on your PATH it is downloaded to `.bin/` (macOS and Linux, x64/arm64).
+
+`pnpm dev` runs the same app with HMR if you are working on OTG Code itself.
 
 > [!WARNING]
-> **Keep the tunnel URL private.** Anyone who opens it gets a terminal on the host as the user that launched OTG Code, plus read/write access to that user's files. By default the URL is the only thing protecting it. For a second layer, turn on the **access password** in Settings (the cog in the header, top right) — it puts a login in front of the app and is enforced server-side on the API, the localhost proxy and the terminal socket.
+> **Keep the tunnel URL private.** Anyone who opens it gets a terminal on the host as the user that launched OTG Code, plus read/write access to that user's files. First start asks you to set an **access password** for exactly this reason — it is enforced server-side on every request, the localhost proxy and the terminal socket, not just in the UI. If you declined it, the URL is the only thing protecting that shell; you can turn one on at any time from the Settings cog in the header.
 >
 > Locked yourself out? Set `passwordEnabled` to `false` in `~/.otgcode/config.json` on the host and restart.
 
