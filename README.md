@@ -100,7 +100,7 @@ Native Windows is not supported. `start.sh` stops with a pointer to WSL2 if you 
 
 - **Node.js** 20 or newer
 - **pnpm** 10 or newer — `npm install -g pnpm`
-- **A C/C++ toolchain and Python 3** on Linux, and anywhere else `node-pty` has no prebuilt binary. It compiles `pty.node` from source there, and without it the terminal cannot start:
+- **A C/C++ toolchain and Python 3** on Linux, and anywhere else `node-pty` has no prebuilt binary. It compiles `pty.node` from source there, and without it the terminal cannot start. `node-gyp` itself is a pinned devDependency, so you do not need one installed:
 
   | | |
   |---|---|
@@ -192,25 +192,29 @@ ipconfig /flushdns
 "pnpm": { "onlyBuiltDependencies": ["node-pty"] }
 ```
 
-A fresh `pnpm install` therefore compiles it. If the compile failed, or you are on an older checkout, `./start.sh` catches it at the **Native modules** step and rebuilds. By hand:
+`node-gyp` is a devDependency for the same reason: pnpm, unlike npm, does not supply one, and node-pty's install script calls bare `node-gyp`. Without it the install fails with `sh: node-gyp: command not found`, or silently uses whatever the machine happens to have.
+
+A fresh `pnpm install` therefore compiles it. If the compile failed, or you are on an older checkout, `./start.sh` catches it at the **Native modules** step and rebuilds. By hand, from the repo root:
 
 ```bash
 cd node_modules/.pnpm/node-pty@*/node_modules/node-pty
-npx --yes node-gyp rebuild
+"$OLDPWD/node_modules/.bin/node-gyp" rebuild
 ```
 
-Install `build-essential` (or your platform's equivalent from [Requirements](#requirements)) and `python3` first.
+Install `build-essential` (or your platform's equivalent from [Requirements](#requirements)) and `python3` first. Note that pnpm caches a build per machine, so a compile that failed once is not retried by a later `pnpm install` — use the command above, or `./start.sh`.
 
 ### The terminal crashes the server, or `pty.node` segfaults instead of erroring
 
-A `pty.node` built by an outdated `node-gyp` can bind to the wrong Node ABI and crash on every load rather than failing cleanly. Debian and Ubuntu ship `node-gyp` 9.x as `/usr/bin/node-gyp`, which does exactly this against Node 24. Rebuild with a current one:
+A `pty.node` built by an outdated `node-gyp` can bind to the wrong Node ABI and crash on every load rather than failing cleanly. Debian and Ubuntu ship `node-gyp` 9.x as `/usr/bin/node-gyp`, which does exactly this against Node 24 — measured at 0/10 successful loads, against 10/10 for the same source under a current node-gyp.
+
+The pinned devDependency is what prevents it, so this only bites a checkout that predates it. Rebuild with the local one:
 
 ```bash
 cd node_modules/.pnpm/node-pty@*/node_modules/node-pty
-npx --yes node-gyp rebuild     # fetches a current node-gyp, ignoring /usr/bin/node-gyp
+"$OLDPWD/node_modules/.bin/node-gyp" rebuild
 ```
 
-This is why `start.sh` repairs with `npx node-gyp` rather than `pnpm rebuild`: the latter re-runs node-pty's own install script, which takes whichever `node-gyp` is on PATH.
+`start.sh` uses that same binary rather than `pnpm rebuild`, which would re-run node-pty's install script and pick up whichever `node-gyp` is on PATH again.
 
 ### After switching Node versions, or on a `node_modules` shared between machines
 

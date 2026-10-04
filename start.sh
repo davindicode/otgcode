@@ -37,7 +37,7 @@ show_cursor() { [ "$TTY" = 1 ] && printf '\033[?25h' || true; }
 # other projects', other users' — on any shared machine.
 cleanup() {
   show_cursor
-  rm -f "$STEP_LOG"
+  rm -f "$STEP_LOG" "$STEP_LOG.deps"
 }
 trap cleanup EXIT
 
@@ -125,8 +125,19 @@ printf '  %s%s%s\n\n' "$DIM" "$(printf "%0.s$RULE" $(seq 1 38))" "$RESET"
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
-sync_deps() { pnpm install --frozen-lockfile || pnpm install; }
+# A dependency's build script can fail on its own — no compiler on the box —
+# while every package is still in place. Stopping here would bury that in gyp
+# output; the Native modules step below reports it with the fix instead, so a
+# tree that is otherwise complete is allowed through with a warning.
+DEPS_NOTE="$STEP_LOG.deps"
+sync_deps() {
+  pnpm install --frozen-lockfile && return 0
+  pnpm install && return 0
+  node -e 'require.resolve("react-router");require.resolve("express");require.resolve("node-pty/package.json")' 2>/dev/null || return 1
+  : > "$DEPS_NOTE"
+}
 run_step "Dependencies" sync_deps
+[ -f "$DEPS_NOTE" ] && note_warn "A dependency build script failed — the packages are there, see below."
 
 # macOS: clear quarantine flags on node-pty binaries (Gatekeeper blocks them)
 if [ "$OS" = "darwin" ]; then
@@ -164,10 +175,15 @@ pty_loads() { { node -e 'require("node-pty")'; } >/dev/null 2>&1; }
 # A rebuild that produces a broken binary is worse than no rebuild, because it
 # looks like it worked.
 pty_rebuild() {
-  local dir
+  local dir gyp
   dir=$(node -e 'console.log(require("path").dirname(require.resolve("node-pty/package.json")))' 2>/dev/null) || return 1
   [ -d "$dir" ] || return 1
-  (cd "$dir" && npx --yes node-gyp rebuild 2>&1) || true
+  # The pinned devDependency first; npx only if node_modules is incomplete.
+  # Deliberately unquoted below, so the two-word fallback still expands.
+  gyp="$PWD/node_modules/.bin/node-gyp"
+  [ -x "$gyp" ] || gyp="npx --yes node-gyp"
+  # shellcheck disable=SC2086
+  (cd "$dir" && $gyp rebuild 2>&1) || true
   pty_loads
 }
 

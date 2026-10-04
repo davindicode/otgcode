@@ -63,6 +63,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^4.1.8",
     "jsdom": "^29.1.1",
+    "node-gyp": "^13.1.0",
     "tailwindcss": "^4.1.13",
     "tsx": "^4.21.0",
     "typescript": "^5.9.2",
@@ -71,7 +72,7 @@
     "vitest": "^4.1.8"
   },
   "pnpm": {
-    "onlyBuiltDependencies_comment": "node-pty ships prebuilt binaries for macOS and Windows only, so on Linux it compiles pty.node at install time. pnpm >= 10 skips a dependency's build scripts unless it is listed here, and install still exits 0 — the failure only surfaces later as 'Failed to load native module: pty.node'.",
+    "onlyBuiltDependencies_comment": "node-pty ships prebuilt binaries for macOS and Windows only, so on Linux it compiles pty.node at install time. pnpm >= 10 skips a dependency's build scripts unless it is listed here, and install still exits 0 — the failure only surfaces later as 'Failed to load native module: pty.node'. node-gyp is a devDependency because pnpm, unlike npm, does not supply one: node-pty's install script calls bare `node-gyp`, which otherwise resolves to whatever the machine happens to have (nothing on many, or a years-old distro build that produces a pty.node that segfaults).",
     "onlyBuiltDependencies": [
       "node-pty"
     ],
