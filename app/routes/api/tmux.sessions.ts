@@ -35,25 +35,70 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 }
 
+const SESSION_NAME = /^[\w.@-]{1,64}$/;
+
 /**
- * Kill a session. Done here rather than by typing `tmux kill-session` into
- * some terminal: the session picker is not attached to one, and a session may
- * well be the thing the user is killing it from.
+ * tmux rewrites `.` and `:` in a session name to `_`, because both are
+ * separators in its own target syntax. Apply that up front so the name we ask
+ * for is the name that ends up existing, and the caller can be told which.
+ */
+function tmuxName(raw: string): string {
+  return raw.replace(/[.:]/g, "_");
+}
+
+/** tmux puts the useful part on stderr: "duplicate session: foo". */
+function tmuxStderr(err: unknown): string {
+  const raw = (err as { stderr?: Buffer | string })?.stderr;
+  return (typeof raw === "string" ? raw : raw?.toString() || "").trim();
+}
+
+function tmuxFailure(err: unknown, fallback: string): string {
+  const stderr = tmuxStderr(err);
+  if (/duplicate session/i.test(stderr)) return "A session with that name already exists";
+  if (/(can't find|no such|not found)/i.test(stderr)) return "That session no longer exists";
+  // tmux's own wording beats a generic sentence when we have it.
+  return stderr.replace(/^\w+:\s*/, "") || fallback;
+}
+
+/**
+ * Rename or kill a session. Done here rather than by typing tmux commands into
+ * some terminal: the picker is not attached to one, and the session being acted
+ * on may well be the one the user is sitting in.
  */
 export async function action({ request }: Route.ActionArgs) {
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
-  const { name } = (await request.json()) as { name?: string };
-  // Session names come from the client, so pass them as an argument rather
-  // than through a shell.
-  if (!name || !/^[\w.@-]{1,64}$/.test(name)) {
+  const { op, name, to } = (await request.json()) as { op?: string; name?: string; to?: string };
+  // Session names come from the client, so pass them as arguments rather than
+  // through a shell.
+  if (!name || !SESSION_NAME.test(name)) {
     return Response.json({ error: "Invalid session name" }, { status: 400 });
   }
+
+  if (op === "rename") {
+    if (!to || !SESSION_NAME.test(to)) {
+      return Response.json({ error: "Use letters, numbers, dot, dash, underscore or @" }, { status: 400 });
+    }
+    const target = tmuxName(to);
+    // Renaming a session to the name it already has is not an error.
+    if (target === name) return Response.json({ ok: true, name });
+    try {
+      execFileSync("tmux", ["rename-session", "-t", name, target], {
+        timeout: 3000,
+        stdio: ["ignore", "ignore", "pipe"],
+      });
+      // The name tmux settled on, which is what the tab must now show.
+      return Response.json({ ok: true, name: target });
+    } catch (err) {
+      return Response.json({ error: tmuxFailure(err, `Could not rename "${name}"`) }, { status: 400 });
+    }
+  }
+
   try {
-    execFileSync("tmux", ["kill-session", "-t", name], { timeout: 3000, stdio: "ignore" });
+    execFileSync("tmux", ["kill-session", "-t", name], { timeout: 3000, stdio: ["ignore", "ignore", "pipe"] });
     return Response.json({ ok: true });
-  } catch {
-    return Response.json({ error: `Could not kill "${name}"` }, { status: 400 });
+  } catch (err) {
+    return Response.json({ error: tmuxFailure(err, `Could not kill "${name}"`) }, { status: 400 });
   }
 }

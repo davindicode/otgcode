@@ -3,6 +3,7 @@ import { basename } from "~/lib/paths";
 import type { WorkspaceTab } from "~/lib/workspace.shared";
 import { useFileStore } from "./fileStore";
 import { useTerminalStore } from "./terminalStore";
+import { showToast } from "./toastStore";
 
 /**
  * The single tab strip for the whole app.
@@ -44,7 +45,11 @@ interface TabsState {
   /** Drag-to-reorder: `toIndex` indexes the strip with this tab taken out. */
   move: (id: string, toIndex: number) => void;
   setActive: (id: string) => void;
-  rename: (id: string, title: string) => void;
+  /**
+   * Renaming a tmux tab renames its session, so it is async and can fail — the
+   * title only changes once tmux has agreed to it.
+   */
+  rename: (id: string, title: string) => Promise<void>;
   /** Replace the whole strip — used when restoring a saved workspace. */
   restore: (tabs: WorkspaceTab[], activeId: string | null) => void;
 }
@@ -180,13 +185,29 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     syncContentFocus(id, get().tabs);
   },
 
-  rename: (id, title) => {
+  rename: async (id, title) => {
     const trimmed = title.trim();
     if (!trimmed) return;
-    set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: trimmed } : t)) }));
     const tab = get().tabs.find((t) => t.id === id);
-    if (tab?.kind === "terminal") useTerminalStore.getState().renameSession(id, trimmed);
-    if (tab?.kind === "explorer") useFileStore.getState().updateSession(id, { name: trimmed });
+    if (!tab) return;
+
+    // A tmux tab's title *is* its session's name, so the two can't drift: the
+    // picker lists sessions from tmux, and a reconnect re-attaches by name.
+    // tmux also adjusts names it won't take verbatim, so the name it reports
+    // back is the one to show — not the one that was typed.
+    if (tab.kind === "tmux" && tab.tmuxSession) {
+      const renamed = await renameTmuxSession(tab.tmuxSession, trimmed);
+      if (!renamed) return;
+      set((s) => ({
+        tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: renamed, tmuxSession: renamed } : t)),
+      }));
+      useTerminalStore.getState().renameSession(id, renamed, renamed);
+      return;
+    }
+
+    set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: trimmed } : t)) }));
+    if (tab.kind === "terminal") useTerminalStore.getState().renameSession(id, trimmed);
+    if (tab.kind === "explorer") useFileStore.getState().updateSession(id, { name: trimmed });
   },
 
   restore: (saved, activeId) => {
@@ -246,4 +267,27 @@ export function toWorkspaceTabs(tabs: Tab[]): WorkspaceTab[] {
           : "",
     path: tab.path ?? "",
   }));
+}
+
+/**
+ * Renames the tmux session itself, returning the name it now has — which tmux
+ * may have adjusted — or null when it refused, having shown why.
+ */
+async function renameTmuxSession(from: string, to: string): Promise<string | null> {
+  try {
+    const res = await fetch("/api/tmux/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "rename", name: from, to }),
+    });
+    const data = (await res.json()) as { name?: string; error?: string };
+    if (data.error || !data.name) {
+      showToast(data.error || "Could not rename the session");
+      return null;
+    }
+    return data.name;
+  } catch {
+    showToast("Could not reach the server");
+    return null;
+  }
 }

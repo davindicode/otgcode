@@ -438,7 +438,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
       const res = await fetch(`/api/files/list${query}`);
       const data = await res.json();
       if (data.error) {
-        showToast(`Can't list directory: ${data.error}`);
+        showToast(data.error);
       } else if (useTerminalStore.getState().sessions[sessionId]) {
         // Drop the result if the tab was closed while we were fetching.
         setCdCwd(sessionId, data.dir);
@@ -450,7 +450,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
       }
     } catch {
       setCdDirs([]);
-      showToast("Failed to list directories");
+      showToast("Could not reach the server");
     }
     setCdLoading(false);
   };

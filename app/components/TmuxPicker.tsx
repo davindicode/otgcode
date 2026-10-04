@@ -65,7 +65,7 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
       const res = await fetch("/api/tmux/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: session }),
+        body: JSON.stringify({ op: "kill", name: session }),
       });
       const data = await res.json();
       if (data.error) {

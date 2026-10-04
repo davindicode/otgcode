@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { errorMessage } from "~/lib/errors";
 import { isDirectViewerFile } from "~/lib/fileTypes";
 import { formatSize } from "~/lib/format";
 import { useTabsStore } from "~/stores/tabsStore";
@@ -61,7 +62,7 @@ export default function ViewerPane({ tabId, path }: { tabId: string; path: strin
       if (data.error) showToast(data.error);
       else showToast(`Saved ${path.split("/").pop()}`, "info");
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : "Save failed");
+      showToast(errorMessage(err, "Save failed"));
     }
   };
 

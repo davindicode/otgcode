@@ -43,7 +43,7 @@ function FileSessionView({ session }: { session: FileSession }) {
         patch({ cwd: data.dir, entries: data.entries, error: null, loading: false });
         return null;
       } catch (err: unknown) {
-        const message = errorMessage(err, "Failed to load directory");
+        const message = errorMessage(err, "Could not reach the server");
         patch({ error: message, loading: false });
         return message;
       }
@@ -194,7 +194,7 @@ function FileSessionView({ session }: { session: FileSession }) {
   const handleOpen = async (entry: FileEntry) => {
     if (entry.isDirectory) {
       const err = await loadDirectory(fullPath(entry.name));
-      if (err) showToast(`Can't open "${entry.name}": ${err}`);
+      if (err) showToast(err);
       return;
     }
     // Files open as their own tab. The explorer never becomes an editor, so
@@ -205,7 +205,7 @@ function FileSessionView({ session }: { session: FileSession }) {
   const handleNavigate = async (path: string) => {
     const err = await loadDirectory(path);
     if (err) {
-      showToast(`Can't open "${path}": ${err}`);
+      showToast(err);
       return; // navigation cancelled — stays on the current path
     }
     if (selectMode) exitSelectMode(); // selection is directory-specific
@@ -375,7 +375,7 @@ function FileSessionView({ session }: { session: FileSession }) {
         await loadDirectory(cwd);
         showToast(`Moved "${moveSource.name}" here`, "info");
       } catch (err: unknown) {
-        showToast(err instanceof Error ? err.message : "Move failed");
+        showToast(errorMessage(err, "Move failed"));
       }
     });
   };

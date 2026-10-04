@@ -1,4 +1,5 @@
 import { cp, rename, rm, stat } from "node:fs/promises";
+import { fsErrorMessage } from "~/lib/errors";
 import { planMove } from "~/lib/paths";
 import type { Route } from "./+types/files.move";
 
@@ -61,6 +62,6 @@ export async function action({ request }: Route.ActionArgs) {
 
     return Response.json({ success: true, path: target });
   } catch (err: unknown) {
-    return Response.json({ error: err instanceof Error ? err.message : "Move failed" }, { status: 400 });
+    return Response.json({ error: fsErrorMessage(err, "path", source) }, { status: 400 });
   }
 }

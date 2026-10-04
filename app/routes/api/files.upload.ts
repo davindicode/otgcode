@@ -1,6 +1,6 @@
 import { writeFile } from "fs/promises";
 import { join } from "path";
-import { errorMessage } from "~/lib/errors";
+import { fsErrorMessage } from "~/lib/errors";
 import type { Route } from "./+types/files.upload";
 
 export async function action({ request }: Route.ActionArgs) {
@@ -16,12 +16,12 @@ export async function action({ request }: Route.ActionArgs) {
     return Response.json({ error: "Missing file or dir" }, { status: 400 });
   }
 
+  const dest = join(dir, file.name);
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    const dest = join(dir, file.name);
     await writeFile(dest, buffer);
     return Response.json({ success: true, path: dest });
   } catch (err: unknown) {
-    return Response.json({ error: errorMessage(err) }, { status: 400 });
+    return Response.json({ error: fsErrorMessage(err, "file", dest) }, { status: 400 });
   }
 }

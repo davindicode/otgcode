@@ -1,5 +1,5 @@
 import { mkdir } from "fs/promises";
-import { errorMessage } from "~/lib/errors";
+import { fsErrorMessage } from "~/lib/errors";
 import type { Route } from "./+types/files.mkdir";
 
 export async function action({ request }: Route.ActionArgs) {
@@ -16,6 +16,6 @@ export async function action({ request }: Route.ActionArgs) {
     await mkdir(dirPath, { recursive: true });
     return Response.json({ success: true });
   } catch (err: unknown) {
-    return Response.json({ error: errorMessage(err) }, { status: 400 });
+    return Response.json({ error: fsErrorMessage(err, "folder", dirPath) }, { status: 400 });
   }
 }

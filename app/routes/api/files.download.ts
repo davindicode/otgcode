@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { basename } from "node:path";
 import { Readable } from "node:stream";
 import { lookup } from "mime-types";
+import { fsErrorMessage } from "~/lib/errors";
 import type { Route } from "./+types/files.download";
 
 type ByteRange = { start: number; end: number };
@@ -80,6 +81,6 @@ export async function loader({ request }: Route.LoaderArgs) {
       headers,
     });
   } catch (err: unknown) {
-    return Response.json({ error: err instanceof Error ? err.message : "Failed to read file" }, { status: 400 });
+    return Response.json({ error: fsErrorMessage(err, "file", filePath) }, { status: 400 });
   }
 }

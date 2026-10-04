@@ -33,7 +33,8 @@ interface TerminalState {
   resizeTerminal: (sessionId: string, rows: number, cols: number) => void;
   closeSession: (sessionId: string) => void;
   setActiveSession: (sessionId: string) => void;
-  renameSession: (sessionId: string, name: string) => void;
+  /** `tmuxSession` moves with the name for a tmux tab: the two are the same thing. */
+  renameSession: (sessionId: string, name: string, tmuxSession?: string) => void;
   setFontSize: (size: number) => void;
   setDefaultCwd: (cwd: string) => void;
   setCdCwd: (sessionId: string, cwd: string) => void;
@@ -301,12 +302,17 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     }
   },
 
-  renameSession: (sessionId, name) => {
+  renameSession: (sessionId, name, tmuxSession) => {
     const { sessions } = get();
     const session = sessions[sessionId];
     if (!session) return;
     set({
-      sessions: { ...sessions, [sessionId]: { ...session, name } },
+      sessions: {
+        ...sessions,
+        // Reconnecting re-attaches by this name, so a stale one would land the
+        // tab in a brand new session beside the one it was showing.
+        [sessionId]: { ...session, name, ...(tmuxSession ? { tmuxSession } : {}) },
+      },
     });
   },
 
