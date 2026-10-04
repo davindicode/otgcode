@@ -1428,8 +1428,8 @@ packages:
   dom-accessibility-api@0.6.3:
     resolution: {integrity: sha512-7ZgogeTnjuHbo+ct10G9Ffp0mif17idi0IyWNVA/wcwcm7NPOD/WEHVP3n7n3MhXqxoIYm8d6MuZohYWIZ4T3w==}
 
-  dompurify@3.4.11:
-    resolution: {integrity: sha512-zhlUV12GsaRzMsf9q5M254YhA4+VuF0fG+QFqu6aYpoGlKtz+w8//jBcGVYBgQkR5GHjUomejY84AV+/uPbWdw==}
+  dompurify@3.4.16:
+    resolution: {integrity: sha512-sqo+pNp3qRhCIpbgRi1y8Tgk27Bo2Ry7w0dC1NBeNTdZChWjz9Xb/KOoZbRP/R6pQZ80Qw8YhXw13hWWBbMRnQ==}
 
   dotenv@17.3.1:
     resolution: {integrity: sha512-IO8C/dzEb6O3F9/twg6ZLXz164a2fhTnEWb95H23Dm4OuN+92NmEAlTrupP9VW6Jm3sO26tQlqyvyi4CsnY9GA==}
@@ -1456,8 +1456,8 @@ packages:
     resolution: {integrity: sha512-HqD3yTBfnBxIrbnM1DoD6Pcq8NECnh8d4As1Qgh0z5Gg3jRRIqijury0CL3ghu/edArpUYiYqQiDUQBIs4np3Q==}
     engines: {node: '>=10.0.0'}
 
-  engine.io@6.6.6:
-    resolution: {integrity: sha512-U2SN0w3OpjFRVlrc17E6TMDmH58Xl9rai1MblNjAdwWp07Kk+llmzX0hjDpQdrDGzwmvOtgM5yI+meYX6iZ2xA==}
+  engine.io@6.6.11:
+    resolution: {integrity: sha512-z34mGpLoY/82ZbkX1LqGMIaf3wjVMPL6gVC681QDqnmzJ26synI8qAE32P+a7UazmpJZ8UGrFIeAavgRfXzYrg==}
     engines: {node: '>=10.2.0'}
 
   enhanced-resolve@5.20.1:
@@ -2169,8 +2169,8 @@ packages:
     resolution: {integrity: sha512-uP0bpjWrjQmUt5DTHq9RuoCBdFJF10cdX9X+a368j/Ft0wmaVgxlrjvK3kjvgCODOMMOz9lcaRzxmso0bTWZ/g==}
     engines: {node: '>=10.0.0'}
 
-  socket.io-parser@4.2.6:
-    resolution: {integrity: sha512-asJqbVBDsBCJx0pTqw3WfesSY0iRX+2xzWEWzrpcH7L6fLzrhyF8WPI8UaeM4YCuDfpwA/cgsdugMsmtz8EJeg==}
+  socket.io-parser@4.2.7:
+    resolution: {integrity: sha512-IH/iSeO9T6gz1KkFleGDWkG9N3dl4jXVYUtMhIqH10Md0ttMer8nUNWiP1DKuNrybD2xBrixLJdCC9J6ECoYkg==}
     engines: {node: '>=10.0.0'}
 
   socket.io@4.8.3:
@@ -3639,7 +3639,7 @@ snapshots:
 
   dom-accessibility-api@0.6.3: {}
 
-  dompurify@3.4.11:
+  dompurify@3.4.16:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -3671,13 +3671,12 @@ snapshots:
 
   engine.io-parser@5.2.3: {}
 
-  engine.io@6.6.6:
+  engine.io@6.6.11:
     dependencies:
       '@types/cors': 2.8.19
       '@types/node': 22.19.15
       '@types/ws': 8.18.1
       accepts: 1.3.8
-      base64id: 2.0.0
       cookie: 0.7.2
       cors: 2.8.6
       debug: 4.4.3
@@ -4111,7 +4110,7 @@ snapshots:
 
   monaco-editor@0.55.1:
     dependencies:
-      dompurify: 3.4.11
+      dompurify: 3.4.16
       marked: 14.0.0
 
   ms@2.1.3: {}
@@ -4414,13 +4413,13 @@ snapshots:
       '@socket.io/component-emitter': 3.1.2
       debug: 4.4.3
       engine.io-client: 6.6.4
-      socket.io-parser: 4.2.6
+      socket.io-parser: 4.2.7
     transitivePeerDependencies:
       - bufferutil
       - supports-color
       - utf-8-validate
 
-  socket.io-parser@4.2.6:
+  socket.io-parser@4.2.7:
     dependencies:
       '@socket.io/component-emitter': 3.1.2
       debug: 4.4.3
@@ -4433,9 +4432,9 @@ snapshots:
       base64id: 2.0.0
       cors: 2.8.6
       debug: 4.4.3
-      engine.io: 6.6.6
+      engine.io: 6.6.11
       socket.io-adapter: 2.5.6
-      socket.io-parser: 4.2.6
+      socket.io-parser: 4.2.7
     transitivePeerDependencies:
       - bufferutil
       - supports-color
