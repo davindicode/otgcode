@@ -1,6 +1,7 @@
 import { readFile, stat } from "fs/promises";
 import { lookup } from "mime-types";
 import { fsErrorMessage } from "~/lib/errors";
+import { fileVersion } from "~/lib/fileVersion";
 import type { Route } from "./+types/files.read";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -27,7 +28,15 @@ export async function loader({ request }: Route.LoaderArgs) {
 
     if (isText || stats.size < 10 * 1024 * 1024) {
       const content = await readFile(filePath, "utf-8");
-      return Response.json({ path: filePath, content, mimeType, size: stats.size });
+      // The version the caller is holding, so a later write can tell whether
+      // the file moved underneath it.
+      return Response.json({
+        path: filePath,
+        content,
+        mimeType,
+        size: stats.size,
+        version: fileVersion(stats),
+      });
     }
 
     return Response.json({ error: "File too large for text preview", size: stats.size, mimeType }, { status: 413 });

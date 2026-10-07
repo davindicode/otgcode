@@ -4,6 +4,7 @@ export default [
   index("routes/_index.tsx"),
   route("api/files/list", "routes/api/files.list.ts"),
   route("api/files/read", "routes/api/files.read.ts"),
+  route("api/files/version", "routes/api/files.version.ts"),
   route("api/files/write", "routes/api/files.write.ts"),
   route("api/files/rename", "routes/api/files.rename.ts"),
   route("api/files/delete", "routes/api/files.delete.ts"),

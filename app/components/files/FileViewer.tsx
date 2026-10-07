@@ -17,6 +17,8 @@ interface FileViewerProps {
   onReload: () => void;
   /** Bumped per reload, so a cached media URL is not reused. */
   version: number;
+  /** The file has changed on disk since it was read. */
+  stale: boolean;
 }
 
 function MediaViewer({
@@ -24,11 +26,13 @@ function MediaViewer({
   type,
   onReload,
   version,
+  stale,
 }: {
   path: string;
   type: "video" | "audio";
   onReload: () => void;
   version: number;
+  stale: boolean;
 }) {
   // `version` changes on reload, which is what makes the browser fetch the
   // file again instead of serving the copy it already has.
@@ -96,8 +100,10 @@ function MediaViewer({
           </a>
           <button
             onClick={onReload}
-            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
-            title="Reload from disk"
+            className={`relief p-1 rounded-control ${
+              stale ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70" : "text-ink-muted hover:text-ink"
+            }`}
+            title={stale ? "Changed on disk — reload" : "Reload from disk"}
             aria-label="Reload from disk"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -176,7 +182,17 @@ function LazyPdfPage({
   );
 }
 
-function PdfViewer({ path, onReload, version }: { path: string; onReload: () => void; version: number }) {
+function PdfViewer({
+  path,
+  onReload,
+  version,
+  stale,
+}: {
+  path: string;
+  onReload: () => void;
+  version: number;
+  stale: boolean;
+}) {
   const [numPages, setNumPages] = useState<number>(0);
   const [scale, setScale] = useState(1.0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -233,8 +249,10 @@ function PdfViewer({ path, onReload, version }: { path: string; onReload: () => 
           </a>
           <button
             onClick={onReload}
-            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
-            title="Reload from disk"
+            className={`relief p-1 rounded-control ${
+              stale ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70" : "text-ink-muted hover:text-ink"
+            }`}
+            title={stale ? "Changed on disk — reload" : "Reload from disk"}
             aria-label="Reload from disk"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -265,28 +283,28 @@ function PdfViewer({ path, onReload, version }: { path: string; onReload: () => 
   );
 }
 
-export default function FileViewer({ path, content, onSave, onReload, version }: FileViewerProps) {
+export default function FileViewer({ path, content, onSave, onReload, version, stale }: FileViewerProps) {
   const kind = fileKind(path);
 
   if (kind === "image") {
-    return <ImageViewer path={path} onReload={onReload} version={version} />;
+    return <ImageViewer path={path} onReload={onReload} version={version} stale={stale} />;
   }
 
   if (kind === "pdf") {
-    return <PdfViewer path={path} onReload={onReload} version={version} />;
+    return <PdfViewer path={path} onReload={onReload} version={version} stale={stale} />;
   }
 
   if (kind === "video") {
-    return <MediaViewer path={path} type="video" onReload={onReload} version={version} />;
+    return <MediaViewer path={path} type="video" onReload={onReload} version={version} stale={stale} />;
   }
 
   if (kind === "audio") {
-    return <MediaViewer path={path} type="audio" onReload={onReload} version={version} />;
+    return <MediaViewer path={path} type="audio" onReload={onReload} version={version} stale={stale} />;
   }
 
   // Default to code editor for everything else
   if (content !== null) {
-    return <CodeEditor path={path} content={content} onSave={onSave} onReload={onReload} />;
+    return <CodeEditor path={path} content={content} onSave={onSave} onReload={onReload} stale={stale} />;
   }
 
   return (
@@ -316,8 +334,10 @@ export default function FileViewer({ path, content, onSave, onReload, version }:
           </a>
           <button
             onClick={onReload}
-            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
-            title="Reload from disk"
+            className={`relief p-1 rounded-control ${
+              stale ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70" : "text-ink-muted hover:text-ink"
+            }`}
+            title={stale ? "Changed on disk — reload" : "Reload from disk"}
             aria-label="Reload from disk"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>

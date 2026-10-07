@@ -6,9 +6,11 @@ interface ImageViewerProps {
   onReload: () => void;
   /** Bumped per reload, so the browser refetches rather than reusing its copy. */
   version: number;
+  /** The file has changed on disk since it was read. */
+  stale: boolean;
 }
 
-export default function ImageViewer({ path, onReload, version }: ImageViewerProps) {
+export default function ImageViewer({ path, onReload, version, stale }: ImageViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -126,8 +128,10 @@ export default function ImageViewer({ path, onReload, version }: ImageViewerProp
           </a>
           <button
             onClick={onReload}
-            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
-            title="Reload from disk"
+            className={`relief p-1 rounded-control ${
+              stale ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70" : "text-ink-muted hover:text-ink"
+            }`}
+            title={stale ? "Changed on disk — reload" : "Reload from disk"}
             aria-label="Reload from disk"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>

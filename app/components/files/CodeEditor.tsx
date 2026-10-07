@@ -14,6 +14,8 @@ interface CodeEditorProps {
   onSave: (content: string) => void;
   /** Re-read the file from disk; it may have changed since the tab opened. */
   onReload: () => void;
+  /** It already has, and the pane is saying so. */
+  stale: boolean;
 }
 
 const PREVIEWABLE = new Set(["md", "markdown", "html", "htm", "ipynb"]);
@@ -211,7 +213,7 @@ interface MonacoHandle {
   addCommand: (keybinding: number, handler: () => void) => void;
 }
 
-export default function CodeEditor({ path, content, onSave, onReload }: CodeEditorProps) {
+export default function CodeEditor({ path, content, onSave, onReload, stale }: CodeEditorProps) {
   const ext = getExt(path);
   const canPreview = PREVIEWABLE.has(ext);
   const [value, setValue] = useState(content);
@@ -482,9 +484,17 @@ export default function CodeEditor({ path, content, onSave, onReload }: CodeEdit
           <button
             onClick={reload}
             className={`relief p-1 rounded-control ${
-              discardArmed ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70" : "text-ink-muted hover:text-ink"
+              stale || discardArmed
+                ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70"
+                : "text-ink-muted hover:text-ink"
             }`}
-            title={discardArmed ? "Tap again to discard your edits and reload" : "Reload from disk"}
+            title={
+              discardArmed
+                ? "Tap again to discard your edits and reload"
+                : stale
+                  ? "Changed on disk — reload"
+                  : "Reload from disk"
+            }
             aria-label="Reload from disk"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
