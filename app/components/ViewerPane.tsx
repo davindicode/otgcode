@@ -17,6 +17,12 @@ export default function ViewerPane({ tabId, path }: { tabId: string; path: strin
   const closeTab = useTabsStore((s) => s.close);
   const showToast = useToastStore((s) => s.show);
   const [load, setLoad] = useState<Load>({ status: "loading" });
+  /**
+   * Counts reloads. A file can change under an open tab — an agent edits it, a
+   * build writes it — and the tab held whatever it read when it opened. For the
+   * streamed types this is also what stops the browser reusing its cached copy.
+   */
+  const [version, setVersion] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
   const read = useCallback(async () => {
@@ -112,5 +118,16 @@ export default function ViewerPane({ tabId, path }: { tabId: string; path: strin
     );
   }
 
-  return <FileViewer path={path} content={load.content} onSave={handleSave} onClose={close} />;
+  return (
+    <FileViewer
+      path={path}
+      content={load.content}
+      onSave={handleSave}
+      onReload={() => {
+        setVersion((v) => v + 1);
+        read();
+      }}
+      version={version}
+    />
+  );
 }

@@ -2,6 +2,7 @@ import { marked } from "marked";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isSaveShortcut } from "~/lib/keys";
 import { rewriteLocalAssets } from "~/lib/markdown";
+import { showToast } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
 import CopyPathButton from "./CopyPathButton";
 
@@ -11,7 +12,8 @@ interface CodeEditorProps {
   path: string;
   content: string;
   onSave: (content: string) => void;
-  onClose: () => void;
+  /** Re-read the file from disk; it may have changed since the tab opened. */
+  onReload: () => void;
 }
 
 const PREVIEWABLE = new Set(["md", "markdown", "html", "htm", "ipynb"]);
@@ -209,7 +211,7 @@ interface MonacoHandle {
   addCommand: (keybinding: number, handler: () => void) => void;
 }
 
-export default function CodeEditor({ path, content, onSave, onClose }: CodeEditorProps) {
+export default function CodeEditor({ path, content, onSave, onReload }: CodeEditorProps) {
   const ext = getExt(path);
   const canPreview = PREVIEWABLE.has(ext);
   const [value, setValue] = useState(content);
@@ -218,6 +220,9 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
   const [modeMenu, setModeMenu] = useState(false);
   const modeMenuRef = useRef<HTMLDivElement>(null);
   const monacoRef = useRef<MonacoHandle | null>(null);
+  // Reloading over unsaved work would throw it away silently, so the first tap
+  // only warns. Clears itself, so an armed button cannot sit waiting.
+  const [discardArmed, setDiscardArmed] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
@@ -225,6 +230,30 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
   const monacoTheme = useWorkspaceStore((s) => (s.theme === "light" ? "light" : "vs-dark"));
   const isHtml = ext === "html" || ext === "htm";
   const [htmlZoom, setHtmlZoom] = useState(100);
+
+  // `value` is only seeded from `content` at mount, so a reload has to be taken
+  // up here. Keeps the chosen mode and zoom, which a remount would reset.
+  useEffect(() => {
+    setValue(content);
+    setDirty(false);
+    setDiscardArmed(false);
+  }, [content]);
+
+  /**
+   * Reload, unless that would throw away unsaved work: the first tap then only
+   * says so, and the second goes through. Not a dialog, because a two-tap
+   * button is already the pattern the remove-command control uses.
+   */
+  const reload = () => {
+    if (dirty && !discardArmed) {
+      setDiscardArmed(true);
+      showToast("Unsaved changes — tap reload again to discard them");
+      setTimeout(() => setDiscardArmed(false), 4000);
+      return;
+    }
+    setDiscardArmed(false);
+    onReload();
+  };
 
   // Asks Monaco rather than shadowing it with a second stack: two histories
   // over one editor would disagree the moment someone pressed Ctrl+Z.
@@ -450,9 +479,20 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 3v4h-4M7 17h10M7 13h10" />
             </svg>
           </button>
-          <button onClick={onClose} className="relief p-1 text-ink-muted hover:text-ink rounded-control" title="Close">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <button
+            onClick={reload}
+            className={`relief p-1 rounded-control ${
+              discardArmed ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70" : "text-ink-muted hover:text-ink"
+            }`}
+            title={discardArmed ? "Tap again to discard your edits and reload" : "Reload from disk"}
+            aria-label="Reload from disk"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
           </button>
         </div>

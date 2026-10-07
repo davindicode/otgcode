@@ -3,10 +3,12 @@ import CopyPathButton from "./CopyPathButton";
 
 interface ImageViewerProps {
   path: string;
-  onClose: () => void;
+  onReload: () => void;
+  /** Bumped per reload, so the browser refetches rather than reusing its copy. */
+  version: number;
 }
 
-export default function ImageViewer({ path, onClose }: ImageViewerProps) {
+export default function ImageViewer({ path, onReload, version }: ImageViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -15,7 +17,7 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
   // image, which restarts the animation (a play-once gif can't otherwise replay).
   const isGif = path.split(".").pop()?.toLowerCase() === "gif";
   const [replayKey, setReplayKey] = useState(0);
-  const src = `/api/files/download?path=${encodeURIComponent(path)}&inline=1${replayKey ? `&_r=${replayKey}` : ""}`;
+  const src = `/api/files/download?path=${encodeURIComponent(path)}&inline=1&v=${version}${replayKey ? `&_r=${replayKey}` : ""}`;
 
   const zoomIn = () => setZoom((z) => Math.min(5, z + 0.25));
   const zoomOut = () => setZoom((z) => Math.max(0.1, z - 0.25));
@@ -122,9 +124,18 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
               />
             </svg>
           </a>
-          <button onClick={onClose} className="relief p-1 text-ink-muted hover:text-ink rounded-control" title="Close">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <button
+            onClick={onReload}
+            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
+            title="Reload from disk"
+            aria-label="Reload from disk"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
           </button>
         </div>

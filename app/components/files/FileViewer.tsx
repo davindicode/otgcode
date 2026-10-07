@@ -13,11 +13,26 @@ interface FileViewerProps {
   path: string;
   content: string | null;
   onSave: (content: string) => void;
-  onClose: () => void;
+  /** Re-read the file: it may have changed on disk since the tab opened. */
+  onReload: () => void;
+  /** Bumped per reload, so a cached media URL is not reused. */
+  version: number;
 }
 
-function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "audio"; onClose: () => void }) {
-  const src = `/api/files/download?path=${encodeURIComponent(path)}&inline=1`;
+function MediaViewer({
+  path,
+  type,
+  onReload,
+  version,
+}: {
+  path: string;
+  type: "video" | "audio";
+  onReload: () => void;
+  version: number;
+}) {
+  // `version` changes on reload, which is what makes the browser fetch the
+  // file again instead of serving the copy it already has.
+  const src = `/api/files/download?path=${encodeURIComponent(path)}&inline=1&v=${version}`;
   const [loop, setLoop] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
 
@@ -79,9 +94,18 @@ function MediaViewer({ path, type, onClose }: { path: string; type: "video" | "a
               />
             </svg>
           </a>
-          <button onClick={onClose} className="relief p-1 text-ink-muted hover:text-ink rounded-control" title="Close">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <button
+            onClick={onReload}
+            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
+            title="Reload from disk"
+            aria-label="Reload from disk"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
           </button>
         </div>
@@ -152,7 +176,7 @@ function LazyPdfPage({
   );
 }
 
-function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
+function PdfViewer({ path, onReload, version }: { path: string; onReload: () => void; version: number }) {
   const [numPages, setNumPages] = useState<number>(0);
   const [scale, setScale] = useState(1.0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -165,7 +189,7 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
     setNumPages(numPages);
   }, []);
 
-  const pdfUrl = `/api/files/download?path=${encodeURIComponent(path)}&inline=1`;
+  const pdfUrl = `/api/files/download?path=${encodeURIComponent(path)}&inline=1&v=${version}`;
 
   return (
     <div className="flex flex-col h-full">
@@ -207,9 +231,18 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
               />
             </svg>
           </a>
-          <button onClick={onClose} className="relief p-1 text-ink-muted hover:text-ink rounded-control" title="Close">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <button
+            onClick={onReload}
+            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
+            title="Reload from disk"
+            aria-label="Reload from disk"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
           </button>
         </div>
@@ -232,28 +265,28 @@ function PdfViewer({ path, onClose }: { path: string; onClose: () => void }) {
   );
 }
 
-export default function FileViewer({ path, content, onSave, onClose }: FileViewerProps) {
+export default function FileViewer({ path, content, onSave, onReload, version }: FileViewerProps) {
   const kind = fileKind(path);
 
   if (kind === "image") {
-    return <ImageViewer path={path} onClose={onClose} />;
+    return <ImageViewer path={path} onReload={onReload} version={version} />;
   }
 
   if (kind === "pdf") {
-    return <PdfViewer path={path} onClose={onClose} />;
+    return <PdfViewer path={path} onReload={onReload} version={version} />;
   }
 
   if (kind === "video") {
-    return <MediaViewer path={path} type="video" onClose={onClose} />;
+    return <MediaViewer path={path} type="video" onReload={onReload} version={version} />;
   }
 
   if (kind === "audio") {
-    return <MediaViewer path={path} type="audio" onClose={onClose} />;
+    return <MediaViewer path={path} type="audio" onReload={onReload} version={version} />;
   }
 
   // Default to code editor for everything else
   if (content !== null) {
-    return <CodeEditor path={path} content={content} onSave={onSave} onClose={onClose} />;
+    return <CodeEditor path={path} content={content} onSave={onSave} onReload={onReload} />;
   }
 
   return (
@@ -281,9 +314,18 @@ export default function FileViewer({ path, content, onSave, onClose }: FileViewe
               />
             </svg>
           </a>
-          <button onClick={onClose} className="relief p-1 text-ink-muted hover:text-ink rounded-control" title="Close">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <button
+            onClick={onReload}
+            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
+            title="Reload from disk"
+            aria-label="Reload from disk"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
           </button>
         </div>
