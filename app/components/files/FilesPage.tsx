@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import RefreshIcon from "~/components/RefreshIcon";
+import { apiPost } from "~/lib/api";
 import { copyText } from "~/lib/clipboard";
 import { errorMessage } from "~/lib/errors";
 import { formatSize } from "~/lib/format";
@@ -38,14 +39,14 @@ function FileSessionView({ session }: { session: FileSession }) {
         const res = await fetch(`/api/files/list?dir=${encodeURIComponent(dir)}&showHidden=${hidden}`);
         const data = await res.json();
         if (data.error) {
-          patch({ error: data.error, loading: false });
+          patch({ loading: false });
           return data.error as string;
         }
-        patch({ cwd: data.dir, entries: data.entries, error: null, loading: false });
+        patch({ cwd: data.dir, entries: data.entries, loading: false });
         return null;
       } catch (err: unknown) {
         const message = errorMessage(err, "Could not reach the server");
-        patch({ error: message, loading: false });
+        patch({ loading: false });
         return message;
       }
     },
@@ -109,6 +110,13 @@ function FileSessionView({ session }: { session: FileSession }) {
     } finally {
       setOpBusy(false);
     }
+  };
+
+  // Reload the listing after an action changed it. A failure here is its own
+  // problem: the action itself worked, it is reading the result that broke.
+  const refresh = async () => {
+    const err = await loadDirectory(cwd);
+    if (err) showToast(err);
   };
 
   const fullPath = (name: string) => (cwd === "/" ? `/${name}` : `${cwd}/${name}`);
@@ -218,9 +226,10 @@ function FileSessionView({ session }: { session: FileSession }) {
     handleNavigate(parent);
   };
 
-  const toggleHidden = (val: boolean) => {
+  const toggleHidden = async (val: boolean) => {
     patch({ showHidden: val });
-    loadDirectory(cwd, val);
+    const err = await loadDirectory(cwd, val);
+    if (err) showToast(err);
   };
 
   // --- Actions ---
@@ -232,16 +241,10 @@ function FileSessionView({ session }: { session: FileSession }) {
     const name = inputValue.trim();
     if (!name) return;
     try {
-      const res = await fetch("/api/files/mkdir", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: fullPath(name) }),
-      });
-      const data = await res.json();
-      if (data.error) patch({ error: data.error });
-      else await loadDirectory(cwd);
+      await apiPost("/api/files/mkdir", { path: fullPath(name) });
+      await refresh();
     } catch (err: unknown) {
-      patch({ error: errorMessage(err) });
+      showToast(errorMessage(err, `Could not create "${name}"`));
     }
     setDialog(null);
   };
@@ -254,16 +257,10 @@ function FileSessionView({ session }: { session: FileSession }) {
     const name = inputValue.trim();
     if (!name) return;
     try {
-      const res = await fetch("/api/files/write", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: fullPath(name), content: "" }),
-      });
-      const data = await res.json();
-      if (data.error) patch({ error: data.error });
-      else await loadDirectory(cwd);
+      await apiPost("/api/files/write", { path: fullPath(name), content: "" });
+      await refresh();
     } catch (err: unknown) {
-      patch({ error: errorMessage(err) });
+      showToast(errorMessage(err, `Could not create "${name}"`));
     }
     setDialog(null);
   };
@@ -271,17 +268,12 @@ function FileSessionView({ session }: { session: FileSession }) {
   const handleDelete = (entry: FileEntry) => setDialog({ type: "delete", entry });
   const confirmDelete = async () => {
     if (dialog?.type !== "delete") return;
+    const { name } = dialog.entry;
     try {
-      const res = await fetch("/api/files/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: fullPath(dialog.entry.name) }),
-      });
-      const data = await res.json();
-      if (data.error) patch({ error: data.error });
-      else await loadDirectory(cwd);
+      await apiPost("/api/files/delete", { path: fullPath(name) });
+      await refresh();
     } catch (err: unknown) {
-      patch({ error: errorMessage(err) });
+      showToast(errorMessage(err, `Could not delete "${name}"`));
     }
     setDialog(null);
   };
@@ -295,22 +287,22 @@ function FileSessionView({ session }: { session: FileSession }) {
     // get reset to cwd by the refresh).
     await withBusy(async () => {
       let failed = 0;
+      let reason = "";
       for (const entry of items) {
         try {
-          const res = await fetch("/api/files/delete", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ path: fullPath(entry.name) }),
-          });
-          const data = await res.json();
-          if (data.error) failed++;
-        } catch {
+          await apiPost("/api/files/delete", { path: fullPath(entry.name) });
+        } catch (err: unknown) {
           failed++;
+          // The first refusal is almost always the reason for all of them —
+          // one unwritable directory — and is what the person can act on.
+          reason = reason || errorMessage(err);
         }
       }
-      if (failed > 0) showToast(`Failed to delete ${failed} of ${items.length} item${items.length === 1 ? "" : "s"}`);
+      if (failed > 0) {
+        showToast(failed === items.length ? reason : `${reason} — ${failed} of ${items.length} not deleted`);
+      }
       exitSelectMode();
-      await loadDirectory(cwd);
+      await refresh();
     });
   };
 
@@ -326,16 +318,10 @@ function FileSessionView({ session }: { session: FileSession }) {
       return;
     }
     try {
-      const res = await fetch("/api/files/rename", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ oldPath: fullPath(dialog.entry.name), newPath: fullPath(newName) }),
-      });
-      const data = await res.json();
-      if (data.error) patch({ error: data.error });
-      else await loadDirectory(cwd);
+      await apiPost("/api/files/rename", { oldPath: fullPath(dialog.entry.name), newPath: fullPath(newName) });
+      await refresh();
     } catch (err: unknown) {
-      patch({ error: errorMessage(err) });
+      showToast(errorMessage(err, `Could not rename to "${newName}"`));
     }
     setDialog(null);
   };
@@ -362,18 +348,9 @@ function FileSessionView({ session }: { session: FileSession }) {
     if (!moveSource) return;
     await withBusy(async () => {
       try {
-        const res = await fetch("/api/files/move", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sourcePath: moveSource.path, destDir: cwd }),
-        });
-        const data = await res.json();
-        if (data.error) {
-          showToast(data.error);
-          return;
-        }
+        await apiPost("/api/files/move", { sourcePath: moveSource.path, destDir: cwd });
         setMoveSource(null);
-        await loadDirectory(cwd);
+        await refresh();
         showToast(`Moved "${moveSource.name}" here`, "info");
       } catch (err: unknown) {
         showToast(errorMessage(err, "Move failed"));
@@ -401,6 +378,17 @@ function FileSessionView({ session }: { session: FileSession }) {
     if (uploadQueue.length === 0) return;
     const allDone = uploadQueue.every((f) => f.status === "done" || f.status === "error" || f.status === "cancelled");
     if (!allDone) return;
+    // The per-row label is faint, truncated and about to be cleared, so the
+    // reason an upload was refused has to be said somewhere that persists.
+    const failures = uploadQueue.filter((f) => f.status === "error");
+    if (failures.length > 0) {
+      const reason = failures[0].error || "Upload failed";
+      showToast(
+        failures.length === uploadQueue.length
+          ? reason
+          : `${reason} — ${failures.length} of ${uploadQueue.length} failed`,
+      );
+    }
     let cancelled = false;
     const timer = setTimeout(async () => {
       setOpBusy(true);
@@ -418,11 +406,12 @@ function FileSessionView({ session }: { session: FileSession }) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [uploadQueue]);
+  }, [uploadQueue, showToast]);
 
   const CHUNK_SIZE = 80 * 1024 * 1024; // 80MB — under Cloudflare's 100MB limit
 
-  const uploadChunk = (blob: Blob, uploadId: string, chunkIndex: number, index: number): Promise<boolean> => {
+  /** Resolves with the server's refusal, or "" when the chunk landed. */
+  const uploadChunk = (blob: Blob, uploadId: string, chunkIndex: number, index: number): Promise<string> => {
     return new Promise((resolve) => {
       const formData = new FormData();
       formData.append("uploadId", uploadId);
@@ -434,20 +423,21 @@ function FileSessionView({ session }: { session: FileSession }) {
 
       xhr.onload = () => {
         uploadXhrs.current.delete(index);
+        let error = xhr.status >= 200 && xhr.status < 300 ? "" : `Upload failed (${xhr.status})`;
         try {
-          const data = JSON.parse(xhr.responseText);
-          resolve(!data.error);
+          error = JSON.parse(xhr.responseText).error || error;
         } catch {
-          resolve(false);
+          if (!error) error = "The server gave an unreadable reply";
         }
+        resolve(error);
       };
       xhr.onerror = () => {
         uploadXhrs.current.delete(index);
-        resolve(false);
+        resolve("Network error");
       };
       xhr.onabort = () => {
         uploadXhrs.current.delete(index);
-        resolve(false);
+        resolve("Cancelled");
       };
 
       xhr.open("POST", "/api/files/upload-chunk");
@@ -478,16 +468,20 @@ function FileSessionView({ session }: { session: FileSession }) {
         };
         xhr.onload = () => {
           uploadXhrs.current.delete(index);
+          // A body that isn't JSON (a proxy's HTML error page) used to count as
+          // success here, which is how a refused upload looked like a finished
+          // one. Only a 2xx with no `error` is a success.
+          let error = xhr.status >= 200 && xhr.status < 300 ? "" : `Upload failed (${xhr.status})`;
           try {
-            const data = JSON.parse(xhr.responseText);
-            if (data.error) {
-              setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "error", error: data.error } : f)));
-            } else {
-              setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "done", progress: 100 } : f)));
-            }
+            error = JSON.parse(xhr.responseText).error || error;
           } catch {
-            setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "done", progress: 100 } : f)));
+            if (!error) error = "The server gave an unreadable reply";
           }
+          setUploadQueue((q) =>
+            q.map((f, i) =>
+              i === index ? (error ? { ...f, status: "error", error } : { ...f, status: "done", progress: 100 }) : f,
+            ),
+          );
           resolve();
         };
         xhr.onerror = () => {
@@ -518,11 +512,10 @@ function FileSessionView({ session }: { session: FileSession }) {
       const end = Math.min(start + CHUNK_SIZE, file.size);
       const blob = file.slice(start, end);
 
-      const ok = await uploadChunk(blob, uploadId, c, index);
-      if (!ok) {
-        setUploadQueue((q) =>
-          q.map((f, i) => (i === index ? { ...f, status: "error", error: `Chunk ${c + 1}/${totalChunks} failed` } : f)),
-        );
+      const failure = await uploadChunk(blob, uploadId, c, index);
+      if (failure) {
+        const error = `${failure} (part ${c + 1} of ${totalChunks})`;
+        setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "error", error } : f)));
         return;
       }
       const pct = Math.round(((c + 1) / totalChunks) * 100);
@@ -531,20 +524,17 @@ function FileSessionView({ session }: { session: FileSession }) {
 
     // Finalize: assemble chunks on server
     try {
-      const res = await fetch("/api/files/upload-finalize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uploadId, dir: cwd, fileName: file.name, relativePath, totalChunks }),
+      await apiPost("/api/files/upload-finalize", {
+        uploadId,
+        dir: cwd,
+        fileName: file.name,
+        relativePath,
+        totalChunks,
       });
-      const data = await res.json();
-      if (data.error) {
-        setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "error", error: data.error } : f)));
-      } else {
-        setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "done", progress: 100 } : f)));
-      }
+      setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "done", progress: 100 } : f)));
     } catch (err: unknown) {
-      const message = errorMessage(err, "Upload failed");
-      setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "error", error: message } : f)));
+      const error = errorMessage(err, "Upload failed");
+      setUploadQueue((q) => q.map((f, i) => (i === index ? { ...f, status: "error", error } : f)));
     }
   };
 
@@ -1051,7 +1041,7 @@ function FileSessionView({ session }: { session: FileSession }) {
               <button
                 onClick={() => {
                   if (selectMode) exitSelectMode();
-                  loadDirectory(cwd);
+                  refresh();
                 }}
                 disabled={busy}
                 className="p-1.5 text-ink-dim hover:text-ink disabled:text-ink-ghost disabled:pointer-events-none transition-colors"

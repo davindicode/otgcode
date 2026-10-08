@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiPost } from "~/lib/api";
+import { errorMessage } from "~/lib/errors";
 import { useTabsStore } from "~/stores/tabsStore";
 import { useToastStore } from "~/stores/toastStore";
 
@@ -69,14 +71,10 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
   const kill = async (session: string) => {
     setBusy(true);
     try {
-      const res = await fetch("/api/tmux/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ op: "kill", name: session }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        showToast(data.error);
+      try {
+        await apiPost("/api/tmux/sessions", { op: "kill", name: session });
+      } catch (err: unknown) {
+        showToast(errorMessage(err, "Could not kill the session"));
         return;
       }
       // The session is gone, so any tab attached to it has nothing to show.

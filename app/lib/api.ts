@@ -43,3 +43,24 @@ export function watchForExpiredSession(): void {
     return response;
   };
 }
+
+/**
+ * POST JSON to one of our own API routes, throwing the server's own message.
+ *
+ * Every route answers a failure with `{ error }` — but a failure that never
+ * reached the route (a 405, an SSR crash, a proxy refusing the body) answers
+ * with HTML and no `error` field at all. Checking only `data.error`, which
+ * every call site used to do by hand, read those as success.
+ */
+export async function apiPost<T = unknown>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data: unknown = await res.json().catch(() => null);
+  const error = data && typeof data === "object" && "error" in data ? String((data as { error: unknown }).error) : "";
+  if (error) throw new Error(error);
+  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  return data as T;
+}

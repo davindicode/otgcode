@@ -8,7 +8,6 @@ export default [
   route("api/files/write", "routes/api/files.write.ts"),
   route("api/files/rename", "routes/api/files.rename.ts"),
   route("api/files/delete", "routes/api/files.delete.ts"),
-  route("api/files/upload", "routes/api/files.upload.ts"),
   route("api/files/download", "routes/api/files.download.ts"),
   route("api/files/mkdir", "routes/api/files.mkdir.ts"),
   route("api/files/move", "routes/api/files.move.ts"),

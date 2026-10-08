@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import DownloadIcon from "~/components/DownloadIcon";
 import RefreshIcon from "~/components/RefreshIcon";
+import { showToast } from "~/stores/toastStore";
 import CopyPathButton from "./CopyPathButton";
 
 interface ImageViewerProps {
@@ -31,6 +32,20 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
     const img = e.currentTarget;
     setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
   }, []);
+
+  // A file we are not allowed to read answers with a JSON error, which an
+  // <img> cannot render — leaving a broken-image icon and no reason for it.
+  // The same URL still has the reason, and by now it is a few bytes.
+  const reportFailure = useCallback(async () => {
+    let reason = "";
+    try {
+      const data = (await (await fetch(src)).json()) as { error?: string };
+      reason = data.error ?? "";
+    } catch {
+      // Not JSON either: the image is simply undisplayable.
+    }
+    showToast(reason || "This image could not be displayed");
+  }, [src]);
 
   // Pinch-to-zoom
   const lastDistance = useRef(0);
@@ -158,6 +173,7 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
             className="max-w-none"
             draggable={false}
             onLoad={handleImageLoad}
+            onError={reportFailure}
             style={
               naturalSize
                 ? {

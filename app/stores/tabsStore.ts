@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { apiPost } from "~/lib/api";
+import { errorMessage } from "~/lib/errors";
 import { basename } from "~/lib/paths";
 import type { WorkspaceTab } from "~/lib/workspace.shared";
 import { useFileStore } from "./fileStore";
@@ -335,19 +337,11 @@ export function toWorkspaceTabs(tabs: Tab[]): WorkspaceTab[] {
  */
 async function renameTmuxSession(from: string, to: string): Promise<string | null> {
   try {
-    const res = await fetch("/api/tmux/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ op: "rename", name: from, to }),
-    });
-    const data = (await res.json()) as { name?: string; error?: string };
-    if (data.error || !data.name) {
-      showToast(data.error || "Could not rename the session");
-      return null;
-    }
-    return data.name;
-  } catch {
-    showToast("Could not reach the server");
+    const { name } = await apiPost<{ name?: string }>("/api/tmux/sessions", { op: "rename", name: from, to });
+    if (!name) throw new Error("Could not rename the session");
+    return name;
+  } catch (err: unknown) {
+    showToast(errorMessage(err, "Could not rename the session"));
     return null;
   }
 }

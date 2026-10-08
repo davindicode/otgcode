@@ -15,7 +15,6 @@ export interface FileSession {
   entries: FileEntry[];
   showHidden: boolean;
   loading: boolean;
-  error: string | null;
 }
 
 interface FileState {
@@ -46,7 +45,6 @@ export const useFileStore = create<FileState>((set, get) => ({
           entries: [],
           showHidden: false,
           loading: false,
-          error: null,
         },
       },
     });

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import RefreshIcon from "~/components/RefreshIcon";
+import { apiPost } from "~/lib/api";
+import { errorMessage } from "~/lib/errors";
 import { shellQuote } from "~/lib/shell";
 import { useTabsStore } from "~/stores/tabsStore";
 import { useTerminalStore } from "~/stores/terminalStore";
@@ -494,15 +496,9 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     if (tmuxSession) {
       stopInputReporting(sessionId);
       try {
-        const res = await fetch("/api/tmux/sessions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ op: "refresh", name: tmuxSession }),
-        });
-        const data = (await res.json()) as { error?: string };
-        if (data.error) showToast(data.error);
-      } catch {
-        showToast("Could not reach the server");
+        await apiPost("/api/tmux/sessions", { op: "refresh", name: tmuxSession });
+      } catch (err: unknown) {
+        showToast(errorMessage(err, "Could not refresh the session"));
       }
       return;
     }
@@ -519,20 +515,11 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     const index = windowTarget.trim();
     if (!tmuxSession || !/^\d{1,4}$/.test(index)) return;
     try {
-      const res = await fetch("/api/tmux/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ op: "select-window", name: tmuxSession, window: index }),
-      });
-      const data = (await res.json()) as { error?: string };
-      if (data.error) {
-        showToast(data.error);
-        return;
-      }
+      await apiPost("/api/tmux/sessions", { op: "select-window", name: tmuxSession, window: index });
       setWindowTarget("");
       setTmuxWindow(index);
-    } catch {
-      showToast("Could not reach the server");
+    } catch (err: unknown) {
+      showToast(errorMessage(err, `Could not go to window ${index}`));
     }
   };
 

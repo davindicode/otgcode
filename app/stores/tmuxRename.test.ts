@@ -4,13 +4,26 @@ import { useTerminalStore } from "~/stores/terminalStore";
 import { useToastStore } from "~/stores/toastStore";
 
 /** Stands in for /api/tmux/sessions, which is what tmux itself answers for. */
-function stubApi(reply: { name?: string; error?: string }) {
+function stubApi(reply: { name?: string; error?: string }, status = 200) {
   const calls: unknown[] = [];
   vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
     calls.push(JSON.parse(init.body));
-    return { json: async () => reply } as Response;
+    return { ok: status < 400, status, json: async () => reply } as Response;
   });
   return calls;
+}
+
+/** A reply that never reached the route: a status, and HTML rather than JSON. */
+function stubBrokenApi(status: number) {
+  vi.stubGlobal("fetch", async () => {
+    return {
+      ok: false,
+      status,
+      json: async () => {
+        throw new SyntaxError("Unexpected token '<'");
+      },
+    } as unknown as Response;
+  });
 }
 
 function seedTmuxTab(session: string) {
@@ -78,6 +91,18 @@ describe("renaming a tmux tab", () => {
     expect(tab().title).toBe("work");
     expect(tab().tmuxSession).toBe("work");
     expect(toasts()).toEqual(["A session with that name already exists"]);
+  });
+
+  it("treats a reply that never reached the route as a failure", async () => {
+    seedTmuxTab("work");
+    // An SSR crash or a proxy's error page answers with HTML and no `error`
+    // field, which a `data.error` check alone reads as a successful rename.
+    stubBrokenApi(502);
+
+    await useTabsStore.getState().rename("tab-1", "deploy");
+
+    expect(tab().title).toBe("work");
+    expect(toasts()).toEqual(["Request failed (502)"]);
   });
 
   it("does not touch tmux for a plain terminal tab", async () => {

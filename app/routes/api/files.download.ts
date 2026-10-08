@@ -1,5 +1,4 @@
-import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { open, stat } from "node:fs/promises";
 import { basename } from "node:path";
 import { Readable } from "node:stream";
 import { lookup } from "mime-types";
@@ -74,9 +73,13 @@ export async function loader({ request }: Route.LoaderArgs) {
       return new Response(null, { status: range ? 206 : 200, headers });
     }
 
-    const stream = createReadStream(filePath, { start, end });
+    // Opened before the response exists, so a file we are not allowed to read
+    // fails into the catch below and answers 400. `createReadStream` alone
+    // defers that refusal until the body is already streaming, by which point
+    // the status says 200 and all the caller sees is a dropped connection.
+    const handle = await open(filePath, "r");
 
-    return new Response(Readable.toWeb(stream) as ReadableStream<Uint8Array>, {
+    return new Response(Readable.toWeb(handle.createReadStream({ start, end })) as ReadableStream<Uint8Array>, {
       status: range ? 206 : 200,
       headers,
     });
