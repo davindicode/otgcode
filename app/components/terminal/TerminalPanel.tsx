@@ -36,18 +36,11 @@ export default function TerminalPanel({ sessionId }: { sessionId: string }) {
     const el = terminalRef.current;
     if (!el || initialized.current) return;
 
-    // Check if this session already has a terminal in the store (re-attach)
-    const session = useTerminalStore.getState().sessions[sessionId];
-    if (session?.terminal) {
-      initialized.current = true;
-      el.innerHTML = "";
-      session.terminal.open(el);
-      setTimeout(() => {
-        session.fitAddon?.fit();
-        session.terminal!.refresh(0, session.terminal!.rows - 1);
-      }, 50);
-      return;
-    }
+    // No re-attach branch: a pane is never unmounted while its session lives,
+    // so a terminal that already exists cannot need opening into a new element.
+    // The branch that used to do that called `open()` on an already-opened
+    // terminal, which renders nothing at all — it was reachable only because
+    // the session gate replaced the app instead of covering it.
 
     // Delay to ensure the container has dimensions after layout
     const timer = setTimeout(() => {

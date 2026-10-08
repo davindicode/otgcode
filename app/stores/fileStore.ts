@@ -20,11 +20,9 @@ export interface FileSession {
 
 interface FileState {
   sessions: Record<string, FileSession>;
-  activeSessionId: string | null;
 
   createSession: (id?: string, name?: string, cwd?: string) => string;
   closeSession: (id: string) => void;
-  setActiveSession: (id: string) => void;
   updateSession: (id: string, patch: Partial<FileSession>) => void;
 }
 
@@ -32,7 +30,6 @@ let sessionCounter = 0;
 
 export const useFileStore = create<FileState>((set, get) => ({
   sessions: {},
-  activeSessionId: null,
 
   createSession: (id, restoredName, restoredCwd) => {
     sessionCounter++;
@@ -52,24 +49,16 @@ export const useFileStore = create<FileState>((set, get) => ({
           error: null,
         },
       },
-      activeSessionId: sessionId,
     });
     return sessionId;
   },
 
   closeSession: (id) => {
-    const { sessions, activeSessionId } = get();
+    const { sessions } = get();
     const newSessions = { ...sessions };
     delete newSessions[id];
-    const remaining = Object.keys(newSessions);
-    set({
-      sessions: newSessions,
-      activeSessionId:
-        activeSessionId === id ? (remaining.length > 0 ? remaining[remaining.length - 1] : null) : activeSessionId,
-    });
+    set({ sessions: newSessions });
   },
-
-  setActiveSession: (id) => set({ activeSessionId: id }),
 
   updateSession: (id, patch) => {
     const { sessions } = get();

@@ -8,7 +8,6 @@ import { type Progress, startProgress } from "./progress.js";
 
 // Main OTG Code tunnel
 let mainTunnelProcess: ChildProcess | null = null;
-let mainTunnelUrl: string | null = null;
 
 // Cloudflared loads ~/.cloudflared/config.yml AND /etc/cloudflared/config.yml (plus
 // /usr/local/etc/cloudflared/...) by default. If any of those configs define an
@@ -142,7 +141,6 @@ function spawnTunnelOnce(port: number, progress: Progress): Promise<string | nul
       }
       const match = text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
       if (match && !resolved) {
-        mainTunnelUrl = match[0];
         settle(match[0]);
       }
     };
@@ -163,7 +161,6 @@ function spawnTunnelOnce(port: number, progress: Progress): Promise<string | nul
       }
       if (mainTunnelProcess === proc) {
         mainTunnelProcess = null;
-        mainTunnelUrl = null;
       }
     });
   });
@@ -212,6 +209,5 @@ export function stopTunnel(): void {
   if (mainTunnelProcess) {
     mainTunnelProcess.kill();
     mainTunnelProcess = null;
-    mainTunnelUrl = null;
   }
 }

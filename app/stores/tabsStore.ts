@@ -302,8 +302,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
  */
 function syncContentFocus(id: string, tabs: Tab[]): void {
   const tab = tabs.find((t) => t.id === id);
-  if (tab?.kind === "terminal" || tab?.kind === "tmux") useTerminalStore.getState().setActiveSession(id);
-  if (tab?.kind === "explorer") useFileStore.getState().setActiveSession(id);
+  // Only a terminal needs anything on becoming visible: it measures itself
+  // against the layout, and could not while it was hidden. An explorer is
+  // ordinary DOM and simply appears.
+  if (tab?.kind === "terminal" || tab?.kind === "tmux") useTerminalStore.getState().refitSession(id);
 }
 
 /** Shape for persistence — mirrors what the workspace file stores. */

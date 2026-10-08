@@ -156,8 +156,6 @@ function AddPortRow() {
   const [input, setInput] = useState("");
   const addTab = useBrowserStore((s) => s.addTab);
   const setTabPort = useBrowserStore((s) => s.setTabPort);
-  const tabs = useBrowserStore((s) => s.tabs);
-
   const val = input.trim();
   const isNumeric = val !== "" && /^\d+$/.test(val);
   const blocked = isNumeric ? isPortBlocked(parseInt(val, 10)) : null;

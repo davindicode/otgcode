@@ -32,7 +32,6 @@ interface TerminalSession {
 
 interface TerminalState {
   sessions: Record<string, TerminalSession>;
-  activeSessionId: string | null;
   socketConnected: boolean;
   fontSize: number;
   defaultCwd: string;
@@ -53,7 +52,12 @@ interface TerminalState {
    * by a program that exited badly.
    */
   resetModes: (sessionId: string) => void;
-  setActiveSession: (sessionId: string) => void;
+  /**
+   * Re-measure a pane that has just been shown. A hidden pane has no size for
+   * the fit addon to read, so one that was switched away from is fitted to
+   * whatever the layout is now.
+   */
+  refitSession: (sessionId: string) => void;
   /** `tmuxSession` moves with the name for a tmux tab: the two are the same thing. */
   renameSession: (sessionId: string, name: string, tmuxSession?: string, tmuxSessionId?: string) => void;
   setFontSize: (size: number) => void;
@@ -139,7 +143,6 @@ const RESET_MODES = [
 
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   sessions: {},
-  activeSessionId: null,
   socketConnected: false,
   fontSize: DEFAULT_FONT_SIZE,
   defaultCwd: "",
@@ -322,7 +325,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           cdCwd: "",
         },
       },
-      activeSessionId: sessionId,
     });
 
     // Socket.IO buffers emits made while offline, which would create this twice
@@ -382,7 +384,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   },
 
   closeSession: (sessionId) => {
-    const { sessions, activeSessionId } = get();
+    const { sessions } = get();
     const session = sessions[sessionId];
     if (!session) return;
 
@@ -396,19 +398,10 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     const newSessions = { ...sessions };
     delete newSessions[sessionId];
 
-    const remainingIds = Object.keys(newSessions);
-    const newActiveId =
-      activeSessionId === sessionId
-        ? remainingIds.length > 0
-          ? remainingIds[remainingIds.length - 1]
-          : null
-        : activeSessionId;
-
-    set({ sessions: newSessions, activeSessionId: newActiveId });
+    set({ sessions: newSessions });
   },
 
-  setActiveSession: (sessionId) => {
-    set({ activeSessionId: sessionId });
+  refitSession: (sessionId) => {
     const { sessions } = get();
     const session = sessions[sessionId];
     if (session?.fitAddon && session.terminal) {
