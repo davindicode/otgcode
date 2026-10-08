@@ -1,5 +1,7 @@
 import { marked } from "marked";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import DownloadIcon from "~/components/DownloadIcon";
+import RefreshIcon from "~/components/RefreshIcon";
 import { isSaveShortcut } from "~/lib/keys";
 import { rewriteLocalAssets } from "~/lib/markdown";
 import { showToast } from "~/stores/toastStore";
@@ -457,13 +459,7 @@ export default function CodeEditor({ path, content, onSave, onReload, stale }: C
             className="relief p-1 text-ink-muted hover:text-ink rounded-control"
             title="Download"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"
-              />
-            </svg>
+            <DownloadIcon />
           </a>
           {dirty && <span className="text-xs text-yellow-500">*</span>}
           <button
@@ -497,13 +493,7 @@ export default function CodeEditor({ path, content, onSave, onReload, stale }: C
             }
             aria-label="Reload from disk"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+            <RefreshIcon className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

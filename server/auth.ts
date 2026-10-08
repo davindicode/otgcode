@@ -178,10 +178,6 @@ export function readToken(
   return { expiresAt: Number(expiresAt), issuedAt: Number(issuedAt) };
 }
 
-export function verifyToken(token: string | undefined | null, secret: string, now = Date.now()): boolean {
-  return readToken(token, secret, now) !== null;
-}
-
 // ---------------------------------------------------------------------------
 // Cookies
 // ---------------------------------------------------------------------------
@@ -224,7 +220,7 @@ export function clearedSessionCookie(): string {
 export function isRequestAuthenticated(cookieHeader: string | undefined | null): boolean {
   const config = loadConfig();
   if (!config.passwordEnabled || !config.passwordHash) return true;
-  return verifyToken(parseCookies(cookieHeader)[SESSION_COOKIE], config.sessionSecret);
+  return readToken(parseCookies(cookieHeader)[SESSION_COOKIE], config.sessionSecret) !== null;
 }
 
 /** When this request's session began, if it has one that says. */

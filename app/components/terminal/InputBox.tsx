@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import RefreshIcon from "~/components/RefreshIcon";
 import { shellQuote } from "~/lib/shell";
 import { useTabsStore } from "~/stores/tabsStore";
 import { useTerminalStore } from "~/stores/terminalStore";
@@ -740,13 +741,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
             aria-label="Reset the terminal"
             className="p-1.5 text-ink-dim transition-colors hover:text-ink disabled:pointer-events-none disabled:text-ink-ghost"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+            <RefreshIcon className="h-4 w-4" />
           </button>
         </div>
       </div>

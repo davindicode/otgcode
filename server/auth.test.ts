@@ -13,7 +13,6 @@ import {
   sessionCookie,
   validatePassword,
   verifyPassword,
-  verifyToken,
 } from "./auth";
 import { isPublicPath } from "./auth-routes";
 
@@ -56,29 +55,29 @@ describe("validatePassword", () => {
 
 describe("session tokens", () => {
   it("accepts a token it just issued", () => {
-    expect(verifyToken(issueToken(SECRET), SECRET)).toBe(true);
+    expect(readToken(issueToken(SECRET), SECRET)).not.toBeNull();
   });
 
   it("rejects a token signed with a different secret (rotation logs sessions out)", () => {
-    expect(verifyToken(issueToken(SECRET), "b".repeat(64))).toBe(false);
+    expect(readToken(issueToken(SECRET), "b".repeat(64))).toBeNull();
   });
 
   it("rejects an expired token", () => {
     const token = issueToken(SECRET, 1_000, 5_000);
-    expect(verifyToken(token, SECRET, 5_000)).toBe(true);
-    expect(verifyToken(token, SECRET, 6_001)).toBe(false);
+    expect(readToken(token, SECRET, 5_000)).not.toBeNull();
+    expect(readToken(token, SECRET, 6_001)).toBeNull();
   });
 
   it("rejects tampered expiry, tampered signature and junk", () => {
     const token = issueToken(SECRET, 1_000, 5_000);
     const [, signature] = token.split(".");
-    expect(verifyToken(`99999999999999.${signature}`, SECRET, 2_000)).toBe(false);
-    expect(verifyToken(`${token}x`, SECRET, 2_000)).toBe(false);
-    expect(verifyToken("", SECRET)).toBe(false);
-    expect(verifyToken(undefined, SECRET)).toBe(false);
-    expect(verifyToken("nodot", SECRET)).toBe(false);
-    expect(verifyToken(".onlysig", SECRET)).toBe(false);
-    expect(verifyToken("notanumber.sig", SECRET)).toBe(false);
+    expect(readToken(`99999999999999.${signature}`, SECRET, 2_000)).toBeNull();
+    expect(readToken(`${token}x`, SECRET, 2_000)).toBeNull();
+    expect(readToken("", SECRET)).toBeNull();
+    expect(readToken(undefined, SECRET)).toBeNull();
+    expect(readToken("nodot", SECRET)).toBeNull();
+    expect(readToken(".onlysig", SECRET)).toBeNull();
+    expect(readToken("notanumber.sig", SECRET)).toBeNull();
   });
 });
 
@@ -202,8 +201,8 @@ describe("session cookie", () => {
 
   it("expires a sitting token on time", () => {
     const token = issueToken(SECRET, 0, SITTING_TTL_MS);
-    expect(verifyToken(token, SECRET, SITTING_TTL_MS - 1)).toBe(true);
-    expect(verifyToken(token, SECRET, SITTING_TTL_MS + 1)).toBe(false);
+    expect(readToken(token, SECRET, SITTING_TTL_MS - 1)).not.toBeNull();
+    expect(readToken(token, SECRET, SITTING_TTL_MS + 1)).toBeNull();
   });
 });
 
@@ -218,7 +217,7 @@ describe("readToken", () => {
   it("refuses the older two-part token, which cannot say when it began", () => {
     const legacy = `${2_000_000}.${createHmac("sha256", secret).update("2000000").digest("base64url")}`;
     expect(readToken(legacy, secret, 1_000_000)).toBeNull();
-    expect(verifyToken(legacy, secret, 1_000_000)).toBe(false);
+    expect(readToken(legacy, secret, 1_000_000)).toBeNull();
   });
 
   it("refuses a token whose issue time was edited, since it is signed too", () => {

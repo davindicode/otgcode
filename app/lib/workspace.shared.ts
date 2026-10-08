@@ -112,7 +112,9 @@ function tabs(value: unknown): WorkspaceTab[] {
       path,
       openedFrom: str(tab.openedFrom),
       tmuxSession,
-      // Optional: a tab saved before ids were recorded still reopens, by name.
+      // Empty until the tab has attached and tmux has told us its id, which
+      // is also true of a tab that has never been opened yet. Reconnecting by
+      // name is the behaviour in that window.
       tmuxSessionId: str(tab.tmuxSessionId),
     });
   }

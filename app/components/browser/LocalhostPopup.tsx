@@ -74,12 +74,7 @@ function PortRow({ tab }: { tab: BrowserTab }) {
   return (
     <div className="flex items-center gap-2 px-2.5 py-1.5 bg-raised border border-line/50 rounded-panel">
       {/* Status dot */}
-      {state.status === "checking" && (
-        <svg className="w-4 h-4 animate-spin text-blue-500 shrink-0" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-      )}
+      {state.status === "checking" && <span className="spinner spinner-sm shrink-0" aria-hidden="true" />}
       {state.status === "ready" && <div className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0" title="Reachable" />}
       {state.status === "unreachable" && (
         <div
