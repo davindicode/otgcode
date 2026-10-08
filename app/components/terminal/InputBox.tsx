@@ -296,6 +296,8 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     return () => clearTimeout(timer);
   }, [activeGroup]);
   const sendInput = useTerminalStore((s) => s.sendInput);
+  const resetModes = useTerminalStore((s) => s.resetModes);
+  const stopInputReporting = useTerminalStore((s) => s.stopInputReporting);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
 
@@ -473,6 +475,41 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   }, [drawerGroup, sessionId, tmuxSession]);
 
   /**
+   * Put the terminal back to a usable state after a program left it wrong.
+   *
+   * Two halves, because neither fixes the other: the modes, which is what
+   * stops a dead program's mouse reporting, and a repaint, which is what
+   * clears what it left on screen.
+   *
+   * The halves differ by what the tab is. A plain terminal gets the full mode
+   * reset — leaving the alternate screen is how you get out of a dead TUI's
+   * buffer — then Ctrl+L, which every shell and editor reads as "redraw" and
+   * none reads as a command. A tmux tab must stay on the alternate screen,
+   * since tmux is legitimately drawing there, so it gets the reporting modes
+   * cleared and then tmux is asked to repaint, which it does authoritatively.
+   */
+  const resetTerminal = async () => {
+    if (!sessionId) return;
+    if (tmuxSession) {
+      stopInputReporting(sessionId);
+      try {
+        const res = await fetch("/api/tmux/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ op: "refresh", name: tmuxSession }),
+        });
+        const data = (await res.json()) as { error?: string };
+        if (data.error) showToast(data.error);
+      } catch {
+        showToast("Could not reach the server");
+      }
+      return;
+    }
+    resetModes(sessionId);
+    sendInput(sessionId, "\x0c");
+  };
+
+  /**
    * Any window index. Asks the server to run `select-window` rather than
    * typing into tmux's command prompt, which cannot be driven by a burst of
    * keystrokes, and rather than prefix-and-digit, which stops at 9.
@@ -640,6 +677,28 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
           because they act on the session rather than on a directory. */}
           {tabBtn(CD_TAB, "navigate", "Move to another directory", !sessionId)}
           {tmuxSession && tabBtn(TMUX_TAB, "tmux session", `Controls for session "${tmuxSession}"`, false, "app")}
+          {/* Right-aligned, so it sits in the same place whichever tab this is
+              and is never one of the things being chosen between. */}
+          <button
+            type="button"
+            onClick={resetTerminal}
+            disabled={!sessionId}
+            title={
+              tmuxSession
+                ? "Reset: stop mouse reporting and ask tmux to repaint"
+                : "Reset: clear leftover terminal modes and redraw"
+            }
+            aria-label="Reset the terminal"
+            className="relief ml-auto mr-1 shrink-0 rounded-control p-1.5 text-ink-dim hover:text-ink"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
         </div>
       </div>
 

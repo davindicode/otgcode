@@ -69,7 +69,32 @@ function tmuxFailure(err: unknown, fallback: string): string {
 }
 
 /**
- * Rename a session, select one of its windows, or kill it. Done here rather than by typing tmux commands into
+ * Asks tmux to repaint the clients attached to a session.
+ *
+ * `refresh-client` targets a client, not a session, so the clients have to be
+ * found first. TMUX is dropped from the environment for the same reason the
+ * other lookups drop it: the app may itself have been started from inside
+ * tmux, and the answer would be scoped to that session instead of the server.
+ */
+function refreshClients(session: string): number {
+  const env = { ...process.env };
+  delete env.TMUX;
+  const ttys = execFileSync("tmux", ["list-clients", "-t", session, "-F", "#{client_tty}"], {
+    encoding: "utf-8",
+    timeout: 3000,
+    env,
+  })
+    .trim()
+    .split("\n")
+    .filter(Boolean);
+  for (const tty of ttys) {
+    execFileSync("tmux", ["refresh-client", "-t", tty], { timeout: 3000, stdio: ["ignore", "ignore", "pipe"], env });
+  }
+  return ttys.length;
+}
+
+/**
+ * Rename a session, select one of its windows, repaint it, or kill it. Done here rather than by typing tmux commands into
  * some terminal: the picker is not attached to one, and the session being acted
  * on may well be the one the user is sitting in.
  */
@@ -105,6 +130,14 @@ export async function action({ request }: Route.ActionArgs) {
       return Response.json({ ok: true, name: target });
     } catch (err) {
       return Response.json({ error: tmuxFailure(err, `Could not rename "${name}"`) }, { status: 400 });
+    }
+  }
+
+  if (op === "refresh") {
+    try {
+      return Response.json({ ok: true, clients: refreshClients(name) });
+    } catch (err) {
+      return Response.json({ error: tmuxFailure(err, "Could not refresh") }, { status: 400 });
     }
   }
 

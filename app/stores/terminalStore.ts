@@ -47,6 +47,12 @@ interface TerminalState {
   restartSession: (sessionId: string) => void;
   /** Stop the terminal reporting pointer movement, after a program left it on. */
   stopInputReporting: (sessionId: string) => void;
+  /**
+   * Put the terminal back to a known state: out of the alternate screen, no
+   * scroll region, cursor showing, nothing reporting. For a shell left behind
+   * by a program that exited badly.
+   */
+  resetModes: (sessionId: string) => void;
   setActiveSession: (sessionId: string) => void;
   /** `tmuxSession` moves with the name for a tmux tab: the two are the same thing. */
   renameSession: (sessionId: string, name: string, tmuxSession?: string, tmuxSessionId?: string) => void;
@@ -322,6 +328,10 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     // Socket.IO buffers emits made while offline, which would create this twice
     // once the connect handler also asks. Leave it to that handler instead.
     if (socket.connected) requestPty(sessionId, get, set, cwd);
+  },
+
+  resetModes: (sessionId) => {
+    get().sessions[sessionId]?.terminal?.write(RESET_MODES);
   },
 
   stopInputReporting: (sessionId) => {
