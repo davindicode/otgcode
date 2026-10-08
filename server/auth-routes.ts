@@ -15,6 +15,7 @@ import {
   SITTING_TTL_MS,
   saveConfig,
   sessionCookie,
+  sessionStartedAt,
   validatePassword,
   verifyPassword,
 } from "./auth.js";
@@ -84,6 +85,7 @@ export function mountAuthRoutes(app: Express): void {
       enabled: isPasswordEnabled(),
       authenticated: isRequestAuthenticated(req.headers.cookie),
       user: localUsername(),
+      since: sessionStartedAt(req.headers.cookie),
     });
   });
 

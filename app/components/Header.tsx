@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import AccountPopup from "./AccountPopup";
 import LocalhostPopup from "./browser/LocalhostPopup";
 import SettingsModal from "./SettingsModal";
 
 declare const __APP_VERSION__: string;
 
-type Panel = "info" | "settings" | "localhost";
+type Panel = "info" | "account" | "settings" | "localhost";
 
 // Marks the header buttons so the click-outside handler can ignore them —
 // without this, clicking an open panel's own trigger would close it on
@@ -191,6 +192,23 @@ export default function Header() {
           </svg>
         </button>
         <button
+          {...{ [TRIGGER_ATTR]: "account" }}
+          onClick={() => toggle("account")}
+          className={triggerClass(panel === "account")}
+          title="Account"
+          aria-label="Account"
+          aria-pressed={panel === "account"}
+          aria-expanded={panel === "account"}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+            />
+          </svg>
+        </button>
+        <button
           {...{ [TRIGGER_ATTR]: "settings" }}
           onClick={() => toggle("settings")}
           className={triggerClass(panel === "settings")}
@@ -211,6 +229,7 @@ export default function Header() {
       </div>
       {panel === "localhost" && <LocalhostPopup onClose={() => setPanel(null)} />}
       {panel === "info" && <SystemInfoPopup onClose={() => setPanel(null)} />}
+      {panel === "account" && <AccountPopup onClose={() => setPanel(null)} />}
       {panel === "settings" && <SettingsModal onClose={() => setPanel(null)} />}
     </header>
   );

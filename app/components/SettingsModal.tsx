@@ -100,37 +100,39 @@ function Appearance() {
   );
 }
 
-/** Set, change or remove the access password. */
-function AccessPassword() {
-  const enabled = useAuthStore((s) => s.enabled);
-  const user = useAuthStore((s) => s.user);
+/**
+ * Turning the password off, or changing it.
+ *
+ * A dialog rather than a form unfolding inside the settings list: both need the
+ * current password, which is a thing to stop and do, and inline they pushed
+ * everything below them down the panel while you typed.
+ */
+function PasswordDialog({ mode, onClose }: { mode: "change" | "disable"; onClose: () => void }) {
   const setPassword = useAuthStore((s) => s.setPassword);
   const disablePassword = useAuthStore((s) => s.disablePassword);
   const showToast = useToastStore((s) => s.show);
 
-  // `null` = collapsed, showing just the toggle.
-  const [form, setForm] = useState<"change" | "disable" | null>(null);
-  const [setupOpen, setSetupOpen] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const panelRef = useRef<HTMLFormElement>(null);
 
-  const reset = () => {
-    setForm(null);
-    setCurrent("");
-    setNext("");
-    setConfirm("");
-    setError(null);
-  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose, busy]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy) return;
     setError(null);
 
-    if (form === "disable") {
+    if (mode === "disable") {
       setBusy(true);
       const message = await disablePassword(current);
       setBusy(false);
@@ -139,7 +141,7 @@ function AccessPassword() {
         return;
       }
       showToast("Access password removed", "info");
-      reset();
+      onClose();
       return;
     }
 
@@ -160,59 +162,43 @@ function AccessPassword() {
       return;
     }
     showToast("Access password changed", "info");
-    reset();
+    onClose();
   };
 
+  const disabling = mode === "disable";
+
   return (
-    <div>
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[11px] text-ink-dim">
-          {enabled ? (
-            <span className="text-green-400">On — a login is required</span>
-          ) : (
-            <span>Off — anyone with the URL gets in</span>
-          )}
-        </span>
-        {form === null && (
-          <button
-            type="button"
-            onClick={() => (enabled ? setForm("disable") : setSetupOpen(true))}
-            className={`shrink-0 rounded-control px-2 py-1 text-xs font-medium transition-colors ${
-              enabled
-                ? "border border-line text-ink-muted hover:text-ink"
-                : "relief-accent text-white hover:bg-blue-500"
-            }`}
-          >
-            {enabled ? "Turn off" : "Turn on"}
-          </button>
-        )}
-      </div>
+    <div
+      className="scrim fixed inset-0 z-[170] flex items-center justify-center px-4"
+      onMouseDown={(e) => {
+        if (!busy && !panelRef.current?.contains(e.target as Node)) onClose();
+      }}
+    >
+      <form
+        ref={panelRef}
+        onSubmit={submit}
+        className="glass w-full max-w-xs rounded-panel p-4"
+        aria-label={disabling ? "Turn off the access password" : "Change the access password"}
+      >
+        <h2 className="text-sm font-medium text-ink">{disabling ? "Turn off the password?" : "Change password"}</h2>
+        <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
+          {disabling
+            ? "The tunnel URL becomes the only thing in front of your shell. Every signed-in device is signed out."
+            : "Every signed-in device is signed out, including this one."}
+        </p>
 
-      {enabled && form === null && (
-        <button
-          type="button"
-          onClick={() => setForm("change")}
-          className="mt-2 text-[11px] text-blue-400 transition-colors hover:text-blue-300"
-        >
-          Change password
-        </button>
-      )}
-
-      {form !== null && (
-        <form onSubmit={submit} className="mt-3 space-y-2">
-          {(form === "change" || form === "disable") && (
-            <PasswordField
-              value={current}
-              onChange={(v) => {
-                setCurrent(v);
-                setError(null);
-              }}
-              placeholder="Current password"
-              autoComplete="current-password"
-              disabled={busy}
-            />
-          )}
-          {form !== "disable" && (
+        <div className="mt-3 space-y-2">
+          <PasswordField
+            value={current}
+            onChange={(v) => {
+              setCurrent(v);
+              setError(null);
+            }}
+            placeholder="Current password"
+            autoComplete="current-password"
+            disabled={busy}
+          />
+          {!disabling && (
             <>
               <PasswordField
                 value={next}
@@ -236,39 +222,93 @@ function AccessPassword() {
               />
             </>
           )}
+        </div>
 
-          {error && (
-            <p role="alert" className="text-[11px] text-red-400">
-              {error}
-            </p>
+        {error && (
+          <p role="alert" className="mt-2 text-[11px] text-red-400">
+            {error}
+          </p>
+        )}
+
+        <div className="mt-4 flex items-center gap-2">
+          <button
+            type="submit"
+            disabled={busy}
+            className={`flex items-center gap-1.5 rounded-control px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:bg-control disabled:text-ink-faint ${
+              disabling ? "relief-accent relief-danger" : "relief-accent"
+            }`}
+          >
+            {busy && <span className="spinner spinner-sm" aria-hidden="true" />}
+            {disabling ? "Turn off" : "Change"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-control border border-line px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/** Whether a password is required, and the two ways to change that. */
+function AccessPassword() {
+  const enabled = useAuthStore((s) => s.enabled);
+  const user = useAuthStore((s) => s.user);
+
+  const [dialog, setDialog] = useState<"change" | "disable" | null>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="min-w-0 text-[11px] text-ink-dim">
+          {enabled ? (
+            <span className="text-green-400">On — a login is required</span>
+          ) : (
+            <span>Off — anyone with the URL gets in</span>
           )}
+        </span>
 
-          <div className="flex items-center gap-2 pt-0.5">
-            <button
-              type="submit"
-              disabled={busy}
-              className={`flex items-center gap-1.5 rounded-control px-2.5 py-1 text-xs font-medium text-ink transition-colors disabled:bg-control disabled:text-ink-faint ${
-                form === "disable" ? "relief-accent relief-danger" : "relief-accent"
-              }`}
-            >
-              {busy && <span className="spinner spinner-sm" aria-hidden="true" />}
-              {form === "disable" ? "Turn off" : form === "change" ? "Change" : "Enable"}
-            </button>
+        {/* One line: what to do about it sits beside what it says. */}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {enabled ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setDialog("disable")}
+                className="relief rounded-control px-2 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
+              >
+                Turn off
+              </button>
+              <button
+                type="button"
+                onClick={() => setDialog("change")}
+                className="relief rounded-control px-2 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
+              >
+                Change
+              </button>
+            </>
+          ) : (
             <button
               type="button"
-              onClick={reset}
-              disabled={busy}
-              className="rounded-control border border-line px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
+              onClick={() => setSetupOpen(true)}
+              className="relief-accent rounded-control px-2 py-1 text-xs font-medium text-white"
             >
-              Cancel
+              Turn on
             </button>
-          </div>
-        </form>
-      )}
+          )}
+        </div>
+      </div>
 
+      {dialog && <PasswordDialog mode={dialog} onClose={() => setDialog(null)} />}
       {setupOpen && <PasswordSetup onCancel={() => setSetupOpen(false)} />}
 
-      {!enabled && form === null && (
+      {!enabled && (
         <p className="mt-2 text-[10px] leading-relaxed text-ink-ghost">
           OTG Code serves a real shell as{user ? ` "${user}"` : " the user that launched it"}. With the password off,
           the tunnel URL is the only thing protecting it.
@@ -279,8 +319,6 @@ function AccessPassword() {
 }
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
-  const enabled = useAuthStore((s) => s.enabled);
-  const logout = useAuthStore((s) => s.logout);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -334,18 +372,6 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         >
           <AccessPassword />
         </Section>
-
-        {enabled && (
-          <Section title="Session" description="Sign out of this device. The password stays enabled.">
-            <button
-              type="button"
-              onClick={logout}
-              className="rounded-control border border-line px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
-            >
-              Sign out
-            </button>
-          </Section>
-        )}
       </div>
     </div>
   );

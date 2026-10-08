@@ -137,25 +137,50 @@ function sign(payload: string, secret: string): string {
   return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
+/**
+ * `<expiresAt>.<issuedAt>.<hmac>`, signed over both times so neither can be
+ * edited. The issue time is only there to be shown back to the user — "signed
+ * in since" — and is covered by the signature because anything in a cookie is
+ * attacker-supplied otherwise.
+ */
 export function issueToken(secret: string, now = Date.now(), ttlMs = SESSION_TTL_MS): string {
-  const expiresAt = String(now + ttlMs);
-  return `${expiresAt}.${sign(expiresAt, secret)}`;
+  const payload = `${now + ttlMs}.${now}`;
+  return `${payload}.${sign(payload, secret)}`;
+}
+
+/**
+ * The session a token describes, or null if it is not one we issued, has been
+ * tampered with, or has expired.
+ *
+ * Two shapes are accepted: `<expiresAt>.<issuedAt>.<hmac>`, and the older
+ * `<expiresAt>.<hmac>` which carries no issue time. Keeping the old one valid
+ * means this change does not sign everybody out to gain a timestamp.
+ */
+export function readToken(
+  token: string | undefined | null,
+  secret: string,
+  now = Date.now(),
+): { expiresAt: number; issuedAt: number | null } | null {
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length < 2 || parts.length > 3) return null;
+
+  const signature = parts[parts.length - 1];
+  const payload = parts.slice(0, -1).join(".");
+  if (!signature || !parts.slice(0, -1).every((p) => /^\d+$/.test(p))) return null;
+
+  const expected = Buffer.from(sign(payload, secret));
+  const actual = Buffer.from(signature);
+  if (expected.length !== actual.length) return null;
+  if (!timingSafeEqual(expected, actual)) return null;
+
+  const expiresAt = Number(parts[0]);
+  if (expiresAt <= now) return null;
+  return { expiresAt, issuedAt: parts.length === 3 ? Number(parts[1]) : null };
 }
 
 export function verifyToken(token: string | undefined | null, secret: string, now = Date.now()): boolean {
-  if (!token) return false;
-  const dot = token.indexOf(".");
-  if (dot <= 0) return false;
-  const expiresAt = token.slice(0, dot);
-  const signature = token.slice(dot + 1);
-  if (!/^\d+$/.test(expiresAt) || !signature) return false;
-
-  const expected = Buffer.from(sign(expiresAt, secret));
-  const actual = Buffer.from(signature);
-  if (expected.length !== actual.length) return false;
-  if (!timingSafeEqual(expected, actual)) return false;
-
-  return Number(expiresAt) > now;
+  return readToken(token, secret, now) !== null;
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +226,13 @@ export function isRequestAuthenticated(cookieHeader: string | undefined | null):
   const config = loadConfig();
   if (!config.passwordEnabled || !config.passwordHash) return true;
   return verifyToken(parseCookies(cookieHeader)[SESSION_COOKIE], config.sessionSecret);
+}
+
+/** When this request's session began, if it has one that says. */
+export function sessionStartedAt(cookieHeader: string | undefined | null): number | null {
+  const config = loadConfig();
+  if (!config.passwordEnabled || !config.passwordHash) return null;
+  return readToken(parseCookies(cookieHeader)[SESSION_COOKIE], config.sessionSecret)?.issuedAt ?? null;
 }
 
 // ---------------------------------------------------------------------------

@@ -11,6 +11,8 @@ interface AuthState {
   authenticated: boolean;
   /** The OS user the server runs as — shown on the lock screen. */
   user: string;
+  /** When this session began, if there is one that says. */
+  since: number | null;
   /**
    * A live socket was already open when the session was invalidated, so the
    * page has to reload after unlocking to rebuild terminal state cleanly.
@@ -49,6 +51,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   enabled: false,
   authenticated: true,
   user: "",
+  since: null,
   needsReload: false,
 
   refresh: async () => {
@@ -59,6 +62,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         enabled: boolean;
         authenticated: boolean;
         user?: string;
+        since?: number | null;
       };
       set({
         loaded: true,
@@ -66,6 +70,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         enabled: data.enabled,
         authenticated: data.authenticated,
         user: data.user || "",
+        since: typeof data.since === "number" ? data.since : null,
       });
     } catch {
       // Treat an unreachable status endpoint as "not gated" rather than

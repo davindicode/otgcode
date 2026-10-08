@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   createLoginThrottle,
@@ -5,6 +6,7 @@ import {
   issueToken,
   MIN_PASSWORD_LENGTH,
   parseCookies,
+  readToken,
   SESSION_COOKIE,
   SESSION_TTL_MS,
   SITTING_TTL_MS,
@@ -202,5 +204,34 @@ describe("session cookie", () => {
     const token = issueToken(SECRET, 0, SITTING_TTL_MS);
     expect(verifyToken(token, SECRET, SITTING_TTL_MS - 1)).toBe(true);
     expect(verifyToken(token, SECRET, SITTING_TTL_MS + 1)).toBe(false);
+  });
+});
+
+describe("readToken", () => {
+  const secret = "s".repeat(64);
+
+  it("reports when the session began", () => {
+    const token = issueToken(secret, 1_000_000, 60_000);
+    expect(readToken(token, secret, 1_000_001)).toEqual({ expiresAt: 1_060_000, issuedAt: 1_000_000 });
+  });
+
+  it("still accepts a token issued before it carried one, rather than signing everybody out", () => {
+    // The old shape: `<expiresAt>.<hmac>`.
+    const legacy = `${2_000_000}.${createHmac("sha256", secret).update("2000000").digest("base64url")}`;
+    expect(readToken(legacy, secret, 1_000_000)).toEqual({ expiresAt: 2_000_000, issuedAt: null });
+    expect(verifyToken(legacy, secret, 1_000_000)).toBe(true);
+  });
+
+  it("refuses a token whose issue time was edited, since it is signed too", () => {
+    const token = issueToken(secret, 1_000_000, 60_000);
+    const [expiresAt, , signature] = token.split(".");
+    expect(readToken(`${expiresAt}.999.${signature}`, secret, 1_000_001)).toBeNull();
+  });
+
+  it("refuses junk, a wrong secret, and an expired session", () => {
+    const token = issueToken(secret, 1_000_000, 60_000);
+    expect(readToken("nonsense", secret)).toBeNull();
+    expect(readToken(token, "other".repeat(16), 1_000_001)).toBeNull();
+    expect(readToken(token, secret, 1_060_001)).toBeNull();
   });
 });
