@@ -722,10 +722,10 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                 stopInputReporting(sessionId);
                 setCaptureDeclined(true);
               }}
-              title="A program left the terminal reporting pointer movement — stop it"
-              className="px-1.5 py-0.5 text-[11px] text-amber-300 transition-colors hover:text-amber-200"
+              title="A program left the terminal reporting pointer movement, which is what the stray text is"
+              className="whitespace-nowrap rounded-control border border-line px-2 py-0.5 text-[11px] text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
             >
-              mouse off
+              turn mouse tracking off
             </button>
           )}
           <button

@@ -215,11 +215,10 @@ describe("readToken", () => {
     expect(readToken(token, secret, 1_000_001)).toEqual({ expiresAt: 1_060_000, issuedAt: 1_000_000 });
   });
 
-  it("still accepts a token issued before it carried one, rather than signing everybody out", () => {
-    // The old shape: `<expiresAt>.<hmac>`.
+  it("refuses the older two-part token, which cannot say when it began", () => {
     const legacy = `${2_000_000}.${createHmac("sha256", secret).update("2000000").digest("base64url")}`;
-    expect(readToken(legacy, secret, 1_000_000)).toEqual({ expiresAt: 2_000_000, issuedAt: null });
-    expect(verifyToken(legacy, secret, 1_000_000)).toBe(true);
+    expect(readToken(legacy, secret, 1_000_000)).toBeNull();
+    expect(verifyToken(legacy, secret, 1_000_000)).toBe(false);
   });
 
   it("refuses a token whose issue time was edited, since it is signed too", () => {

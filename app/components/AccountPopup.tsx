@@ -1,15 +1,25 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "~/stores/authStore";
 
-/** "3 hours ago", give or take — this is orientation, not a stopwatch. */
-function sinceLabel(at: number): string {
-  const mins = Math.floor((Date.now() - at) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? "" : "s"} ago`;
+/** How long this session has been going: "3h 12m". */
+function duration(ms: number): string {
+  const mins = Math.max(0, Math.floor(ms / 60000));
+  const days = Math.floor(mins / 1440);
+  const hours = Math.floor((mins % 1440) / 60);
+  const rest = mins % 60;
+  if (days) return `${days}d ${hours}h`;
+  if (hours) return `${hours}h ${rest}m`;
+  return `${rest}m`;
+}
+
+/** The clock time it started, for when "4h 2m" is not the question. */
+function clock(at: number): string {
+  return new Date(at).toLocaleString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "numeric",
+    month: "short",
+  });
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
@@ -35,6 +45,14 @@ export default function AccountPopup({ onClose }: { onClose: () => void }) {
   const since = useAuthStore((s) => s.since);
   const logout = useAuthStore((s) => s.logout);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // So the elapsed time is right the whole time the popup is open, rather than
+  // frozen at whatever it was when it opened.
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -71,10 +89,13 @@ export default function AccountPopup({ onClose }: { onClose: () => void }) {
 
       <div className="px-3 py-2">
         <Row label="User" value={<span className="font-mono">{user || "unknown"}</span>} />
-        {enabled ? (
-          <Row label="Signed in" value={since === null ? "this session" : sinceLabel(since)} />
+        {enabled && since !== null ? (
+          <>
+            <Row label="Online" value={duration(Date.now() - since)} />
+            <Row label="Signed in" value={clock(since)} />
+          </>
         ) : (
-          <Row label="Login" value="not required" />
+          <Row label="Login" value={enabled ? "this session" : "not required"} />
         )}
       </div>
 

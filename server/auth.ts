@@ -152,31 +152,30 @@ export function issueToken(secret: string, now = Date.now(), ttlMs = SESSION_TTL
  * The session a token describes, or null if it is not one we issued, has been
  * tampered with, or has expired.
  *
- * Two shapes are accepted: `<expiresAt>.<issuedAt>.<hmac>`, and the older
- * `<expiresAt>.<hmac>` which carries no issue time. Keeping the old one valid
- * means this change does not sign everybody out to gain a timestamp.
+ * Exactly `<expiresAt>.<issuedAt>.<hmac>`. An older two-part token without an
+ * issue time is refused rather than accepted with the time unknown: "signed in
+ * — at some point" tells nobody anything, and the cost of the stricter rule is
+ * one login, once.
  */
 export function readToken(
   token: string | undefined | null,
   secret: string,
   now = Date.now(),
-): { expiresAt: number; issuedAt: number | null } | null {
+): { expiresAt: number; issuedAt: number } | null {
   if (!token) return null;
   const parts = token.split(".");
-  if (parts.length < 2 || parts.length > 3) return null;
+  if (parts.length !== 3) return null;
 
-  const signature = parts[parts.length - 1];
-  const payload = parts.slice(0, -1).join(".");
-  if (!signature || !parts.slice(0, -1).every((p) => /^\d+$/.test(p))) return null;
+  const [expiresAt, issuedAt, signature] = parts;
+  if (!signature || !/^\d+$/.test(expiresAt) || !/^\d+$/.test(issuedAt)) return null;
 
-  const expected = Buffer.from(sign(payload, secret));
+  const expected = Buffer.from(sign(`${expiresAt}.${issuedAt}`, secret));
   const actual = Buffer.from(signature);
   if (expected.length !== actual.length) return null;
   if (!timingSafeEqual(expected, actual)) return null;
 
-  const expiresAt = Number(parts[0]);
-  if (expiresAt <= now) return null;
-  return { expiresAt, issuedAt: parts.length === 3 ? Number(parts[1]) : null };
+  if (Number(expiresAt) <= now) return null;
+  return { expiresAt: Number(expiresAt), issuedAt: Number(issuedAt) };
 }
 
 export function verifyToken(token: string | undefined | null, secret: string, now = Date.now()): boolean {
