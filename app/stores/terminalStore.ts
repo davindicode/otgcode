@@ -45,6 +45,8 @@ interface TerminalState {
   closeSession: (sessionId: string) => void;
   /** Ask for a new pty for a session whose own has gone. */
   restartSession: (sessionId: string) => void;
+  /** Stop the terminal reporting pointer movement, after a program left it on. */
+  stopInputReporting: (sessionId: string) => void;
   setActiveSession: (sessionId: string) => void;
   /** `tmuxSession` moves with the name for a tmux tab: the two are the same thing. */
   renameSession: (sessionId: string, name: string, tmuxSession?: string, tmuxSessionId?: string) => void;
@@ -103,13 +105,29 @@ function requestPty(
  * drew its prompt inside the dead program's frame. Scrollback is deliberately
  * kept: this resets modes, it does not wipe what you were looking at.
  */
+/**
+ * The modes that make a terminal send input nobody asked for.
+ *
+ * A program that enables mouse reporting and exits without disabling it leaves
+ * the terminal reporting every pointer move to a shell that cannot read them,
+ * which is what `35;79;43M` scrolling past is: an SGR mouse report printing as
+ * text. Turning these off is safe even while a program is running — it stops
+ * receiving mouse events, which on a touchscreen is usually an improvement.
+ */
+export const INPUT_REPORTING_OFF = [
+  "\x1b[?1000l", // X11 mouse: button press and release
+  "\x1b[?1002l", // cell motion tracking (drag)
+  "\x1b[?1003l", // all motion tracking — the one that spams
+  "\x1b[?1006l", // SGR extended coordinates
+  "\x1b[?1004l", // focus in/out reporting
+].join("");
+
 const RESET_MODES = [
   "\x1b[?1049l", // leave the alternate screen, back to the normal buffer
   "\x1b[!p", // soft reset: scroll region, origin mode, character sets
   "\x1b[?25h", // show the cursor, which a TUI may have hidden
   "\x1b[0m", // drop colours and attributes
-  "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l", // mouse reporting
-  "\x1b[?1004l", // focus reporting
+  INPUT_REPORTING_OFF,
   "\x1b[?2004l", // bracketed paste
 ].join("");
 
@@ -304,6 +322,13 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     // Socket.IO buffers emits made while offline, which would create this twice
     // once the connect handler also asks. Leave it to that handler instead.
     if (socket.connected) requestPty(sessionId, get, set, cwd);
+  },
+
+  stopInputReporting: (sessionId) => {
+    const session = get().sessions[sessionId];
+    // Written into the terminal rather than sent to the pty: it is the
+    // terminal's own mode, and the shell has nothing to do with turning it off.
+    session?.terminal?.write(INPUT_REPORTING_OFF);
   },
 
   restartSession: (sessionId) => {
