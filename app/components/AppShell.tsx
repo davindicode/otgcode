@@ -66,6 +66,7 @@ export default function AppShell() {
   const [workspaceReady, setWorkspaceReady] = useState(false);
 
   const sessionStatus = usePresenceStore((s) => s.status);
+  /** The app is behind a gate: visible, but nothing in it should be touched. */
   const tabs = useTabsStore((s) => s.tabs);
   const activeId = useTabsStore((s) => s.activeId);
 
@@ -112,19 +113,18 @@ export default function AppShell() {
 
   if (locked) return <PasswordGate />;
   if (!configured) return <PasswordSetup />;
-  // Another device holds the session, or took it. Nothing here can work until
-  // that is resolved, so don't render an app that would fight it.
-  if (sessionStatus !== "ok") return <SessionGate />;
+
+  const usable = socketConnected && sessionStatus === "ok";
 
   return (
     <div className="app-shell bg-app text-ink">
       <Toaster />
       <div
         className={`flex min-h-0 flex-1 flex-col transition-[filter,opacity] duration-200 ${
-          socketConnected ? "" : "pointer-events-none opacity-45 grayscale"
+          usable ? "" : "pointer-events-none opacity-45 grayscale"
         }`}
-        inert={!socketConnected}
-        aria-hidden={!socketConnected}
+        inert={!usable}
+        aria-hidden={!usable}
       >
         <Header />
         <TabBar />
@@ -163,7 +163,13 @@ export default function AppShell() {
             </div>
           ))}
       </div>
-      {!socketConnected && <ConnectionGate />}
+      {/* Over the app, not instead of it. Returning a different tree here
+          unmounted every terminal pane, and the xterm instances outlived it in
+          the store — so coming back re-opened an already-opened terminal into a
+          fresh element, which renders as a dark empty pane. A refresh looked
+          like it fixed things because it threw those instances away and built
+          new ones. Nothing is unmounted now, so there is nothing to re-open. */}
+      {sessionStatus !== "ok" ? <SessionGate /> : !socketConnected && <ConnectionGate />}
     </div>
   );
 }

@@ -164,9 +164,6 @@ const GIT_QUICK_CMDS: { label: string; title: string; command: string }[] = [
 // Matches the .drawer transition in app.css.
 const DRAWER_MS = 280;
 
-/** How often the tab on screen checks whether its terminal is capturing input. */
-const MOUSE_CHECK_MS = 1000;
-
 // Controls for the session a tmux tab is attached to. No session list or
 // switch: the tab is bound to one session and choosing one happens in the +
 // picker. No detach either — closing the tab detaches, and the session keeps
@@ -283,15 +280,6 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const [comboMode, setComboMode] = useState<ComboMode>("none");
   const [kbMode, setKbMode] = useState<KbMode>("main");
   const [gitForm, setGitForm] = useState<GitForm>("commit");
-  /**
-   * Whether the terminal is reporting pointer movement. A program that turns it
-   * on and exits without turning it off leaves every mouse move going to a
-   * shell that prints it as text. xterm knows its own mode but does not
-   * announce changes, so the tab on screen asks.
-   */
-  const [capturing, setCapturing] = useState(false);
-  /** Turned it off once and something turned it back on: it wants the mouse. */
-  const [captureDeclined, setCaptureDeclined] = useState(false);
   /** Which window this tab's tmux client is on, as tmux reports it. */
   const [tmuxWindow, setTmuxWindow] = useState<string | null>(null);
   const [windowTarget, setWindowTarget] = useState("");
@@ -310,7 +298,6 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   }, [activeGroup]);
   const sendInput = useTerminalStore((s) => s.sendInput);
   const resetModes = useTerminalStore((s) => s.resetModes);
-  const isActive = useTabsStore((s) => s.activeId === sessionId);
   const stopInputReporting = useTerminalStore((s) => s.stopInputReporting);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
@@ -487,21 +474,6 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
       clearInterval(id);
     };
   }, [drawerGroup, sessionId, tmuxSession]);
-
-  // Only the tab on screen looks, so this stays one check a second however
-  // many terminals are open.
-  useEffect(() => {
-    if (!isActive || !sessionId) return;
-    const check = () => {
-      const term = useTerminalStore.getState().sessions[sessionId]?.terminal;
-      const on = !!term && term.modes.mouseTrackingMode !== "none";
-      setCapturing(on && !captureDeclined);
-      if (!on) setCaptureDeclined(false);
-    };
-    check();
-    const id = setInterval(check, MOUSE_CHECK_MS);
-    return () => clearInterval(id);
-  }, [isActive, sessionId, captureDeclined]);
 
   /**
    * Put the terminal back to a usable state after a program left it wrong.
@@ -713,22 +685,6 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-1 px-2 py-1">
-          {/* Only while the terminal is capturing. It belongs here rather than
-              over the terminal: it is a control for this tab, and this is where
-              a tab's controls are. */}
-          {capturing && (
-            <button
-              type="button"
-              onClick={() => {
-                stopInputReporting(sessionId);
-                setCaptureDeclined(true);
-              }}
-              title="A program left the terminal reporting pointer movement, which is what the stray text is"
-              className="whitespace-nowrap rounded-control border border-line px-2 py-0.5 text-[11px] text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
-            >
-              turn mouse tracking off
-            </button>
-          )}
           <button
             type="button"
             onClick={resetTerminal}

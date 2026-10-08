@@ -35,7 +35,9 @@ export default function SessionGate() {
   const displaced = status === "displaced";
 
   return (
-    <div className="flex h-screen flex-col items-center justify-center gap-5 bg-app px-6">
+    // Over the app rather than in place of it, so the terminals behind keep
+    // their DOM and nothing has to be rebuilt when the session comes back.
+    <div className="scrim fixed inset-0 z-[180] flex flex-col items-center justify-center gap-5 px-6">
       <div className="glass flex w-full max-w-sm flex-col gap-4 rounded-panel p-5">
         <div className="flex items-center gap-2.5">
           <svg
