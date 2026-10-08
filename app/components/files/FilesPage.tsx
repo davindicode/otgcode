@@ -1089,7 +1089,7 @@ function FileSessionView({ session }: { session: FileSession }) {
                 type="button"
                 onClick={selectMode ? exitSelectMode : enterSelectMode}
                 disabled={busy}
-                className="px-2 py-0.5 text-xs text-ink-muted hover:text-ink border border-line hover:border-line-strong rounded-control transition-colors disabled:pointer-events-none disabled:opacity-50"
+                className="relief rounded-control px-2 py-0.5 text-xs text-ink-muted transition-colors hover:text-ink disabled:pointer-events-none disabled:opacity-50"
               >
                 {selectMode ? "Cancel" : "Select"}
               </button>

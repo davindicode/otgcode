@@ -163,6 +163,9 @@ const GIT_QUICK_CMDS: { label: string; title: string; command: string }[] = [
 // Matches the .drawer transition in app.css.
 const DRAWER_MS = 280;
 
+/** How often the tab on screen checks whether its terminal is capturing input. */
+const MOUSE_CHECK_MS = 1000;
+
 // Controls for the session a tmux tab is attached to. No session list or
 // switch: the tab is bound to one session and choosing one happens in the +
 // picker. No detach either — closing the tab detaches, and the session keeps
@@ -279,6 +282,15 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const [comboMode, setComboMode] = useState<ComboMode>("none");
   const [kbMode, setKbMode] = useState<KbMode>("main");
   const [gitForm, setGitForm] = useState<GitForm>("commit");
+  /**
+   * Whether the terminal is reporting pointer movement. A program that turns it
+   * on and exits without turning it off leaves every mouse move going to a
+   * shell that prints it as text. xterm knows its own mode but does not
+   * announce changes, so the tab on screen asks.
+   */
+  const [capturing, setCapturing] = useState(false);
+  /** Turned it off once and something turned it back on: it wants the mouse. */
+  const [captureDeclined, setCaptureDeclined] = useState(false);
   /** Which window this tab's tmux client is on, as tmux reports it. */
   const [tmuxWindow, setTmuxWindow] = useState<string | null>(null);
   const [windowTarget, setWindowTarget] = useState("");
@@ -297,6 +309,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   }, [activeGroup]);
   const sendInput = useTerminalStore((s) => s.sendInput);
   const resetModes = useTerminalStore((s) => s.resetModes);
+  const isActive = useTabsStore((s) => s.activeId === sessionId);
   const stopInputReporting = useTerminalStore((s) => s.stopInputReporting);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
@@ -473,6 +486,21 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
       clearInterval(id);
     };
   }, [drawerGroup, sessionId, tmuxSession]);
+
+  // Only the tab on screen looks, so this stays one check a second however
+  // many terminals are open.
+  useEffect(() => {
+    if (!isActive || !sessionId) return;
+    const check = () => {
+      const term = useTerminalStore.getState().sessions[sessionId]?.terminal;
+      const on = !!term && term.modes.mouseTrackingMode !== "none";
+      setCapturing(on && !captureDeclined);
+      if (!on) setCaptureDeclined(false);
+    };
+    check();
+    const id = setInterval(check, MOUSE_CHECK_MS);
+    return () => clearInterval(id);
+  }, [isActive, sessionId, captureDeclined]);
 
   /**
    * Put the terminal back to a usable state after a program left it wrong.
@@ -666,19 +694,40 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
       className="bg-surface border-t border-line shrink-0 overflow-hidden terminal-focus-area rounded-sm"
       style={{ minWidth: 0 }}
     >
-      {/* Tab bar */}
-      <div className="border-b border-line/50 overflow-x-auto scrollbar-none" style={{ minWidth: 0 }}>
-        <div className="flex items-center gap-1 px-2 py-1 w-max">
-          {tabBtn(KB_TAB, "keyboard", "Type, and the keys a terminal needs", !sessionId)}
-          {TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !sessionId))}
-          {/* navigate works on a tmux tab too: the server resolves the pane
-          that tab's own tmux client is looking at, so it follows you between
-          windows. A tmux tab then also gets its session's controls, last
-          because they act on the session rather than on a directory. */}
-          {tabBtn(CD_TAB, "navigate", "Move to another directory", !sessionId)}
-          {tmuxSession && tabBtn(TMUX_TAB, "tmux session", `Controls for session "${tmuxSession}"`, false, "app")}
-          {/* Right-aligned, so it sits in the same place whichever tab this is
-              and is never one of the things being chosen between. */}
+      {/* Tab bar. Two halves: the tabs scroll, the controls on the right do
+          not — they are not things to choose between, so they keep their place
+          however far the tabs are scrolled. */}
+      <div className="flex items-center border-b border-line/50" style={{ minWidth: 0 }}>
+        <div onPointerDown={dragScroll} className="min-w-0 flex-1 overflow-x-auto scrollbar-none">
+          <div className="flex w-max items-center gap-1 px-2 py-1">
+            {tabBtn(KB_TAB, "keyboard", "Type, and the keys a terminal needs", !sessionId)}
+            {TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !sessionId))}
+            {/* navigate works on a tmux tab too: the server resolves the pane
+            that tab's own tmux client is looking at, so it follows you between
+            windows. A tmux tab then also gets its session's controls, last
+            because they act on the session rather than on a directory. */}
+            {tabBtn(CD_TAB, "navigate", "Move to another directory", !sessionId)}
+            {tmuxSession && tabBtn(TMUX_TAB, "tmux session", `Controls for session "${tmuxSession}"`, false, "app")}
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1 px-2 py-1">
+          {/* Only while the terminal is capturing. It belongs here rather than
+              over the terminal: it is a control for this tab, and this is where
+              a tab's controls are. */}
+          {capturing && (
+            <button
+              type="button"
+              onClick={() => {
+                stopInputReporting(sessionId);
+                setCaptureDeclined(true);
+              }}
+              title="A program left the terminal reporting pointer movement — stop it"
+              className="px-1.5 py-0.5 text-[11px] text-amber-300 transition-colors hover:text-amber-200"
+            >
+              mouse off
+            </button>
+          )}
           <button
             type="button"
             onClick={resetTerminal}
@@ -689,9 +738,9 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                 : "Reset: clear leftover terminal modes and redraw"
             }
             aria-label="Reset the terminal"
-            className="relief ml-auto mr-1 shrink-0 rounded-control p-1.5 text-ink-dim hover:text-ink"
+            className="p-1.5 text-ink-dim transition-colors hover:text-ink disabled:pointer-events-none disabled:text-ink-ghost"
           >
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
