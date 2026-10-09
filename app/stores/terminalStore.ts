@@ -40,7 +40,6 @@ interface TerminalState {
   createSession: (sessionId: string, name?: string, cwd?: string, tmuxSession?: string, tmuxSessionId?: string) => void;
   registerTerminal: (sessionId: string, terminal: Terminal, fitAddon: FitAddon) => void;
   sendInput: (sessionId: string, data: string) => void;
-  resizeTerminal: (sessionId: string, rows: number, cols: number) => void;
   closeSession: (sessionId: string) => void;
   /** Ask for a new pty for a session whose own has gone. */
   restartSession: (sessionId: string) => void;
@@ -52,11 +51,7 @@ interface TerminalState {
    * by a program that exited badly.
    */
   resetModes: (sessionId: string) => void;
-  /**
-   * Re-measure a pane that has just been shown. A hidden pane has no size for
-   * the fit addon to read, so one that was switched away from is fitted to
-   * whatever the layout is now.
-   */
+  /** Re-measure a pane and tell its pty, if the pane is on screen. */
   refitSession: (sessionId: string) => void;
   /** `tmuxSession` moves with the name for a tmux tab: the two are the same thing. */
   renameSession: (sessionId: string, name: string, tmuxSession?: string, tmuxSessionId?: string) => void;
@@ -104,6 +99,48 @@ function requestPty(
     cols: session.terminal?.cols,
     rows: session.terminal?.rows,
   });
+}
+
+/**
+ * Whether a terminal currently occupies space on the page.
+ *
+ * An inactive tab is `display: none`, and an element with no layout box has no
+ * used value for its size: `getComputedStyle` hands back the `height: 100%` it
+ * was written with, verbatim. The fit addon reads that as 100 *pixels*.
+ */
+function isOnScreen(terminal: Terminal | null): boolean {
+  const el = terminal?.element;
+  return !!el && el.offsetWidth > 0 && el.offsetHeight > 0;
+}
+
+/**
+ * Fit a terminal to its pane and tell the pty the new size — but only while
+ * the pane is on screen.
+ *
+ * Measuring a hidden pane proposes a terminal of about 17x9 (see `isOnScreen`),
+ * and that used to be pushed straight to the pty on the way *out* of a tab.
+ * tmux resized its window to match and SIGWINCHed whatever was running into a
+ * corner. A freshly started opencode does not survive that: measured here, its
+ * Bun process crashes outright under roughly 40x12, which left a crash dump
+ * where the TUI had been and its mouse reporting switched on, because a process
+ * that dies in a signal handler sends none of the sequences that turn it off.
+ *
+ * The delay is for the opposite case: a pane that has just been shown may not
+ * have been laid out yet, and would be skipped as hidden.
+ */
+function fitAndPush(sessionId: string, get: () => TerminalState): void {
+  setTimeout(() => {
+    const session = get().sessions[sessionId];
+    if (!session?.terminal || !session.fitAddon || !isOnScreen(session.terminal)) return;
+    session.fitAddon.fit();
+    const socket = getSocket();
+    if (!socket.connected) return;
+    socket.emit("terminal_resize", {
+      sessionId,
+      cols: session.terminal.cols,
+      rows: session.terminal.rows,
+    });
+  }, 50);
 }
 
 /**
@@ -230,16 +267,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       // prompt and hides it; tmux paints a whole screen the moment it attaches,
       // so a tmux tab sat drawn at 80x24 until some unrelated layout change
       // resized the pane. Push the size here, where the PTY is known to exist.
-      if (session.terminal) {
-        // A no-op while this tab is hidden: the fit addon can't measure a
-        // display:none pane. It re-fits from its ResizeObserver when shown.
-        session.fitAddon?.fit();
-        socket.emit("terminal_resize", {
-          sessionId: data.sessionId,
-          cols: session.terminal.cols,
-          rows: session.terminal.rows,
-        });
-      }
+      fitAndPush(data.sessionId, get);
     });
 
     socket.on("terminal_output", (data: { sessionId: string; data: string }) => {
@@ -376,13 +404,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     }
   },
 
-  resizeTerminal: (sessionId, rows, cols) => {
-    const socket = getSocket();
-    if (socket.connected) {
-      socket.emit("terminal_resize", { sessionId, cols, rows });
-    }
-  },
-
   closeSession: (sessionId) => {
     const { sessions } = get();
     const session = sessions[sessionId];
@@ -401,13 +422,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     set({ sessions: newSessions });
   },
 
-  refitSession: (sessionId) => {
-    const { sessions } = get();
-    const session = sessions[sessionId];
-    if (session?.fitAddon && session.terminal) {
-      setTimeout(() => session.fitAddon!.fit(), 50);
-    }
-  },
+  refitSession: (sessionId) => fitAndPush(sessionId, get),
 
   renameSession: (sessionId, name, tmuxSession, tmuxSessionId) => {
     const { sessions } = get();
@@ -434,20 +449,10 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     // Apply to all existing terminal instances
     const { sessions } = get();
     for (const session of Object.values(sessions)) {
-      if (session.terminal) {
-        session.terminal.options.fontSize = size;
-        if (session.fitAddon) {
-          session.fitAddon.fit();
-          const socket = getSocket();
-          if (socket.connected) {
-            socket.emit("terminal_resize", {
-              sessionId: session.id,
-              cols: session.terminal.cols,
-              rows: session.terminal.rows,
-            });
-          }
-        }
-      }
+      if (!session.terminal) continue;
+      session.terminal.options.fontSize = size;
+      // A hidden pane keeps the new size and re-fits when it is next shown.
+      fitAndPush(session.id, get);
     }
   },
   setDefaultCwd: (cwd) => set({ defaultCwd: cwd }),

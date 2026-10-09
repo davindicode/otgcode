@@ -14,7 +14,7 @@ export default function TerminalPanel({ sessionId }: { sessionId: string }) {
 
   const registerTerminal = useTerminalStore((s) => s.registerTerminal);
   const sendInput = useTerminalStore((s) => s.sendInput);
-  const resizeTerminal = useTerminalStore((s) => s.resizeTerminal);
+  const refitSession = useTerminalStore((s) => s.refitSession);
   const fontSize = useTerminalStore((s) => s.fontSize);
   const theme = useWorkspaceStore((s) => s.theme);
 
@@ -63,25 +63,21 @@ export default function TerminalPanel({ sessionId }: { sessionId: string }) {
 
       term.open(el);
 
-      // Fit after opening
-      requestAnimationFrame(() => {
-        fitAddon.fit();
-        resizeTerminal(sessionId, term.rows, term.cols);
-      });
-
-      // Register with store — flushes buffered output
+      // Register with store — flushes buffered output. Before the fit below,
+      // which measures through the store and so needs the terminal in it.
       registerTerminal(sessionId, term, fitAddon);
+
+      requestAnimationFrame(() => refitSession(sessionId));
 
       // Wire up keyboard input from xterm to the pty
       term.onData((data) => {
         sendInput(sessionId, data);
       });
 
-      // Re-fit on container resize (panel drag) and window resize
-      const doFit = () => {
-        fitAddon.fit();
-        resizeTerminal(sessionId, term.rows, term.cols);
-      };
+      // Re-fit on container resize (panel drag) and window resize. This also
+      // fires with a zero-sized box when the tab is switched away from, which
+      // is why the fit is guarded rather than done here.
+      const doFit = () => refitSession(sessionId);
 
       const ro = new ResizeObserver(() => doFit());
       ro.observe(el);

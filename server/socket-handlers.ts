@@ -93,9 +93,13 @@ export function registerSocketHandlers(io: Server): void {
     });
 
     socket.on("terminal_resize", (data: { sessionId: string; cols: number; rows: number }) => {
-      if (data.sessionId) {
-        resizePty(data.sessionId, socket.id, data.cols, data.rows);
-      }
+      const cols = dimension(data.cols);
+      const rows = dimension(data.rows);
+      // Dropped rather than clamped: a size this far off is a measurement that
+      // went wrong, and guessing a replacement would resize the pty to
+      // something the pane never was.
+      if (!data.sessionId || !cols || !rows) return;
+      resizePty(data.sessionId, socket.id, cols, rows);
     });
 
     socket.on("close_terminal", (data: { sessionId: string }) => {
