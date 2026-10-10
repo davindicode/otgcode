@@ -11,6 +11,7 @@ export default function PasswordGate() {
   const login = useAuthStore((s) => s.login);
   const needsReload = useAuthStore((s) => s.needsReload);
   const user = useAuthStore((s) => s.user);
+  const host = useAuthStore((s) => s.host);
   const [password, setPassword] = useState("");
   const [stay, setStay] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,9 +50,7 @@ export default function PasswordGate() {
           <div className="text-center">
             <h1 className="text-sm font-semibold text-ink">OTG Code is locked</h1>
             <p className="mt-1 text-[11px] text-ink-faint">
-              {user
-                ? `Enter the access password to reach ${user}'s terminal.`
-                : "Enter the access password to continue."}
+              {user && host ? `${user} on ${host}` : user || host || "Enter the access password to continue."}
             </p>
           </div>
         </div>

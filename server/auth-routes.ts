@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { hostname } from "node:os";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import type { Server as SocketIOServer } from "socket.io";
 import {
@@ -85,6 +86,7 @@ export function mountAuthRoutes(app: Express): void {
       enabled: isPasswordEnabled(),
       authenticated: isRequestAuthenticated(req.headers.cookie),
       user: localUsername(),
+      host: hostname(),
       since: sessionStartedAt(req.headers.cookie),
     });
   });

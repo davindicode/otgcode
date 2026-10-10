@@ -11,6 +11,8 @@ interface AuthState {
   authenticated: boolean;
   /** The OS user the server runs as — shown on the lock screen. */
   user: string;
+  /** The host it runs on, to tell two OTGCode tabs apart. */
+  host: string;
   /** When this session began, if there is one that says. */
   since: number | null;
   /**
@@ -51,6 +53,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   enabled: false,
   authenticated: true,
   user: "",
+  host: "",
   since: null,
   needsReload: false,
 
@@ -62,6 +65,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         enabled: boolean;
         authenticated: boolean;
         user?: string;
+        host?: string;
         since?: number | null;
       };
       set({
@@ -70,6 +74,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         enabled: data.enabled,
         authenticated: data.authenticated,
         user: data.user || "",
+        host: data.host || "",
         since: typeof data.since === "number" ? data.since : null,
       });
     } catch {
