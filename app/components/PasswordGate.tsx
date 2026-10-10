@@ -49,9 +49,11 @@ export default function PasswordGate() {
           <img src="/logo-square.png" alt="" className="h-10 w-10 rounded-control" />
           <div className="text-center">
             <h1 className="text-sm font-semibold text-ink">OTG Code is locked</h1>
-            <p className="mt-1 text-[11px] text-ink-faint">
-              {user && host ? `${user} on ${host}` : user || host || "Enter the access password to continue."}
-            </p>
+            {user && (
+              <p className="mt-1 font-mono text-[11px] text-ink">
+                {user} <span className="text-ink-ghost">on</span> {host}
+              </p>
+            )}
           </div>
         </div>
 
