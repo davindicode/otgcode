@@ -80,15 +80,15 @@ export default function DropUpSelect<T extends string>({
           tint ? TINTS[tint].value : "text-ink-dim hover:text-ink"
         }`}
       >
-        {/* Points the way the menu opens — up, from a drawer at the bottom of
-            the screen — and flips once it is open. */}
+        {/* Right while closed; turns to point up at the open menu, which is
+            above it — this drawer sits at the bottom of the screen. */}
         <svg
           className="h-2.5 w-2.5 transition-transform"
-          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+          style={{ transform: open ? "rotate(-90deg)" : "rotate(0deg)" }}
           fill="currentColor"
           viewBox="0 0 20 20"
         >
-          <path d="M10 5l6 10H4l6-10z" />
+          <path d="M6 4l8 6-8 6V4z" />
         </svg>
         {current?.label}
       </button>
