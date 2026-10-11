@@ -62,6 +62,10 @@ interface TerminalState {
 
 let socketInitialized = false;
 
+/** How long to wait before asking again for a session another device holds. */
+const PRESENCE_RETRY_MS = 5000;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
 /**
  * Bumped on every socket connection. A session carries the generation its pty
  * was requested in; anything older has no pty on the server, because the
@@ -190,8 +194,29 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
     const socket = getSocket();
 
+    /**
+     * Try again, once, in a few seconds.
+     *
+     * Nothing in the app can take the session off the device that holds it, so
+     * this is the only way back in: the other device signs out, closes its tab
+     * or goes idle, and the next attempt lands. Socket.IO's own reconnection
+     * is no use here — it would hammer a handshake that is being deliberately
+     * refused, and it gives up after a while.
+     */
+    const retryWhenFree = () => {
+      if (retryTimer) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        socket.connect();
+      }, PRESENCE_RETRY_MS);
+    };
+
     socket.on("connect", () => {
       generation += 1;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
       set({ socketConnected: true });
       usePresenceStore.getState().clear();
 
@@ -229,16 +254,18 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       }
       if (err?.message === "busy") {
         usePresenceStore.getState().setBusy(err.data?.since ?? null);
-        // Stop the automatic retries; the user decides whether to take over.
         socket.disconnect();
+        retryWhenFree();
       }
     });
 
-    // Another device took the session. Stand down rather than reconnecting
-    // into a tug of war over it.
+    // Another device took the session. Stand down, then wait for it the same
+    // way a device that never had it waits — rather than reconnecting straight
+    // back into a fight over the same lock.
     socket.on("displaced", () => {
       usePresenceStore.getState().setDisplaced();
       socket.disconnect();
+      retryWhenFree();
     });
 
     socket.on("terminal_ready", (data: { sessionId: string }) => {

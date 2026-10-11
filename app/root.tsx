@@ -59,18 +59,33 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * The loading screen, rendered by the server and by the first client render.
+ *
+ * Styled inline as well as by class: it is what a device sees before anything
+ * has executed, and on a tunnel that can be a while — or, if the scripts fail
+ * to arrive at all, forever. A blank white page says nothing about why.
+ */
+function Booting() {
+  return (
+    <div
+      className="flex h-screen flex-col items-center justify-center gap-4 bg-app"
+      style={{ backgroundColor: "var(--color-app, #0d0d1a)" }}
+    >
+      <div className="spinner" />
+      <span className="text-sm text-ink-faint">Loading OTG Code…</span>
+      <noscript>
+        <span className="text-sm text-ink-faint">This needs JavaScript. If it is on, the scripts did not load.</span>
+      </noscript>
+    </div>
+  );
+}
+
 export default function App() {
   return (
-    <ClientOnly>
+    <ClientOnly fallback={<Booting />}>
       {() => (
-        <Suspense
-          fallback={
-            <div className="flex flex-col items-center justify-center h-screen bg-app gap-4">
-              <div className="spinner" />
-              <span className="text-sm text-ink-faint">Loading...</span>
-            </div>
-          }
-        >
+        <Suspense fallback={<Booting />}>
           <AppShell />
         </Suspense>
       )}

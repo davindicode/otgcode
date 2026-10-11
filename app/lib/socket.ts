@@ -29,13 +29,3 @@ export function getSocket(): Socket {
 export function hasSocket(): boolean {
   return socket !== null;
 }
-
-/**
- * Reconnect, displacing the device that currently holds the session. Only
- * reached from the "in use" screen, where the user has been told what it does.
- */
-export function takeOverSession(): void {
-  const s = getSocket();
-  s.auth = { deviceId: deviceId(), takeover: true };
-  s.connect();
-}

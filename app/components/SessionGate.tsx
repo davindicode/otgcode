@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { takeOverSession } from "~/lib/socket";
 import { usePresenceStore } from "~/stores/presenceStore";
 
 function ago(since: number): string {
@@ -19,11 +18,16 @@ function ago(since: number): string {
  * terminals behind them are one workspace on one host, so two devices editing
  * it at once used to mean each one silently killing the other's terminals.
  * Two devices on the same terminal is what a tmux tab is for.
+ *
+ * There is nothing to press. A "take over" button meant anyone who reached the
+ * tunnel URL could pull a live terminal out from under whoever was using it —
+ * on a phone, by mistapping. Waiting is the safe default: the session frees
+ * itself when the other device signs out, closes the tab or its session
+ * expires, and this reconnects on its own when it does.
  */
 export default function SessionGate() {
   const status = usePresenceStore((s) => s.status);
   const since = usePresenceStore((s) => s.since);
-  const [busy, setBusy] = useState(false);
 
   // The "in use since" line would otherwise stay frozen at its first render.
   const [, tick] = useState(0);
@@ -65,22 +69,15 @@ export default function SessionGate() {
           {!displaced && since && <span className="text-ink-faint"> Connected {ago(since)}.</span>}
         </p>
 
-        <button
-          type="button"
-          onClick={() => {
-            setBusy(true);
-            takeOverSession();
-          }}
-          disabled={busy}
-          className="relief-accent rounded-control px-3 py-2 text-xs font-medium text-white disabled:bg-control disabled:text-ink-faint"
-        >
-          {busy ? "Connecting…" : displaced ? "Take it back" : "Take over"}
-        </button>
+        <div className="flex items-center gap-2 text-[11px] text-ink-faint">
+          <span className="spinner spinner-sm" aria-hidden="true" />
+          Waiting for it to be free
+        </div>
 
         <p className="text-[11px] leading-relaxed text-ink-ghost">
-          {displaced
-            ? "Taking it back will disconnect whichever device has it now."
-            : "The other device will be disconnected and told why. Its tmux sessions keep running — a tmux tab re-attaches to them."}
+          Sign out on the other device, close its tab, or let its session expire — this one takes over the moment it
+          does. Nothing here can disconnect it, so a terminal you are using cannot be pulled away from you. tmux
+          sessions keep running either way, and a tmux tab re-attaches to them.
         </p>
       </div>
     </div>
