@@ -102,14 +102,15 @@ const tilde = (code: number) => (m: number) => (m === 1 ? `\x1b[${code}~` : `\x1
 const csiU = (code: number, plain: string) => (m: number) => (m === 1 ? plain : `\x1b[${code};${m}u`);
 
 /**
- * The default set: everything a terminal needs that is not a character.
+ * The default set: everything a terminal needs that is not a character —
+ * confirming, cancelling, moving and answering.
  *
  * Enter, Bksp, Esc and Tab used to sit in a separate always-present row that
  * could not take a modifier, which made two near-identical sets — this one and
  * that row — differing only by Ins/Del. One set, and the modifier applies to
  * all of it.
  */
-export const MAIN_COMBO_KEYS: NamedKey[] = [
+export const NAV_COMBO_KEYS: NamedKey[] = [
   // Ordered by how often a hand reaches for it, not by keyboard geography:
   // confirm and cancel, then moving the cursor, then answering the prompts a
   // coding CLI puts up, then paging through its output or tmux's scrollback.
@@ -168,16 +169,16 @@ export const SYMBOL_COMBO_KEYS: { label: string; title: string; ch: string; ctrl
   { label: "/", title: "Undo (readline)", ch: "/" },
 ];
 
-// main first: it is the set the keyboard opens on, and the one that covers
+// nav first: it is the set the keyboard opens on, and the one that covers
 // what a terminal needs before it needs characters.
-export const COMBO_SETS = ["main", "numbers", "letters", "function", "symbols"] as const;
+export const COMBO_SETS = ["nav", "numbers", "letters", "function", "symbols"] as const;
 export type ComboSet = (typeof COMBO_SETS)[number];
 
 /** Sequence for a labelled key in one of the combo sets. */
 export function comboSequence(label: string, mode: ComboMode): string {
   const symbol = SYMBOL_COMBO_KEYS.find((k) => k.label === label);
   if (symbol) return mode === "ctrl" && symbol.ctrl ? symbol.ctrl : comboChar(symbol.ch, mode);
-  const named = [...MAIN_COMBO_KEYS, ...FN_COMBO_KEYS].find((k) => k.label === label);
+  const named = [...NAV_COMBO_KEYS, ...FN_COMBO_KEYS].find((k) => k.label === label);
   // Narrowed by which half of the union is present, not by a flag.
   if (named) return named.seq ? named.seq(MODIFIER_PARAM[mode]) : comboChar(named.char, mode);
   return comboChar(label, mode);

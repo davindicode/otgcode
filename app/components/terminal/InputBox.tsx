@@ -15,7 +15,7 @@ import {
   type ComboSet,
   comboSequence,
   FN_COMBO_KEYS,
-  MAIN_COMBO_KEYS,
+  NAV_COMBO_KEYS,
   SYMBOL_COMBO_KEYS,
 } from "./combos";
 import DropUpSelect from "./DropUpSelect";
@@ -58,7 +58,7 @@ const TERMINAL_GROUPS: QuickKeyGroup[] = [
  * and taking back a typo is Bksp. Both sit next to Enter because all three are
  * one interaction — read the question, move, confirm.
  *
- * Sequences come from the main set rather than being respelled here, so DEL vs
+ * Sequences come from the nav set rather than being respelled here, so DEL vs
  * BS and `CSI A` vs `SS3 A` are decided in one place.
  */
 const CODE_NAV_KEYS: QuickKey[] = [
@@ -224,7 +224,7 @@ const TMUX_GROUPS: { label: string; keys: QuickKey[] }[] = [
     keys: [
       { label: "[ scroll", key: "\x02[", title: "Enter copy mode to scroll back" },
       // No prefix on these three: inside copy mode they are the keys
-      // themselves, and the main set's arrows and paging work there too.
+      // themselves, and the nav set's arrows and paging work there too.
       { label: "/ search", key: "/", title: "Search backward — inside copy mode" },
       { label: "? fwd", key: "?", title: "Search forward — inside copy mode" },
       { label: "q quit", key: "q", title: "Leave copy mode" },
@@ -286,7 +286,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const [cdDirs, setCdDirs] = useState<string[]>([]);
   const [cdLoading, setCdLoading] = useState(false);
   const [comboMode, setComboMode] = useState<ComboMode>("none");
-  const [kbMode, setKbMode] = useState<KbMode>("main");
+  const [kbMode, setKbMode] = useState<KbMode>("nav");
   const [gitForm, setGitForm] = useState<GitForm>("commit");
   /** Which window this tab's tmux client is on, as tmux reports it. */
   const [tmuxWindow, setTmuxWindow] = useState<string | null>(null);
@@ -416,10 +416,12 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
 
   const modeLabel = comboMode === "none" ? "" : (COMBO_MODES.find((m) => m.id === comboMode)?.label ?? "");
 
-  const KB_MODES: { id: KbMode; label: string }[] = [
-    ...COMBO_SETS.map((set) => ({ id: set as KbMode, label: set })),
-    ...CLI_VENDORS.map((v) => ({ id: `cli:${v.name}` as KbMode, label: v.name })),
-    { id: "git", label: "git" },
+  // Two kinds of mode, which the menu says out loud: sets of keys the terminal
+  // itself needs, and a keyboard built for one program.
+  const KB_MODES: { id: KbMode; label: string; group: string }[] = [
+    ...COMBO_SETS.map((set) => ({ id: set as KbMode, label: set, group: "keys" })),
+    ...CLI_VENDORS.map((v) => ({ id: `cli:${v.name}` as KbMode, label: v.name, group: "apps" })),
+    { id: "git", label: "git", group: "apps" },
   ];
   const comboSet = COMBO_SETS.includes(kbMode as ComboSet) ? (kbMode as ComboSet) : null;
   const vendor = kbMode.startsWith("cli:") ? CLI_VENDORS.find((v) => `cli:${v.name}` === kbMode) : undefined;
@@ -447,8 +449,8 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
         title: sentLabel(`${modeLabel}${ch}`, comboSequence(ch, comboMode)),
       }));
     }
-    if (comboSet === "main" || comboSet === "function") {
-      return (comboSet === "main" ? MAIN_COMBO_KEYS : FN_COMBO_KEYS).map((key) => ({
+    if (comboSet === "nav" || comboSet === "function") {
+      return (comboSet === "nav" ? NAV_COMBO_KEYS : FN_COMBO_KEYS).map((key) => ({
         label: key.label,
         seq: comboSequence(key.label, comboMode),
         title: sentLabel(`${modeLabel}${key.title}`, comboSequence(key.label, comboMode)),
@@ -881,13 +883,10 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
               {/* 2. The mode, and whatever qualifies it. The mode selector is
                   pinned left and anything the mode adds sits to its right. */}
               <div className="flex items-center gap-1.5 border-t border-line/50 pt-1.5">
-                <DropUpSelect value={kbMode} options={KB_MODES} onChange={setKbMode} />
+                <DropUpSelect name="mode" value={kbMode} options={KB_MODES} onChange={setKbMode} />
 
                 {comboSet && (
-                  <>
-                    <span className="shrink-0 text-[10px] text-ink-ghost">combo mode:</span>
-                    <DropUpSelect value={comboMode} options={COMBO_MODES} onChange={setComboMode} />
-                  </>
+                  <DropUpSelect name="combo" value={comboMode} options={COMBO_MODES} onChange={setComboMode} />
                 )}
 
                 {vendor &&

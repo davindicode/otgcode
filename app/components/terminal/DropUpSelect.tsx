@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -13,10 +13,14 @@ export default function DropUpSelect<T extends string>({
   value,
   options,
   onChange,
+  name,
 }: {
   value: T;
-  options: { id: T; label: string }[];
+  /** `group` starts a labelled section; options sharing one must be adjacent. */
+  options: { id: T; label: string; group?: string }[];
   onChange: (id: T) => void;
+  /** Prefix on the trigger, for when the current value alone is ambiguous. */
+  name?: string;
 }) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -60,6 +64,7 @@ export default function DropUpSelect<T extends string>({
         >
           <path d="M6 4l8 6-8 6V4z" />
         </svg>
+        {name && <span className="text-ink-ghost">{name}:</span>}
         {current?.label}
       </button>
       {open &&
@@ -76,20 +81,24 @@ export default function DropUpSelect<T extends string>({
               })(),
             }}
           >
-            {options.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                onClick={() => {
-                  onChange(o.id);
-                  setOpen(false);
-                }}
-                className={`block w-full px-3 py-1 text-left text-[11px] transition-colors hover:bg-hover ${
-                  o.id === value ? "text-blue-400" : "text-ink-muted"
-                }`}
-              >
-                {o.label}
-              </button>
+            {options.map((o, i) => (
+              <Fragment key={o.id}>
+                {o.group && o.group !== options[i - 1]?.group && (
+                  <div className="px-3 pb-0.5 pt-1 text-[9px] uppercase tracking-wide text-ink-ghost">{o.group}</div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(o.id);
+                    setOpen(false);
+                  }}
+                  className={`block w-full px-3 py-1 text-left text-[11px] transition-colors hover:bg-hover ${
+                    o.id === value ? "text-blue-400" : "text-ink-muted"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              </Fragment>
             ))}
           </div>,
           document.body,

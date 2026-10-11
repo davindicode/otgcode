@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COMBO_SETS, comboSequence, MAIN_COMBO_KEYS } from "./combos";
+import { COMBO_SETS, comboSequence, NAV_COMBO_KEYS } from "./combos";
 
 const seq = (label: string, mode: Parameters<typeof comboSequence>[1]) => comboSequence(label, mode);
 
@@ -93,7 +93,7 @@ describe("the none modifier", () => {
   });
 });
 
-describe("the main set after absorbing the always-present row", () => {
+describe("the nav set after absorbing the always-present row", () => {
   it("sends the plain control character with no modifier", () => {
     expect(comboSequence("Enter", "none")).toBe("\r");
     expect(comboSequence("Bksp", "none")).toBe("\x7f");
@@ -114,7 +114,7 @@ describe("the main set after absorbing the always-present row", () => {
   });
 
   it("opens on main", () => {
-    expect(COMBO_SETS[0]).toBe("main");
+    expect(COMBO_SETS[0]).toBe("nav");
   });
 });
 
@@ -156,8 +156,8 @@ describe("the shift modifier", () => {
   });
 });
 
-describe("the main set's order", () => {
-  const labels = MAIN_COMBO_KEYS.map((k) => k.label);
+describe("the nav set's order", () => {
+  const labels = NAV_COMBO_KEYS.map((k) => k.label);
   const at = (label: string) => labels.indexOf(label);
 
   it("leads with confirm, cancel and the cursor", () => {
