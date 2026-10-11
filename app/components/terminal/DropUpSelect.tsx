@@ -61,13 +61,15 @@ export default function DropUpSelect<T extends string>({
         aria-expanded={open}
         className="flex shrink-0 select-none items-center gap-0.5 pt-0.5 text-[10px] font-medium text-ink-dim hover:text-ink"
       >
+        {/* Points the way the menu opens — up, from a drawer at the bottom of
+            the screen — and flips once it is open. */}
         <svg
           className="h-2.5 w-2.5 transition-transform"
-          style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
           fill="currentColor"
           viewBox="0 0 20 20"
         >
-          <path d="M6 4l8 6-8 6V4z" />
+          <path d="M10 5l6 10H4l6-10z" />
         </svg>
         {current?.label}
       </button>
