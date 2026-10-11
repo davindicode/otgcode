@@ -18,7 +18,8 @@ export default function ConfirmDialog({
   onCancel,
 }: {
   title: string;
-  body: React.ReactNode;
+  /** Why it matters. Left out where the title is the whole question. */
+  body?: React.ReactNode;
   confirmLabel: string;
   /** Red confirm button, for something destroyed rather than merely closed. */
   danger?: boolean;
@@ -49,8 +50,8 @@ export default function ConfirmDialog({
         className="glass mx-4 w-full max-w-sm rounded-panel p-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="mb-2 text-sm font-medium text-ink">{title}</h3>
-        <div className="mb-3 text-[12px] leading-relaxed text-ink-muted">{body}</div>
+        <h3 className={`text-sm font-medium text-ink ${body ? "mb-2" : "mb-3"}`}>{title}</h3>
+        {body && <div className="mb-3 text-[12px] leading-relaxed text-ink-muted">{body}</div>}
         <div className="flex justify-end gap-2">
           <button
             ref={cancelRef}

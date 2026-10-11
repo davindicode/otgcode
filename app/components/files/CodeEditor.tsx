@@ -18,6 +18,9 @@ interface CodeEditorProps {
   onReload: () => void;
   /** It already has, and the pane is saying so. */
   stale: boolean;
+  /** Told whenever there are edits not on disk — the same fact the save
+   * button's enabled state shows, so closing the tab can warn about them. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 const PREVIEWABLE = new Set(["md", "markdown", "html", "htm", "ipynb"]);
@@ -215,7 +218,7 @@ interface MonacoHandle {
   addCommand: (keybinding: number, handler: () => void) => void;
 }
 
-export default function CodeEditor({ path, content, onSave, onReload, stale }: CodeEditorProps) {
+export default function CodeEditor({ path, content, onSave, onReload, stale, onDirtyChange }: CodeEditorProps) {
   const ext = getExt(path);
   const canPreview = PREVIEWABLE.has(ext);
   const [value, setValue] = useState(content);
@@ -245,6 +248,12 @@ export default function CodeEditor({ path, content, onSave, onReload, stale }: C
     setDirty(false);
     setDiscardArmed(false);
   }, [content]);
+
+  // Reported rather than read: the tab strip needs it to know whether its X
+  // would throw work away, and it is derived state here, not there.
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
 
   /**
    * Reload, unless that would throw away unsaved work: the first tap then only

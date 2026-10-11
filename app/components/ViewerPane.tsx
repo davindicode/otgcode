@@ -24,6 +24,7 @@ const WATCH_MS = 4000;
  */
 export default function ViewerPane({ tabId, path }: { tabId: string; path: string }) {
   const closeTab = useTabsStore((s) => s.close);
+  const setUnsaved = useTabsStore((s) => s.setUnsaved);
   const showToast = useToastStore((s) => s.show);
   const [load, setLoad] = useState<Load>({ status: "loading" });
   /**
@@ -94,6 +95,10 @@ export default function ViewerPane({ tabId, path }: { tabId: string; path: strin
     read();
     return () => abortRef.current?.abort();
   }, [read]);
+
+  // Unmounting means the tab is gone, or the file is being re-read: either
+  // way there are no unsaved edits left to warn about.
+  useEffect(() => () => setUnsaved(tabId, false), [tabId, setUnsaved]);
 
   const loadedVersion = load.status === "ready" ? load.version : null;
 
@@ -255,6 +260,7 @@ export default function ViewerPane({ tabId, path }: { tabId: string; path: strin
       <FileViewer
         path={path}
         content={load.content}
+        onDirtyChange={(dirty) => setUnsaved(tabId, dirty)}
         onSave={handleSave}
         onReload={reload}
         version={version}

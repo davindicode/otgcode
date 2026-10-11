@@ -40,6 +40,15 @@ export interface Tab {
 interface TabsState {
   tabs: Tab[];
   activeId: string | null;
+  /**
+   * Viewer tabs with edits not yet on disk, by tab id.
+   *
+   * The editor owns the edits; the strip owns the X that would throw them
+   * away. This is the one fact that has to travel between them, so closing a
+   * file can ask when there is something to lose and close silently when
+   * there is not.
+   */
+  unsaved: Record<string, boolean>;
 
   openTerminal: (opts?: { id?: string; title?: string; cwd?: string }) => string;
   openExplorer: (opts?: { id?: string; title?: string; cwd?: string }) => string;
@@ -58,6 +67,7 @@ interface TabsState {
   /** Opens the file, or focuses its tab if it is already open. */
   openViewer: (path: string, fromTabId?: string) => string;
   close: (id: string) => void;
+  setUnsaved: (id: string, unsaved: boolean) => void;
   /** Drag-to-reorder: `toIndex` indexes the strip with this tab taken out. */
   move: (id: string, toIndex: number) => void;
   setActive: (id: string) => void;
@@ -111,6 +121,7 @@ function nextTitle(tabs: Tab[], kind: TabKind, label: string): string {
 export const useTabsStore = create<TabsState>((set, get) => ({
   tabs: [],
   activeId: null,
+  unsaved: {},
 
   openTerminal: ({ id, title, cwd } = {}) => {
     const tabId = id ?? nextId("terminal");
@@ -202,6 +213,14 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return tabId;
   },
 
+  setUnsaved: (id, unsaved) => {
+    if (!!get().unsaved[id] === unsaved) return;
+    const next = { ...get().unsaved };
+    if (unsaved) next[id] = true;
+    else delete next[id];
+    set({ unsaved: next });
+  },
+
   close: (id) => {
     const { tabs, activeId } = get();
     const index = tabs.findIndex((t) => t.id === id);
@@ -210,6 +229,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
     if (tab.kind === "terminal" || tab.kind === "tmux") useTerminalStore.getState().closeSession(id);
     if (tab.kind === "explorer") useFileStore.getState().closeSession(id);
+
+    get().setUnsaved(id, false);
 
     const remaining = tabs.filter((t) => t.id !== id);
     // Closing a file returns you to the explorer you opened it from; failing

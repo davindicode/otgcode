@@ -22,6 +22,8 @@ interface FileViewerProps {
   version: number;
   /** The file has changed on disk since it was read. */
   stale: boolean;
+  /** Only the editor can report this, and only the tab strip needs it. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 function MediaViewer({
@@ -295,7 +297,15 @@ function PdfViewer({
   );
 }
 
-export default function FileViewer({ path, content, onSave, onReload, version, stale }: FileViewerProps) {
+export default function FileViewer({
+  path,
+  content,
+  onSave,
+  onReload,
+  version,
+  stale,
+  onDirtyChange,
+}: FileViewerProps) {
   const kind = fileKind(path);
 
   if (kind === "image") {
@@ -315,7 +325,16 @@ export default function FileViewer({ path, content, onSave, onReload, version, s
   }
 
   if (content !== null) {
-    return <CodeEditor path={path} content={content} onSave={onSave} onReload={onReload} stale={stale} />;
+    return (
+      <CodeEditor
+        path={path}
+        content={content}
+        onSave={onSave}
+        onReload={onReload}
+        stale={stale}
+        onDirtyChange={onDirtyChange}
+      />
+    );
   }
 
   // Nothing read the file and no viewer claimed it — which the kinds above

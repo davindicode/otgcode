@@ -1,6 +1,6 @@
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type FileKind, fileKind } from "~/lib/fileTypes";
-import { type Tab, type TabKind, useTabsStore } from "~/stores/tabsStore";
+import { type Tab, useTabsStore } from "~/stores/tabsStore";
 import ConfirmDialog from "./ConfirmDialog";
 import RenamableTab from "./RenamableTab";
 import TmuxPicker from "./TmuxPicker";
@@ -320,6 +320,7 @@ export default function TabBar() {
   const [tmuxPicker, setTmuxPicker] = useState(false);
   /** The tab whose X was tapped, held while the user confirms. */
   const [closing, setClosing] = useState<Tab | null>(null);
+  const unsaved = useTabsStore((s) => s.unsaved);
   const plusRef = useRef<HTMLButtonElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
   const { dragId, onPointerDown } = useTabReorder(stripRef);
@@ -332,14 +333,20 @@ export default function TabBar() {
     else openExplorer();
   };
 
-  // What is lost, per kind. Every close asks — the X is a few millimetres from
-  // the tab you meant to tap — but what it asks about differs: a terminal takes
-  // its processes with it, where a tmux tab is only letting go of the session.
-  const closeCost: Record<TabKind, string> = {
-    terminal: "Its shell and anything running in it stop, and the scrollback goes with them.",
-    tmux: "The tmux session keeps running on the host — this only detaches from it, and the + picker reattaches.",
-    explorer: "Nothing on disk changes.",
-    viewer: "Nothing on disk changes. Unsaved edits in this tab are lost.",
+  /**
+   * What closing this tab costs, or null when it costs nothing and the X
+   * should simply work.
+   *
+   * A viewer tab is the one that usually costs nothing: closing it returns you
+   * to the explorer it came from, and the file is still there. Unless it has
+   * edits that are not — the same state the save button in its header shows.
+   */
+  const closeCost = (tab: Tab): string | null => {
+    if (tab.kind === "terminal") return "Its shell and anything running in it stop, and the scrollback goes with them.";
+    if (tab.kind === "tmux")
+      return "The tmux session keeps running on the host — this only detaches from it, and the + picker reattaches.";
+    if (tab.kind === "viewer") return unsaved[tab.id] ? "This file has edits that are not saved. They are lost." : null;
+    return "";
   };
 
   return (
@@ -361,7 +368,7 @@ export default function TabBar() {
             existingNames={tabs.filter((t) => t.id !== tab.id).map((t) => t.title)}
             onRename={(name) => rename(tab.id, name)}
             onClick={() => setActive(tab.id)}
-            onClose={() => setClosing(tab)}
+            onClose={() => (closeCost(tab) === null ? close(tab.id) : setClosing(tab))}
             title={tab.kind === "viewer" ? tab.path : undefined}
             icon={tabIcon(tab)}
           />
@@ -369,9 +376,9 @@ export default function TabBar() {
         {closing && (
           <ConfirmDialog
             title={`Close ${closing.title}?`}
-            body={closeCost[closing.kind]}
-            confirmLabel="Close tab"
-            danger={closing.kind === "terminal"}
+            body={closeCost(closing)}
+            confirmLabel={unsaved[closing.id] ? "Discard and close" : "Close tab"}
+            danger={closing.kind === "terminal" || !!unsaved[closing.id]}
             onConfirm={() => {
               close(closing.id);
               setClosing(null);
