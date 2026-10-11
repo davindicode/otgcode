@@ -133,9 +133,7 @@ export default function AppShell() {
             terminal keeps its scrollback and socket while you work elsewhere. */}
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
           {tabs.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">
-              Nothing open — use + to start a terminal, a tmux session or a file explorer.
-            </div>
+            <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">No tabs open</div>
           ) : (
             tabs.map((tab) => (
               <div
