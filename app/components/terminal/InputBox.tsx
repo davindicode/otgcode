@@ -61,11 +61,11 @@ const CODE_COMMON_KEYS: QuickKey[] = [
   { label: "Esc Esc", key: "\x1b\x1b", title: "Rewind history (Claude) / Edit prev message (Codex)" },
 ];
 
-// Per-vendor CLI groups: launch commands, keys, and slash commands
+// Per-vendor CLI groups: keys and slash commands. The vendor name is also the
+// command that starts it.
 interface CliVendor {
   name: string;
   keys: QuickKey[];
-  launch: { label: string; title: string; command: string }[];
   /**
    * Typed into the CLI *without* a trailing Enter.
    *
@@ -87,15 +87,6 @@ const CLI_VENDORS: CliVendor[] = [
       { label: "Ctrl+R", key: "\x12", title: "Reverse history search" },
       { label: "Alt+T", key: "\x1bt", title: "Toggle extended thinking" },
       { label: "Alt+P", key: "\x1bp", title: "Model picker" },
-    ],
-    launch: [
-      { label: "claude", title: "Interactive mode", command: "claude\n" },
-      { label: "yolo", title: "Skip all permission checks", command: "claude --dangerously-skip-permissions\n" },
-      {
-        label: "plan",
-        title: "Read-only plan mode",
-        command: "claude --allowedTools Read,Glob,Grep,WebSearch,WebFetch\n",
-      },
     ],
     slashCmds: [
       { label: "/clear", title: "Clear conversation context", command: "/clear" },
@@ -120,15 +111,6 @@ const CLI_VENDORS: CliVendor[] = [
       { label: "Shift+Tab", key: "\x1b[Z", title: "Cycle approval modes" },
       { label: "Ctrl+O", key: "\x0f", title: "Choose environment (cloud)" },
     ],
-    launch: [
-      { label: "suggest", title: "Proposes changes for approval", command: "codex --approval-mode suggest\n" },
-      {
-        label: "auto-edit",
-        title: "Applies file changes, asks for commands",
-        command: "codex --approval-mode auto-edit\n",
-      },
-      { label: "full-auto", title: "Runs without confirmation", command: "codex --approval-mode full-auto\n" },
-    ],
     slashCmds: [
       { label: "/help", title: "Show available commands", command: "/help" },
       { label: "/model", title: "Show or switch model", command: "/model" },
@@ -147,7 +129,6 @@ const CLI_VENDORS: CliVendor[] = [
       { label: "Ctrl+S", key: "\x13", title: "Send message" },
       { label: "Ctrl+A", key: "\x01", title: "Switch session" },
     ],
-    launch: [{ label: "opencode", title: "Interactive mode", command: "opencode\n" }],
     slashCmds: [
       { label: "/help", title: "Show available commands", command: "/help" },
       { label: "/exit", title: "Exit OpenCode", command: "/exit" },
@@ -991,9 +972,21 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
 
                 {vendor && (
                   <>
-                    {/* Enter first: inside a coding CLI, confirming is the key
-                        you reach for most, and switching sets to find it defeats
-                        the point of a sector being chosen. */}
+                    {/* Start it, then confirm: the two things you reach for
+                        most in a coding CLI, so neither costs a switch of sets.
+                        Bare, with no permission flags — those change between
+                        releases, and a stale flag in a button is worse than
+                        typing the one you want. */}
+                    <button
+                      onClick={() => {
+                        if (sessionId) sendInput(sessionId, `${vendor.name}\n`);
+                      }}
+                      disabled={!sessionId}
+                      title={`Start ${vendor.name}`}
+                      className="shrink-0 whitespace-nowrap rounded-control relief select-none px-2 py-0.5 text-[11px] text-purple-300 hover:text-purple-100"
+                    >
+                      {vendor.name}
+                    </button>
                     <button
                       {...repeatProps("\r")}
                       disabled={!sessionId}
@@ -1002,19 +995,6 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                     >
                       Enter
                     </button>
-                    {vendor.launch.map((cmd) => (
-                      <button
-                        key={`${vendor.name}-${cmd.label}`}
-                        onClick={() => {
-                          if (sessionId) sendInput(sessionId, cmd.command);
-                        }}
-                        disabled={!sessionId}
-                        title={cmd.title}
-                        className="shrink-0 whitespace-nowrap rounded-control relief select-none px-2 py-0.5 text-[11px] text-purple-300 hover:text-purple-100"
-                      >
-                        {cmd.label}
-                      </button>
-                    ))}
                     {[...CODE_COMMON_KEYS, ...vendor.keys].map((qk) => (
                       <button
                         key={`${vendor.name}-${qk.label}`}
