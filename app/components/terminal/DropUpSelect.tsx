@@ -62,34 +62,36 @@ export default function DropUpSelect<T extends string>({
   }, [open]);
 
   const current = options.find((o) => o.id === value) ?? options[0];
+  const tone = tint ? TINTS[tint] : { name: "text-ink-ghost", value: "text-ink-dim hover:text-ink" };
 
   return (
     <>
-      {name && (
-        <span className={`shrink-0 select-none text-[10px] ${tint ? TINTS[tint].name : "text-ink-ghost"}`}>
-          {name}:
-        </span>
-      )}
+      {/* A labelled selector needs no caret: the label is what says the value
+          beside it can change, and it brightens while the menu is up. A caret
+          between the two only put a third thing on the line to misalign. */}
+      {name && <span className={`shrink-0 select-none text-[10px] ${open ? tone.value : tone.name}`}>{name}:</span>}
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`flex shrink-0 select-none items-center gap-0.5 pt-0.5 text-[10px] font-medium ${
-          tint ? TINTS[tint].value : "text-ink-dim hover:text-ink"
-        }`}
+        className={`flex shrink-0 select-none items-center gap-0.5 text-[10px] font-medium ${
+          name ? "" : "pt-0.5"
+        } ${tone.value}`}
       >
         {/* Right while closed; turns to point up at the open menu, which is
             above it — this drawer sits at the bottom of the screen. */}
-        <svg
-          className="h-2.5 w-2.5 transition-transform"
-          style={{ transform: open ? "rotate(-90deg)" : "rotate(0deg)" }}
-          fill="currentColor"
-          viewBox="0 0 20 20"
-        >
-          <path d="M6 4l8 6-8 6V4z" />
-        </svg>
+        {!name && (
+          <svg
+            className="h-2.5 w-2.5 transition-transform"
+            style={{ transform: open ? "rotate(-90deg)" : "rotate(0deg)" }}
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path d="M6 4l8 6-8 6V4z" />
+          </svg>
+        )}
         {current?.label}
       </button>
       {open &&
