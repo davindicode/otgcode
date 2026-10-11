@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -16,8 +16,7 @@ export default function DropUpSelect<T extends string>({
   name,
 }: {
   value: T;
-  /** `group` starts a labelled section; options sharing one must be adjacent. */
-  options: { id: T; label: string; group?: string }[];
+  options: { id: T; label: string }[];
   onChange: (id: T) => void;
   /** Prefix on the trigger, for when the current value alone is ambiguous. */
   name?: string;
@@ -81,24 +80,20 @@ export default function DropUpSelect<T extends string>({
               })(),
             }}
           >
-            {options.map((o, i) => (
-              <Fragment key={o.id}>
-                {o.group && o.group !== options[i - 1]?.group && (
-                  <div className="px-3 pb-0.5 pt-1 text-[9px] uppercase tracking-wide text-ink-ghost">{o.group}</div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange(o.id);
-                    setOpen(false);
-                  }}
-                  className={`block w-full px-3 py-1 text-left text-[11px] transition-colors hover:bg-hover ${
-                    o.id === value ? "text-blue-400" : "text-ink-muted"
-                  }`}
-                >
-                  {o.label}
-                </button>
-              </Fragment>
+            {options.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => {
+                  onChange(o.id);
+                  setOpen(false);
+                }}
+                className={`block w-full px-3 py-1 text-left text-[11px] transition-colors hover:bg-hover ${
+                  o.id === value ? "text-blue-400" : "text-ink-muted"
+                }`}
+              >
+                {o.label}
+              </button>
             ))}
           </div>,
           document.body,

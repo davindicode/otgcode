@@ -249,7 +249,7 @@ const KB_TAB = "__keyboard__";
  * a coding CLI and git are all "a bar of keys with something above it" — they
  * were four tabs duplicating the same two rows.
  */
-type KbMode = ComboSet | `cli:${string}` | "git";
+type KbMode = "main" | `cli:${string}` | "git";
 
 /** The git form line, chosen the way a combo modifier is. */
 type GitForm = "commit" | "config";
@@ -286,7 +286,9 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const [cdDirs, setCdDirs] = useState<string[]>([]);
   const [cdLoading, setCdLoading] = useState(false);
   const [comboMode, setComboMode] = useState<ComboMode>("none");
-  const [kbMode, setKbMode] = useState<KbMode>("nav");
+  const [kbMode, setKbMode] = useState<KbMode>("main");
+  /** Which set of keys `main` is showing. Only it has sets. */
+  const [keySet, setKeySet] = useState<ComboSet>("nav");
   const [gitForm, setGitForm] = useState<GitForm>("commit");
   /** Which window this tab's tmux client is on, as tmux reports it. */
   const [tmuxWindow, setTmuxWindow] = useState<string | null>(null);
@@ -416,14 +418,16 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
 
   const modeLabel = comboMode === "none" ? "" : (COMBO_MODES.find((m) => m.id === comboMode)?.label ?? "");
 
-  // Two kinds of mode, which the menu says out loud: sets of keys the terminal
-  // itself needs, and a keyboard built for one program.
-  const KB_MODES: { id: KbMode; label: string; group: string }[] = [
-    ...COMBO_SETS.map((set) => ({ id: set as KbMode, label: set, group: "keys" })),
-    ...CLI_VENDORS.map((v) => ({ id: `cli:${v.name}` as KbMode, label: v.name, group: "apps" })),
-    { id: "git", label: "git", group: "apps" },
+  // One keyboard per thing you are typing at: the terminal itself, or a
+  // program with its own keys. Five options, where listing every key set here
+  // made nine and buried claude between function and symbols.
+  const KB_MODES: { id: KbMode; label: string }[] = [
+    { id: "main", label: "main" },
+    ...CLI_VENDORS.map((v) => ({ id: `cli:${v.name}` as KbMode, label: v.name })),
+    { id: "git", label: "git" },
   ];
-  const comboSet = COMBO_SETS.includes(kbMode as ComboSet) ? (kbMode as ComboSet) : null;
+  // Which keys `main` is showing, and nothing when another keyboard is up.
+  const comboSet = kbMode === "main" ? keySet : null;
   const vendor = kbMode.startsWith("cli:") ? CLI_VENDORS.find((v) => `cli:${v.name}` === kbMode) : undefined;
 
   /** The bottom row's keys for the current combo set, modifier already applied. */
@@ -883,10 +887,18 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
               {/* 2. The mode, and whatever qualifies it. The mode selector is
                   pinned left and anything the mode adds sits to its right. */}
               <div className="flex items-center gap-1.5 border-t border-line/50 pt-1.5">
-                <DropUpSelect name="mode" value={kbMode} options={KB_MODES} onChange={setKbMode} />
+                <DropUpSelect value={kbMode} options={KB_MODES} onChange={setKbMode} />
 
                 {comboSet && (
-                  <DropUpSelect name="combo" value={comboMode} options={COMBO_MODES} onChange={setComboMode} />
+                  <>
+                    <DropUpSelect
+                      name="mode"
+                      value={keySet}
+                      options={COMBO_SETS.map((set) => ({ id: set, label: set }))}
+                      onChange={setKeySet}
+                    />
+                    <DropUpSelect name="combo" value={comboMode} options={COMBO_MODES} onChange={setComboMode} />
+                  </>
                 )}
 
                 {vendor &&
