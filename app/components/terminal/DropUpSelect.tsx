@@ -18,7 +18,12 @@ export default function DropUpSelect<T extends string>({
   value: T;
   options: { id: T; label: string }[];
   onChange: (id: T) => void;
-  /** Prefix on the trigger, for when the current value alone is ambiguous. */
+  /**
+   * Static label in front of the trigger, for when the current value alone is
+   * ambiguous. Outside the button on purpose: what you can tap is the triangle
+   * and the value, and a tappable word in front of them only suggests
+   * otherwise.
+   */
   name?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -47,6 +52,7 @@ export default function DropUpSelect<T extends string>({
 
   return (
     <>
+      {name && <span className="shrink-0 select-none text-[10px] text-ink-ghost">{name}:</span>}
       <button
         ref={buttonRef}
         type="button"
@@ -63,7 +69,6 @@ export default function DropUpSelect<T extends string>({
         >
           <path d="M6 4l8 6-8 6V4z" />
         </svg>
-        {name && <span className="text-ink-ghost">{name}:</span>}
         {current?.label}
       </button>
       {open &&
