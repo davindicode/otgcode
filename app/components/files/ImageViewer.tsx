@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import DownloadIcon from "~/components/DownloadIcon";
 import RefreshIcon from "~/components/RefreshIcon";
-import { showToast } from "~/stores/toastStore";
+import CannotDisplay from "./CannotDisplay";
 import CopyPathButton from "./CopyPathButton";
 
 interface ImageViewerProps {
@@ -64,19 +64,29 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
     setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
   }, []);
 
-  // A file we are not allowed to read answers with a JSON error, which an
-  // <img> cannot render — leaving a broken-image icon and no reason for it.
-  // The same URL still has the reason, and by now it is a few bytes.
+  /**
+   * Why the image did not render, once we know. An <img> reports a failure
+   * without a reason, and the two reasons are different: the server refused
+   * (a JSON error on the same URL, which by now is a few bytes), or the bytes
+   * are not a format this browser decodes — a .heic someone renamed .jpg, a
+   * progressive variant, a truncated file.
+   */
+  const [failure, setFailure] = useState<{ src: string; reason: string } | null>(null);
   const reportFailure = useCallback(async () => {
     let reason = "";
     try {
       const data = (await (await fetch(src)).json()) as { error?: string };
       reason = data.error ?? "";
     } catch {
-      // Not JSON either: the image is simply undisplayable.
+      // Not JSON either, so the server served it happily.
     }
-    showToast(reason || "This image could not be displayed");
+    setFailure({ src, reason: reason || "The bytes are there, but this browser does not decode this image format." });
   }, [src]);
+
+  // Held against the URL it belongs to rather than cleared by an effect: the
+  // failure replaces the <img>, so a reload would have nothing left to fire
+  // onLoad and clear it. A new `src` simply stops matching.
+  const failed = failure?.src === src ? failure.reason : null;
 
   // Pinch-to-zoom
   const lastDistance = useRef(0);
@@ -181,38 +191,42 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
           </button>
         </div>
       </div>
-      <div
-        ref={containerRef}
-        className={`flex-1 overflow-auto bg-app select-none ${grabbing ? "cursor-grabbing" : "cursor-grab"}`}
-        onMouseDown={handleMouseDown}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
+      {failed ? (
+        <CannotDisplay path={path} title="This image could not be displayed" detail={failed} />
+      ) : (
         <div
-          className="flex items-center justify-center p-4"
-          style={{
-            minWidth: naturalSize ? Math.max(naturalSize.w * scale + PAD, box?.w ?? 0) : "100%",
-            minHeight: naturalSize ? Math.max(naturalSize.h * scale + PAD, box?.h ?? 0) : "100%",
-          }}
+          ref={containerRef}
+          className={`flex-1 overflow-auto bg-app select-none ${grabbing ? "cursor-grabbing" : "cursor-grab"}`}
+          onMouseDown={handleMouseDown}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
-          <img
-            src={src}
-            alt={path}
-            className="max-w-none"
-            draggable={false}
-            onLoad={handleImageLoad}
-            onError={reportFailure}
-            style={
-              naturalSize
-                ? {
-                    width: naturalSize.w * scale,
-                    height: naturalSize.h * scale,
-                  }
-                : undefined
-            }
-          />
+          <div
+            className="flex items-center justify-center p-4"
+            style={{
+              minWidth: naturalSize ? Math.max(naturalSize.w * scale + PAD, box?.w ?? 0) : "100%",
+              minHeight: naturalSize ? Math.max(naturalSize.h * scale + PAD, box?.h ?? 0) : "100%",
+            }}
+          >
+            <img
+              src={src}
+              alt={path}
+              className="max-w-none"
+              draggable={false}
+              onLoad={handleImageLoad}
+              onError={reportFailure}
+              style={
+                naturalSize
+                  ? {
+                      width: naturalSize.w * scale,
+                      height: naturalSize.h * scale,
+                    }
+                  : undefined
+              }
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

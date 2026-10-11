@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { fileKind, getExt } from "~/lib/fileTypes";
+import CannotDisplay from "./CannotDisplay";
 import CopyPathButton from "./CopyPathButton";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -275,7 +276,13 @@ function PdfViewer({
           file={pdfUrl}
           onLoadSuccess={onDocumentLoadSuccess}
           loading={<div className="flex items-center justify-center h-full text-ink-faint text-sm">Loading PDF...</div>}
-          error={<div className="flex items-center justify-center h-full text-red-400 text-sm">Failed to load PDF</div>}
+          error={
+            <CannotDisplay
+              path={path}
+              title="This PDF could not be opened"
+              detail="It may be password-protected, or damaged. A reader on your device may still manage it — and will ask for the password if there is one."
+            />
+          }
         >
           <div className="flex flex-col items-center gap-2 p-4">
             {Array.from({ length: numPages }, (_, i) => (
@@ -307,45 +314,18 @@ export default function FileViewer({ path, content, onSave, onReload, version, s
     return <MediaViewer path={path} type="audio" onReload={onReload} version={version} stale={stale} />;
   }
 
-  // Default to code editor for everything else
   if (content !== null) {
     return <CodeEditor path={path} content={content} onSave={onSave} onReload={onReload} stale={stale} />;
   }
 
+  // Nothing read the file and no viewer claimed it — which the kinds above
+  // leave no room for, so this is here to be a dead end rather than a blank
+  // pane if that ever stops being true.
   return (
-    <div className="flex flex-col h-full">
-      <div className="bar-edge flex items-center px-3 py-2 bg-surface border-b border-line shrink-0">
-        <div className="flex min-w-0 items-center gap-1">
-          <span className="min-w-0 truncate text-sm text-ink-muted select-none" title={path}>
-            {path}
-          </span>
-          <CopyPathButton path={path} />
-        </div>
-        <div className="min-w-2 flex-1" />
-        <div className="flex items-center gap-2 shrink-0">
-          <a
-            href={`/api/files/download?path=${encodeURIComponent(path)}`}
-            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
-            download
-            title="Download"
-          >
-            <DownloadIcon />
-          </a>
-          <button
-            onClick={onReload}
-            className={`relief p-1 rounded-control ${
-              stale ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70" : "text-ink-muted hover:text-ink"
-            }`}
-            title={stale ? "Changed on disk — reload" : "Reload from disk"}
-            aria-label="Reload from disk"
-          >
-            <RefreshIcon className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-      <div className="flex-1 flex items-center justify-center text-ink-faint text-sm">
-        Cannot preview this file type (.{getExt(path) || "unknown"})
-      </div>
-    </div>
+    <CannotDisplay
+      path={path}
+      title={`OTG Code cannot display ${getExt(path) ? `a .${getExt(path)} file` : "this file"}`}
+      detail="No viewer here handles this format."
+    />
   );
 }

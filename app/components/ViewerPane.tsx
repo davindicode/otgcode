@@ -4,12 +4,14 @@ import { getExt, isDirectViewerFile } from "~/lib/fileTypes";
 import { formatSize } from "~/lib/format";
 import { useTabsStore } from "~/stores/tabsStore";
 import { useToastStore } from "~/stores/toastStore";
+import CannotDisplay from "./files/CannotDisplay";
 import FileViewer from "./files/FileViewer";
 
 type Load =
   | { status: "loading" }
   | { status: "ready"; content: string | null; version: string | null }
   | { status: "binary"; size: number }
+  | { status: "too-large"; size: number }
   | { status: "error"; message: string };
 
 /** How often an on-screen tab asks whether its file has moved. */
@@ -71,7 +73,9 @@ export default function ViewerPane({ tabId, path }: { tabId: string; path: strin
         signal: controller.signal,
       });
       const data = await res.json();
-      if (data.error) {
+      if (res.status === 413) {
+        setLoad({ status: "too-large", size: data.size ?? 0 });
+      } else if (data.error) {
         setLoad({ status: "error", message: `${data.error}${data.size ? ` (${formatSize(data.size)})` : ""}` });
       } else if (data.binary) {
         setLoad({ status: "binary", size: data.size ?? 0 });
@@ -181,47 +185,38 @@ export default function ViewerPane({ tabId, path }: { tabId: string; path: strin
     );
   }
 
-  if (load.status === "binary") {
+  if (load.status === "binary" || load.status === "too-large") {
     const ext = getExt(path);
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-app px-6">
-        <svg className="h-8 w-8 text-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5A3.375 3.375 0 0010.125 2.25H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-          />
-        </svg>
-        <span className="text-center text-sm text-ink">
-          OTG Code cannot display {ext ? `a .${ext} file` : "this file"}
-        </span>
-        <span className="max-w-full truncate text-center text-xs text-ink-ghost">
-          {path} · {formatSize(load.size)}
-        </span>
-        <p className="max-w-xs text-center text-[11px] leading-relaxed text-ink-faint">
-          Its bytes are not text. Downloading opens it in whatever app on your device knows the format; the raw contents
-          are here too, if that is what you came for.
-        </p>
-        <div className="flex flex-wrap justify-center gap-2">
-          <a
-            href={`/api/files/download?path=${encodeURIComponent(path)}`}
-            download
-            className="relief-accent rounded-control px-4 py-2 text-sm text-white"
-          >
-            Download
-          </a>
-          <button
-            type="button"
-            onClick={() => setRaw(true)}
-            className="relief rounded-control px-4 py-2 text-sm text-ink"
-          >
-            Open raw
-          </button>
-          <button type="button" onClick={close} className="relief rounded-control px-4 py-2 text-sm text-ink">
-            Close tab
-          </button>
-        </div>
-      </div>
+    const named = ext ? `a .${ext} file` : "this file";
+    return load.status === "binary" ? (
+      <CannotDisplay
+        path={path}
+        size={load.size}
+        title={`OTG Code cannot display ${named}`}
+        detail="Its bytes are not text. Downloading opens it in whatever app on your device knows the format — the raw contents are here too, if that is what you came for."
+      >
+        <button
+          type="button"
+          onClick={() => setRaw(true)}
+          className="relief rounded-control px-4 py-2 text-sm text-ink"
+        >
+          Open raw
+        </button>
+        <button type="button" onClick={close} className="relief rounded-control px-4 py-2 text-sm text-ink">
+          Close tab
+        </button>
+      </CannotDisplay>
+    ) : (
+      <CannotDisplay
+        path={path}
+        size={load.size}
+        title="This file is too large to open as text"
+        detail="Reading it into the editor would take more memory than the browser has. Downloading it does not: it streams."
+      >
+        <button type="button" onClick={close} className="relief rounded-control px-4 py-2 text-sm text-ink">
+          Close tab
+        </button>
+      </CannotDisplay>
     );
   }
 
