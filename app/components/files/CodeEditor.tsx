@@ -220,7 +220,10 @@ export default function CodeEditor({ path, content, onSave, onReload, stale }: C
   const canPreview = PREVIEWABLE.has(ext);
   const [value, setValue] = useState(content);
   const [dirty, setDirty] = useState(false);
-  const [mode, setMode] = useState<Mode>(canPreview ? "preview" : "edit");
+  // Opening a file shows it; editing it is a choice you make. Markdown and
+  // friends have a rendered form, everything else gets plain text — so what
+  // you land in never depends on the extension beyond that.
+  const [mode, setMode] = useState<Mode>(canPreview ? "preview" : "plain");
   const [modeMenu, setModeMenu] = useState(false);
   const modeMenuRef = useRef<HTMLDivElement>(null);
   const monacoRef = useRef<MonacoHandle | null>(null);

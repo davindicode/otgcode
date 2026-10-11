@@ -38,3 +38,16 @@ export function fileKind(path: string): FileKind {
 export function isDirectViewerFile(path: string): boolean {
   return fileKind(path) !== "text";
 }
+
+/**
+ * Whether a file's bytes are binary, by git's rule: a NUL in the first 8000.
+ *
+ * An extension list cannot answer this — .heic, .docx, .parquet and whatever
+ * the next machine has are all "text" to an allow-list that has not heard of
+ * them, and the editor then shows their bytes as mojibake. A NUL byte is what
+ * no text file in any encoding we can display contains, and every container
+ * format (zip, ISO-BMFF, ELF) has one in its header.
+ */
+export function looksBinary(bytes: Uint8Array): boolean {
+  return bytes.subarray(0, 8000).includes(0);
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fileKind, getExt, isDirectViewerFile } from "./fileTypes";
+import { fileKind, getExt, isDirectViewerFile, looksBinary } from "./fileTypes";
 
 describe("fileKind", () => {
   it("classifies each viewer's file types", () => {
@@ -44,5 +44,31 @@ describe("getExt", () => {
     expect(getExt("/a/.gitignore")).toBe("");
     // A dot in a directory name is not the file's extension.
     expect(getExt("/a.b/Makefile")).toBe("");
+  });
+});
+
+describe("looksBinary", () => {
+  const bytes = (...parts: (string | number[])[]) =>
+    new Uint8Array(parts.flatMap((p) => (typeof p === "string" ? [...p].map((c) => c.charCodeAt(0)) : p)));
+
+  it("spots the formats an extension list keeps missing", () => {
+    // A zip's local file header — .docx, .xlsx, .odt, .jar all start here.
+    expect(looksBinary(bytes("PK", [3, 4, 20, 0]))).toBe(true);
+    // ISO-BMFF, which is .heic and .mov: a length prefix, then "ftyp".
+    expect(looksBinary(bytes([0, 0, 0, 24], "ftypheic"))).toBe(true);
+    expect(looksBinary(bytes([0x7f], "ELF", [2, 1, 1, 0]))).toBe(true);
+  });
+
+  it("leaves text alone, including encodings we do not decode cleanly", () => {
+    expect(looksBinary(bytes("#!/bin/sh\necho hi\n"))).toBe(false);
+    // Latin-1: mojibake in the editor, but readable, so it is still text.
+    expect(looksBinary(bytes("caf", [0xe9], "\n"))).toBe(false);
+    expect(looksBinary(new Uint8Array(0))).toBe(false);
+  });
+
+  it("only reads the start, so a NUL deep in a big text file is not binary", () => {
+    const big = new Uint8Array(20000).fill(65);
+    big[9000] = 0;
+    expect(looksBinary(big)).toBe(false);
   });
 });

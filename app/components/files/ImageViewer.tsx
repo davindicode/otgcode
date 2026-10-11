@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import DownloadIcon from "~/components/DownloadIcon";
 import RefreshIcon from "~/components/RefreshIcon";
 import { showToast } from "~/stores/toastStore";
@@ -13,10 +13,41 @@ interface ImageViewerProps {
   stale: boolean;
 }
 
+/** The container's padding, which the image has to fit inside. */
+const PAD = 32;
+
 export default function ImageViewer({ path, onReload, version, stale }: ImageViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // What the pane can show, watched rather than read once: rotating a phone,
+  // opening the keyboard and splitting a window all change it. A zero-sized
+  // box means the tab is hidden (`display: none`), which has no size to fit to.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      if (el.clientWidth > 0 && el.clientHeight > 0) setBox({ w: el.clientWidth, h: el.clientHeight });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  /**
+   * Scale at which the whole image is visible — 100%, as every image viewer
+   * means it. Natural pixels are the wrong unit on a phone: a photo from that
+   * same phone is 4000px wide, so "100%" used to mean a tenth of one corner
+   * and a lot of dragging.
+   *
+   * Never above 1: a 48px icon blown up to fill a desktop pane is not what
+   * fitting it means, and the whole thing is visible either way.
+   */
+  const fit = !naturalSize || !box ? 1 : Math.min(1, (box.w - PAD) / naturalSize.w, (box.h - PAD) / naturalSize.h);
+  const scale = fit * zoom;
 
   // GIFs animate via the <img> itself; bumping a cache-busting param reloads the
   // image, which restarts the animation (a play-once gif can't otherwise replay).
@@ -121,6 +152,7 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
             </button>
             <button
               onClick={zoomFit}
+              title={`${Math.round(scale * 100)}% of actual size — tap to fit`}
               className="px-2 py-0.5 text-[10px] text-ink-dim hover:text-ink hover:bg-control tabular-nums"
             >
               {Math.round(zoom * 100)}%
@@ -159,12 +191,8 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
         <div
           className="flex items-center justify-center p-4"
           style={{
-            minWidth: naturalSize
-              ? Math.max(naturalSize.w * zoom + 32, containerRef.current?.clientWidth ?? 0)
-              : "100%",
-            minHeight: naturalSize
-              ? Math.max(naturalSize.h * zoom + 32, containerRef.current?.clientHeight ?? 0)
-              : "100%",
+            minWidth: naturalSize ? Math.max(naturalSize.w * scale + PAD, box?.w ?? 0) : "100%",
+            minHeight: naturalSize ? Math.max(naturalSize.h * scale + PAD, box?.h ?? 0) : "100%",
           }}
         >
           <img
@@ -177,8 +205,8 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
             style={
               naturalSize
                 ? {
-                    width: naturalSize.w * zoom,
-                    height: naturalSize.h * zoom,
+                    width: naturalSize.w * scale,
+                    height: naturalSize.h * scale,
                   }
                 : undefined
             }

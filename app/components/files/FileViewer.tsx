@@ -131,11 +131,12 @@ function MediaViewer({
 // choke; this keeps continuous scroll but mounts pages on demand.
 function LazyPdfPage({
   pageNumber,
-  scale,
+  width,
   root,
 }: {
   pageNumber: number;
-  scale: number;
+  /** Rendered page width in CSS pixels, already scaled. */
+  width: number;
   root: React.RefObject<HTMLDivElement | null>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -161,12 +162,11 @@ function LazyPdfPage({
   return (
     <div ref={ref} className="w-full flex justify-center">
       {render ? (
-        <Page pageNumber={pageNumber} scale={scale} className="shadow-lg" renderTextLayer renderAnnotationLayer />
+        <Page pageNumber={pageNumber} width={width} className="shadow-lg" renderTextLayer renderAnnotationLayer />
       ) : (
-        <div
-          className="w-full max-w-[800px] rounded-control bg-surface/40"
-          style={{ height: Math.round(1000 * scale) }}
-        />
+        // A4's aspect is exactly root 2, and close enough to Letter's, so the
+        // scrollbar barely moves as real pages replace these.
+        <div className="rounded-control bg-surface/40" style={{ width, height: Math.round(width * Math.SQRT2) }} />
       )}
     </div>
   );
@@ -185,7 +185,33 @@ function PdfViewer({
 }) {
   const [numPages, setNumPages] = useState<number>(0);
   const [scale, setScale] = useState(1.0);
+  const [paneWidth, setPaneWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Watched, not read once: rotating a phone or splitting a window changes it.
+  // A zero width means the tab is hidden, which is nothing to fit to.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      if (el.clientWidth > 0) setPaneWidth(el.clientWidth);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  /**
+   * Width of a page at 100%: the pane, less its padding. A PDF page is sized
+   * in points — 612 for US Letter — and rendering that as 612 CSS pixels is
+   * wider than a phone, which is why every document opened half off-screen.
+   *
+   * Capped, because fitting the width of a 2500px desktop pane means rendering
+   * a page at four times its size: slow, and nobody reads at that size.
+   * ponytail: fixed cap, make it a "fit width / fit page" control if asked.
+   */
+  const pageWidth = Math.round(Math.min(Math.max(paneWidth - 32, 180), 1000) * scale);
 
   const zoomIn = () => setScale((s) => Math.min(3, s + 0.25));
   const zoomOut = () => setScale((s) => Math.max(0.25, s - 0.25));
@@ -215,6 +241,7 @@ function PdfViewer({
             </button>
             <button
               onClick={zoomFit}
+              title="Fit the page to the width of the pane"
               className="px-2 py-0.5 text-[10px] text-ink-dim hover:text-ink hover:bg-control tabular-nums"
             >
               {Math.round(scale * 100)}%
@@ -252,7 +279,7 @@ function PdfViewer({
         >
           <div className="flex flex-col items-center gap-2 p-4">
             {Array.from({ length: numPages }, (_, i) => (
-              <LazyPdfPage key={i + 1} pageNumber={i + 1} scale={scale} root={containerRef} />
+              <LazyPdfPage key={i + 1} pageNumber={i + 1} width={pageWidth} root={containerRef} />
             ))}
           </div>
         </Document>
