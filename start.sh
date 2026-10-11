@@ -116,7 +116,34 @@ if [ -f .env ]; then
   set +a
 fi
 
+# ---------------------------------------------------------------------------
+# Options
+#
+# The flag beats OTG_PORT from .env, so one checkout can be started twice on
+# two ports without editing anything. Validated here rather than left to the
+# server, where a non-numeric port becomes NaN and listens on a random one.
+# ---------------------------------------------------------------------------
+usage() {
+  printf '  %sUsage%s  ./start.sh [--port N]\n\n' "$BOLD" "$RESET"
+  printf '    -p, --port N   port to serve on (default 7777, or OTG_PORT)\n'
+  printf '    -h, --help     this\n\n'
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p|--port) OTG_PORT="${2:-}"; shift 2 ;;
+    --port=*)  OTG_PORT="${1#*=}"; shift ;;
+    -h|--help) printf '\n'; usage; exit 0 ;;
+    *) printf '\n  %s%s%s Unknown option: %s\n\n' "$RED" "$MARK_BAD" "$RESET" "$1"; usage; exit 1 ;;
+  esac
+done
+
 PORT="${OTG_PORT:-7777}"
+case "$PORT" in
+  ''|*[!0-9]*) die "Port \"$PORT\" is not a number." "  ${DIM}Example: ./start.sh --port 8080${RESET}\n" ;;
+esac
+[ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || die "Port $PORT is out of range." "  ${DIM}Pick one between 1 and 65535.${RESET}\n"
+export OTG_PORT="$PORT"
 VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)
 
 printf '\n  %sOTG Code%s %sv%s%s\n' "$BOLD" "$RESET" "$DIM" "${VERSION:-?}" "$RESET"

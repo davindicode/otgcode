@@ -87,7 +87,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (password, staySignedIn) => {
     const error = await post("/api/auth/login", { password, staySignedIn });
     if (error) return error;
-    set({ authenticated: true });
+    // Re-read rather than set `authenticated` by hand: the session that just
+    // started is the only thing that knows when it started, and the account
+    // popup reads that from here.
+    await get().refresh();
     return null;
   },
 
@@ -101,7 +104,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setPassword: async (newPassword, currentPassword) => {
     const error = await post("/api/auth/password", { newPassword, currentPassword });
     if (error) return error;
-    set({ configured: true, enabled: true, authenticated: true });
+    await get().refresh();
     return null;
   },
 

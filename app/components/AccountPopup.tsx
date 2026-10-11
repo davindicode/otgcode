@@ -89,14 +89,13 @@ export default function AccountPopup({ onClose }: { onClose: () => void }) {
 
       <div className="px-3 py-2">
         <Row label="User" value={<span className="font-mono">{user || "unknown"}</span>} />
-        {enabled && since !== null ? (
+        {since !== null && (
           <>
             <Row label="Online" value={duration(Date.now() - since)} />
             <Row label="Signed in" value={clock(since)} />
           </>
-        ) : (
-          <Row label="Login" value={enabled ? "this session" : "not required"} />
         )}
+        {!enabled && <Row label="Login" value="not required" />}
       </div>
 
       {enabled ? (
