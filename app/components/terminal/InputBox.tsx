@@ -66,6 +66,15 @@ interface CliVendor {
   name: string;
   keys: QuickKey[];
   launch: { label: string; title: string; command: string }[];
+  /**
+   * Typed into the CLI *without* a trailing Enter.
+   *
+   * An Enter in the same write as the text does not submit: measured against
+   * opencode, both `/help\n` and `/help\r` leave the command sitting in the
+   * input box, while writing `/help` and then `\r` opens the palette and runs
+   * it. So the command used to end up as prose in a prompt rather than a
+   * command. The Enter button beside these chips is that second write.
+   */
   slashCmds: { label: string; title: string; command: string }[];
 }
 
@@ -89,20 +98,20 @@ const CLI_VENDORS: CliVendor[] = [
       },
     ],
     slashCmds: [
-      { label: "/clear", title: "Clear conversation context", command: "/clear\n" },
-      { label: "/compact", title: "Compact conversation to save context", command: "/compact\n" },
-      { label: "/cost", title: "Show token usage and cost", command: "/cost\n" },
-      { label: "/help", title: "Show available commands", command: "/help\n" },
-      { label: "/model", title: "Show or switch model", command: "/model\n" },
-      { label: "/exit", title: "Exit Claude Code", command: "/exit\n" },
-      { label: "/config", title: "Open config", command: "/config\n" },
-      { label: "/memory", title: "Edit CLAUDE.md memory", command: "/memory\n" },
-      { label: "/review", title: "Review a PR", command: "/review\n" },
-      { label: "/context", title: "Show context window usage", command: "/context\n" },
-      { label: "/resume", title: "Resume a past session", command: "/resume\n" },
-      { label: "/agents", title: "Manage subagents", command: "/agents\n" },
-      { label: "/status", title: "Show account and system status", command: "/status\n" },
-      { label: "/vim", title: "Toggle vim mode", command: "/vim\n" },
+      { label: "/clear", title: "Clear conversation context", command: "/clear" },
+      { label: "/compact", title: "Compact conversation to save context", command: "/compact" },
+      { label: "/cost", title: "Show token usage and cost", command: "/cost" },
+      { label: "/help", title: "Show available commands", command: "/help" },
+      { label: "/model", title: "Show or switch model", command: "/model" },
+      { label: "/exit", title: "Exit Claude Code", command: "/exit" },
+      { label: "/config", title: "Open config", command: "/config" },
+      { label: "/memory", title: "Edit CLAUDE.md memory", command: "/memory" },
+      { label: "/review", title: "Review a PR", command: "/review" },
+      { label: "/context", title: "Show context window usage", command: "/context" },
+      { label: "/resume", title: "Resume a past session", command: "/resume" },
+      { label: "/agents", title: "Manage subagents", command: "/agents" },
+      { label: "/status", title: "Show account and system status", command: "/status" },
+      { label: "/vim", title: "Toggle vim mode", command: "/vim" },
     ],
   },
   {
@@ -121,11 +130,11 @@ const CLI_VENDORS: CliVendor[] = [
       { label: "full-auto", title: "Runs without confirmation", command: "codex --approval-mode full-auto\n" },
     ],
     slashCmds: [
-      { label: "/help", title: "Show available commands", command: "/help\n" },
-      { label: "/model", title: "Show or switch model", command: "/model\n" },
-      { label: "/exit", title: "Exit Codex", command: "/exit\n" },
-      { label: "/clear", title: "Clear conversation", command: "/clear\n" },
-      { label: "/approval", title: "Change approval mode", command: "/approval\n" },
+      { label: "/help", title: "Show available commands", command: "/help" },
+      { label: "/model", title: "Show or switch model", command: "/model" },
+      { label: "/exit", title: "Exit Codex", command: "/exit" },
+      { label: "/clear", title: "Clear conversation", command: "/clear" },
+      { label: "/approval", title: "Change approval mode", command: "/approval" },
     ],
   },
   {
@@ -140,10 +149,10 @@ const CLI_VENDORS: CliVendor[] = [
     ],
     launch: [{ label: "opencode", title: "Interactive mode", command: "opencode\n" }],
     slashCmds: [
-      { label: "/help", title: "Show available commands", command: "/help\n" },
-      { label: "/exit", title: "Exit OpenCode", command: "/exit\n" },
-      { label: "/clear", title: "Clear conversation", command: "/clear\n" },
-      { label: "/compact", title: "Compact context", command: "/compact\n" },
+      { label: "/help", title: "Show available commands", command: "/help" },
+      { label: "/exit", title: "Exit OpenCode", command: "/exit" },
+      { label: "/clear", title: "Clear conversation", command: "/clear" },
+      { label: "/compact", title: "Compact context", command: "/compact" },
     ],
   },
 ];
@@ -893,7 +902,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                         .map((c) => ({ label: c.label, command: c.command, title: c.title })),
                       ...customSlash
                         .filter((c) => c.vendor === vendor.name)
-                        .map((c) => ({ label: c.label, command: `${c.command}\n`, title: c.command, custom: true })),
+                        .map((c) => ({ label: c.label, command: c.command, title: c.command, custom: true })),
                     ];
                     return (
                       <div className="min-w-0 flex-1">
@@ -904,7 +913,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                           disabled={!sessionId}
                           chipClass="px-2 py-0.5 text-[11px] relief text-cyan-300 hover:text-cyan-100 rounded-control whitespace-nowrap select-none"
                           dialogTitle={`Add ${vendor.name} slash command`}
-                          dialogHint={`Sent to ${vendor.name} when tapped. Saved for ${vendor.name} only.`}
+                          dialogHint={`Typed into ${vendor.name} when tapped — press Enter to run. Saved for ${vendor.name} only.`}
                           commandPlaceholder="/review"
                           onRun={(command) => sessionId && sendInput(sessionId, command)}
                           onAdd={(label, command) => addSlash({ vendor: vendor.name, label, command })}
