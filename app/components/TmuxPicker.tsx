@@ -3,6 +3,7 @@ import { apiPost } from "~/lib/api";
 import { errorMessage } from "~/lib/errors";
 import { useTabsStore } from "~/stores/tabsStore";
 import { useToastStore } from "~/stores/toastStore";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface TmuxSession {
   name: string;
@@ -29,6 +30,8 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
   const [version, setVersion] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  /** The session whose X was tapped. Killing one ends its processes for good. */
+  const [killing, setKilling] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -94,6 +97,20 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
         if (!panelRef.current?.contains(e.target as Node)) onClose();
       }}
     >
+      {killing && (
+        <ConfirmDialog
+          title={`Kill ${killing}?`}
+          body="Every window and process in the session ends. This cannot be undone, and any tab attached to it closes."
+          confirmLabel="Kill session"
+          danger
+          onConfirm={() => {
+            const name = killing;
+            setKilling(null);
+            kill(name);
+          }}
+          onCancel={() => setKilling(null)}
+        />
+      )}
       <div
         ref={panelRef}
         role="dialog"
@@ -133,7 +150,7 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
                     {s.attached && <span className="ml-1 text-green-400">•</span>}
                   </button>
                   <button
-                    onClick={() => kill(s.name)}
+                    onClick={() => setKilling(s.name)}
                     disabled={busy}
                     className="py-0.5 pl-0.5 pr-1.5 text-ink-ghost transition-colors hover:text-red-400"
                     title={`Kill ${s.name} and close its tab`}
