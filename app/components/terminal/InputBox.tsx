@@ -53,6 +53,22 @@ const TERMINAL_GROUPS: QuickKeyGroup[] = [
   },
 ];
 
+/**
+ * Answering a coding CLI: its multiple-choice prompts are an arrow-key list,
+ * and taking back a typo is Bksp. Both sit next to Enter because all three are
+ * one interaction — read the question, move, confirm.
+ *
+ * Sequences come from the main set rather than being respelled here, so DEL vs
+ * BS and `CSI A` vs `SS3 A` are decided in one place.
+ */
+const CODE_NAV_KEYS: QuickKey[] = [
+  { label: "Bksp", title: "Backspace" },
+  { label: "↑", title: "Up — previous option" },
+  { label: "↓", title: "Down — next option" },
+  { label: "←", title: "Left" },
+  { label: "→", title: "Right" },
+].map((k) => ({ ...k, key: comboSequence(k.label, "none") }));
+
 // Keys every coding CLI shares, shown with that CLI's own.
 const CODE_COMMON_KEYS: QuickKey[] = [
   { label: "Ctrl+C", key: "\x03", title: "Cancel / interrupt / quit" },
@@ -995,7 +1011,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                     >
                       Enter
                     </button>
-                    {[...CODE_COMMON_KEYS, ...vendor.keys].map((qk) => (
+                    {[...CODE_NAV_KEYS, ...CODE_COMMON_KEYS, ...vendor.keys].map((qk) => (
                       <button
                         key={`${vendor.name}-${qk.label}`}
                         {...repeatProps(qk.key)}
