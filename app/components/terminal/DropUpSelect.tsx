@@ -9,15 +9,28 @@ import { createPortal } from "react-dom";
  * the bottom of the screen: a downward menu would be off-screen, and the
  * drawer clips its own overflow.
  */
+/**
+ * Each selector in a row gets its own hue, so a label and the value it governs
+ * read as one control rather than four words in a line. The label is the same
+ * hue held back, which is what pairs them without competing with the value.
+ */
+const TINTS = {
+  sky: { name: "text-sky-400/60", value: "text-sky-300 hover:text-sky-200" },
+  emerald: { name: "text-emerald-400/60", value: "text-emerald-300 hover:text-emerald-200" },
+} as const;
+
 export default function DropUpSelect<T extends string>({
   value,
   options,
   onChange,
   name,
+  tint,
 }: {
   value: T;
   options: { id: T; label: string }[];
   onChange: (id: T) => void;
+  /** Hue for this selector. Plain ink when there is only one in the row. */
+  tint?: keyof typeof TINTS;
   /**
    * Static label in front of the trigger, for when the current value alone is
    * ambiguous. Outside the button on purpose: what you can tap is the triangle
@@ -52,14 +65,20 @@ export default function DropUpSelect<T extends string>({
 
   return (
     <>
-      {name && <span className="shrink-0 select-none text-[10px] text-ink-ghost">{name}:</span>}
+      {name && (
+        <span className={`shrink-0 select-none text-[10px] ${tint ? TINTS[tint].name : "text-ink-ghost"}`}>
+          {name}:
+        </span>
+      )}
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex shrink-0 select-none items-center gap-0.5 pt-0.5 text-[10px] font-medium text-ink-dim hover:text-ink"
+        className={`flex shrink-0 select-none items-center gap-0.5 pt-0.5 text-[10px] font-medium ${
+          tint ? TINTS[tint].value : "text-ink-dim hover:text-ink"
+        }`}
       >
         {/* Points the way the menu opens — up, from a drawer at the bottom of
             the screen — and flips once it is open. */}

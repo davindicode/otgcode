@@ -893,11 +893,18 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                   <>
                     <DropUpSelect
                       name="mode"
+                      tint="sky"
                       value={keySet}
                       options={COMBO_SETS.map((set) => ({ id: set, label: set }))}
                       onChange={setKeySet}
                     />
-                    <DropUpSelect name="combo" value={comboMode} options={COMBO_MODES} onChange={setComboMode} />
+                    <DropUpSelect
+                      name="combo"
+                      tint="emerald"
+                      value={comboMode}
+                      options={COMBO_MODES}
+                      onChange={setComboMode}
+                    />
                   </>
                 )}
 
