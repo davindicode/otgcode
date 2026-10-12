@@ -80,6 +80,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   connection exhaustion, a protocol-revision mismatch on upgrade, and
   zero-attachment memory exhaustion. The remaining dependency alerts were
   checked against this app and do not reach it.
+- **`pnpm audit` is clean.** 41 advisories down to one, almost all of them
+  already allowed by the declared ranges and only waiting on a lockfile
+  refresh — three of the pnpm overrides had become the thing holding us *on* a
+  vulnerable release, and their floors now name the patched version
+  (`undici` 7.29.1, `postcss` 8.5.23, `qs` 6.16.0). The `react-router` family
+  moves 7.18.0 → 7.18.4, which closes an RSC-mode CSRF advisory and puts the
+  four packages back on one version: `@react-router/express` had floated ahead
+  of the three that were pinned exactly.
+- The one advisory left has no fix to take: `braces` stack exhaustion on deeply
+  nested patterns, where 3.0.3 is the latest release and `micromatch` 4 still
+  depends on it, `http-proxy-middleware` 4 included. It is also unreachable
+  here — neither proxy passes a `pathFilter`, so micromatch never compiles a
+  pattern and no user input reaches one. Recorded in `pnpm.auditConfig` with
+  that reasoning instead of leaving the audit permanently red.
 
 <!-- earlier in this cycle -->
 
