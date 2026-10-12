@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { usePresenceStore } from "~/stores/presenceStore";
+import { useTerminalStore } from "~/stores/terminalStore";
 
 function ago(since: number): string {
   const mins = Math.floor((Date.now() - since) / 60000);
@@ -19,15 +20,33 @@ function ago(since: number): string {
  * it at once used to mean each one silently killing the other's terminals.
  * Two devices on the same terminal is what a tmux tab is for.
  *
- * There is nothing to press. A "take over" button meant anyone who reached the
- * tunnel URL could pull a live terminal out from under whoever was using it —
- * on a phone, by mistapping. Waiting is the safe default: the session frees
- * itself when the other device signs out, closes the tab or its session
- * expires, and this reconnects on its own when it does.
+ * The only button asks the server again. A "take over" button meant anyone who
+ * reached the tunnel URL could pull a live terminal out from under whoever was
+ * using it — on a phone, by mistapping. Nothing here reconnects on a timer
+ * either: the handshake that put this screen up was the check, and only the
+ * other device can give the session up, so a poll would be a question asked
+ * over and over on the off-chance. One tap is cheaper and says more.
  */
 export default function SessionGate() {
   const status = usePresenceStore((s) => s.status);
   const since = usePresenceStore((s) => s.since);
+  const lastCheck = usePresenceStore((s) => s.lastCheck);
+  const retryNow = useTerminalStore((s) => s.retryNow);
+
+  /**
+   * The `lastCheck` the current tap was made against, wrapped so that checking
+   * against `null` — the displaced case, which has no refusal behind it yet —
+   * is still distinguishable from not checking at all. A refusal bumps
+   * `lastCheck`, so the comparison alone ends the wait; the timeout is for a
+   * server that answers nothing.
+   */
+  const [pending, setPending] = useState<{ from: number | null } | null>(null);
+  const checking = pending !== null && pending.from === lastCheck;
+  useEffect(() => {
+    if (!checking) return;
+    const id = setTimeout(() => setPending(null), 6000);
+    return () => clearTimeout(id);
+  }, [checking]);
 
   // The "in use since" line would otherwise stay frozen at its first render.
   const [, tick] = useState(0);
@@ -69,15 +88,29 @@ export default function SessionGate() {
           {!displaced && since && <span className="text-ink-faint"> Connected {ago(since)}.</span>}
         </p>
 
-        <div className="flex items-center gap-2 text-[11px] text-ink-faint">
-          <span className="spinner spinner-sm" aria-hidden="true" />
-          Waiting for it to be free
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              setPending({ from: lastCheck });
+              retryNow();
+            }}
+            disabled={checking}
+            className="relief-accent shrink-0 rounded-control px-3 py-1.5 text-[12px] text-white disabled:opacity-60"
+          >
+            {checking ? "Checking…" : "Check now"}
+          </button>
+          {checking ? (
+            <span className="spinner spinner-sm" aria-hidden="true" />
+          ) : (
+            lastCheck !== null && (
+              <span className="text-[11px] text-ink-faint">Still in use as of {ago(lastCheck)}</span>
+            )
+          )}
         </div>
 
         <p className="text-[11px] leading-relaxed text-ink-ghost">
-          Sign out on the other device, close its tab, or let its session expire — this one takes over the moment it
-          does. Nothing here can disconnect it, so a terminal you are using cannot be pulled away from you. tmux
-          sessions keep running either way, and a tmux tab re-attaches to them.
+          Sign out on the other device, close its tab, or let its session expire.
         </p>
       </div>
     </div>

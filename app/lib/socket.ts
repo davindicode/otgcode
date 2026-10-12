@@ -15,12 +15,6 @@ export function getSocket(): Socket {
       // this one coming back rather than a new one arriving.
       auth: { deviceId: deviceId() },
     });
-
-    // Takeover is a one-shot: left set, every automatic reconnect would
-    // silently displace whoever holds the session by then.
-    socket.on("connect", () => {
-      if (socket) socket.auth = { deviceId: deviceId() };
-    });
   }
   return socket;
 }

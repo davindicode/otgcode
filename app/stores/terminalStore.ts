@@ -37,6 +37,8 @@ interface TerminalState {
   defaultCwd: string;
 
   initSocket: () => void;
+  /** Ask the server for the session again, on the user's say-so. */
+  retryNow: () => void;
   createSession: (sessionId: string, name?: string, cwd?: string, tmuxSession?: string, tmuxSessionId?: string) => void;
   registerTerminal: (sessionId: string, terminal: Terminal, fitAddon: FitAddon) => void;
   sendInput: (sessionId: string, data: string) => void;
@@ -61,10 +63,6 @@ interface TerminalState {
 }
 
 let socketInitialized = false;
-
-/** How long to wait before asking again for a session another device holds. */
-const PRESENCE_RETRY_MS = 5000;
-let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Bumped on every socket connection. A session carries the generation its pty
@@ -194,29 +192,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
     const socket = getSocket();
 
-    /**
-     * Try again, once, in a few seconds.
-     *
-     * Nothing in the app can take the session off the device that holds it, so
-     * this is the only way back in: the other device signs out, closes its tab
-     * or goes idle, and the next attempt lands. Socket.IO's own reconnection
-     * is no use here — it would hammer a handshake that is being deliberately
-     * refused, and it gives up after a while.
-     */
-    const retryWhenFree = () => {
-      if (retryTimer) return;
-      retryTimer = setTimeout(() => {
-        retryTimer = null;
-        socket.connect();
-      }, PRESENCE_RETRY_MS);
-    };
-
     socket.on("connect", () => {
       generation += 1;
-      if (retryTimer) {
-        clearTimeout(retryTimer);
-        retryTimer = null;
-      }
       set({ socketConnected: true });
       usePresenceStore.getState().clear();
 
@@ -255,17 +232,15 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       if (err?.message === "busy") {
         usePresenceStore.getState().setBusy(err.data?.since ?? null);
         socket.disconnect();
-        retryWhenFree();
       }
     });
 
-    // Another device took the session. Stand down, then wait for it the same
-    // way a device that never had it waits — rather than reconnecting straight
-    // back into a fight over the same lock.
+    // Another device took the session. Stand down and stay down: reconnecting
+    // on our own would be a tug of war over the same lock, and the gate has a
+    // Check now button for when the user wants back in.
     socket.on("displaced", () => {
       usePresenceStore.getState().setDisplaced();
       socket.disconnect();
-      retryWhenFree();
     });
 
     socket.on("terminal_ready", (data: { sessionId: string }) => {
@@ -355,6 +330,12 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         },
       });
     });
+  },
+
+  // Nothing retries on its own: the session is held by a device this one
+  // cannot touch, so the only honest trigger is the user asking.
+  retryNow: () => {
+    getSocket().connect();
   },
 
   createSession: (sessionId, name, cwd, tmuxSession, tmuxSessionId) => {
