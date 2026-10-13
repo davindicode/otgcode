@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fileKind, getExt, isDirectViewerFile, looksBinary } from "./fileTypes";
+import { contentDisposition, fileKind, getExt, isDirectViewerFile, looksBinary } from "./fileTypes";
 
 describe("fileKind", () => {
   it("classifies each viewer's file types", () => {
@@ -70,5 +70,30 @@ describe("looksBinary", () => {
     const big = new Uint8Array(20000).fill(65);
     big[9000] = 0;
     expect(looksBinary(big)).toBe(false);
+  });
+});
+
+describe("contentDisposition", () => {
+  it("carries a plain name in both parameters", () => {
+    expect(contentDisposition("notes.txt")).toBe("attachment; filename=\"notes.txt\"; filename*=UTF-8''notes.txt");
+  });
+
+  it("keeps a non-ASCII name readable, flattening only the ASCII copy", () => {
+    const value = contentDisposition("ファイル.txt");
+    expect(value).toContain('filename="____.txt"');
+    expect(value).toContain("filename*=UTF-8''%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB.txt");
+  });
+
+  it("cannot be used to end the quoted string or add a header", () => {
+    const value = contentDisposition('evil".txt\r\nX-Injected: 1');
+    expect(value).not.toContain("\r");
+    expect(value).not.toContain("\n");
+    // One opening and one closing quote, so nothing escapes the parameter.
+    expect(value.match(/"/g)).toHaveLength(2);
+  });
+
+  it("marks inline only when asked", () => {
+    expect(contentDisposition("a.png", true).startsWith("inline;")).toBe(true);
+    expect(contentDisposition("a.png").startsWith("attachment;")).toBe(true);
   });
 });

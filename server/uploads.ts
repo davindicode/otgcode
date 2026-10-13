@@ -58,10 +58,14 @@ function answer(req: Request, res: Response) {
 /**
  * Busboy throws synchronously on a body that is not multipart, which reaches
  * Express as an unhandled error and answers with an HTML stack trace.
+ *
+ * `defParamCharset` is the filename's encoding, and busboy defaults it to
+ * latin1 — so a phone uploading `テスト.txt` wrote `ãã¹ã.txt` to the host,
+ * each UTF-8 byte having become its own character. Browsers send UTF-8.
  */
 function parseMultipart(req: Request, reply: ReturnType<typeof answer>) {
   try {
-    return Busboy({ headers: req.headers });
+    return Busboy({ headers: req.headers, defParamCharset: "utf8" });
   } catch {
     reply.fail(400, "Expected a file upload");
     return null;

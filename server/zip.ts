@@ -3,6 +3,7 @@ import { access, constants, readdir, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { ZipArchive } from "archiver";
 import type { Express } from "express";
+import { contentDisposition } from "../app/lib/fileTypes.js";
 
 /** A file to put in the archive: where it is, and what it is called inside. */
 interface Entry {
@@ -122,7 +123,7 @@ export function mountZipRoute(app: Express): void {
     const tree = await plan(paths);
 
     res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="${name.replace(/"/g, "")}"`);
+    res.setHeader("Content-Disposition", contentDisposition(name));
 
     const archive = new ZipArchive({ level: 9 });
     archive.on("error", (err: Error) => {

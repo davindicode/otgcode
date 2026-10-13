@@ -51,3 +51,27 @@ export function isDirectViewerFile(path: string): boolean {
 export function looksBinary(bytes: Uint8Array): boolean {
   return bytes.subarray(0, 8000).includes(0);
 }
+
+/**
+ * A `Content-Disposition` value that survives a non-ASCII filename.
+ *
+ * Both header APIs reject a character above 255 — Node's `setHeader` throws
+ * `ERR_INVALID_CHAR`, and fetch's `Headers` refuses to make a ByteString of it
+ * — so a file called `ファイル.txt` used to fail its own download: 500 from the
+ * zip route, 400 from the single-file one. An accented Latin name slipped
+ * through only because it fits in one byte.
+ *
+ * RFC 6266 is the way out, and needs both halves: a flattened ASCII `filename`
+ * for anything that reads only that, and a percent-encoded UTF-8 `filename*`,
+ * which browsers prefer when present. Flattening also closes the quoted string
+ * against a name carrying a quote, a backslash or a newline — the zip route
+ * takes its name from the query, where a CRLF would otherwise be a header of
+ * the caller's choosing.
+ */
+export function contentDisposition(name: string, inline = false): string {
+  const ascii = name.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "");
+  // encodeURIComponent leaves !'()* alone, and RFC 5987's attr-char does not
+  // allow them.
+  const utf8 = encodeURIComponent(name).replace(/['()*!]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `${inline ? "inline" : "attachment"}; filename="${ascii}"; filename*=UTF-8''${utf8}`;
+}

@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import { Readable } from "node:stream";
 import { lookup } from "mime-types";
 import { fsErrorMessage } from "~/lib/errors";
+import { contentDisposition } from "~/lib/fileTypes";
 import type { Route } from "./+types/files.download";
 
 type ByteRange = { start: number; end: number };
@@ -53,7 +54,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     const commonHeaders = {
       "Accept-Ranges": "bytes",
       "Content-Type": mimeType,
-      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${name}"`,
+      "Content-Disposition": contentDisposition(name, inline),
     };
 
     if (rangeHeader && !range) {

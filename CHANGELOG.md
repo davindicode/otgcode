@@ -210,6 +210,17 @@ workspace that is saved on the host rather than in the browser.
   pointed at a path on the host. Its bytes are copied instead. A link to a
   directory is left out rather than followed, since one pointing back up its
   own tree would recurse until the archive filled the disk.
+- **A file with a non-ASCII name could not be downloaded at all.** Both header
+  APIs reject a character above 255, so `ファイル.txt` failed its own download —
+  500 from the zip route, 400 from the single-file one — while an accented Latin
+  name slipped through only because it fits in one byte. Downloads now send the
+  RFC 6266 pair: a flattened ASCII `filename` and a percent-encoded UTF-8
+  `filename*`. The same flattening closes the zip route's name, which comes
+  from the query, against a newline that would otherwise add a header.
+- **An uploaded file with a non-ASCII name arrived mangled** — `テスト.txt`
+  was written as `ãã¹ã.txt`, every UTF-8 byte having become its own
+  character, because the multipart parser defaults a filename to latin1 while
+  browsers send UTF-8.
 - **A slash-command chip never ran its command.** It sent the text and a newline
   in one write, which a coding CLI reads as a prompt rather than a submit.
 - **A new tab could take a name already on the strip** — closing Explorer 1
