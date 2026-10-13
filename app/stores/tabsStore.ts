@@ -113,9 +113,23 @@ export function reorder<T>(items: T[], from: number, to: number): T[] {
   return rest;
 }
 
-function nextTitle(tabs: Tab[], kind: TabKind, label: string): string {
-  const used = tabs.filter((t) => t.kind === kind).length;
-  return `${label} ${used + 1}`;
+/**
+ * `label N` with the lowest N no tab is using.
+ *
+ * Counting the tabs of a kind was wrong in both directions. Close Explorer 1
+ * while Explorer 2 is open and the count says 1, so the next tab is a second
+ * Explorer 2; rename a tab to Explorer 3 and the count cannot see it at all.
+ * Reading the names is the only thing that survives renaming and closing,
+ * which is the whole reason this function exists.
+ *
+ * Every tab is checked, not just this kind: the user reads one strip of tabs,
+ * and two tabs reading `Explorer 2` are confusing whatever is behind them.
+ */
+export function nextTitle(tabs: Tab[], label: string): string {
+  const taken = new Set(tabs.map((t) => t.title));
+  let n = 1;
+  while (taken.has(`${label} ${n}`)) n++;
+  return `${label} ${n}`;
 }
 
 export const useTabsStore = create<TabsState>((set, get) => ({
@@ -125,7 +139,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   openTerminal: ({ id, title, cwd } = {}) => {
     const tabId = id ?? nextId("terminal");
-    const name = title || nextTitle(get().tabs, "terminal", "Terminal");
+    const name = title || nextTitle(get().tabs, "Terminal");
     useTerminalStore.getState().createSession(tabId, name, cwd || undefined);
     set((s) => ({ tabs: [...s.tabs, { id: tabId, kind: "terminal", title: name }], activeId: tabId }));
     return tabId;
@@ -133,7 +147,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   openExplorer: ({ id, title, cwd } = {}) => {
     const tabId = id ?? nextId("explorer");
-    const name = title || nextTitle(get().tabs, "explorer", "Explorer");
+    const name = title || nextTitle(get().tabs, "Explorer");
     useFileStore.getState().createSession(tabId, name, cwd);
     set((s) => ({ tabs: [...s.tabs, { id: tabId, kind: "explorer", title: name }], activeId: tabId }));
     return tabId;

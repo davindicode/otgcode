@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { insertIndexFor, reorder, type Tab } from "./tabsStore";
+import { insertIndexFor, nextTitle, reorder, type Tab } from "./tabsStore";
 
 const explorer = (id: string): Tab => ({ id, kind: "explorer", title: id });
+const named = (kind: Tab["kind"], title: string): Tab => ({ id: title, kind, title }) as Tab;
 const terminal = (id: string): Tab => ({ id, kind: "terminal", title: id });
 const viewer = (id: string, openedFrom?: string): Tab => ({
   id,
@@ -66,5 +67,32 @@ describe("reorder", () => {
 
   it("clamps a drop past the end", () => {
     expect(reorder(strip, 1, 99)).toEqual(["a", "c", "d", "b"]);
+  });
+});
+
+describe("nextTitle", () => {
+  it("starts at 1", () => {
+    expect(nextTitle([], "Explorer")).toBe("Explorer 1");
+  });
+
+  it("fills the gap left by a closed tab", () => {
+    // The bug this replaced: counting one open tab proposed "Explorer 2"
+    // again, so the strip showed two of them.
+    expect(nextTitle([named("explorer", "Explorer 2")], "Explorer")).toBe("Explorer 1");
+  });
+
+  it("skips past a name a rename took", () => {
+    const tabs = [named("explorer", "Explorer 1"), named("terminal", "Explorer 2")];
+    expect(nextTitle(tabs, "Explorer")).toBe("Explorer 3");
+  });
+
+  it("counts up only while the numbers are contiguous", () => {
+    const tabs = [named("terminal", "Terminal 1"), named("terminal", "Terminal 2")];
+    expect(nextTitle(tabs, "Terminal")).toBe("Terminal 3");
+  });
+
+  it("ignores tabs named something else entirely", () => {
+    const tabs = [named("terminal", "build"), named("tmux", "dev")];
+    expect(nextTitle(tabs, "Terminal")).toBe("Terminal 1");
   });
 });
