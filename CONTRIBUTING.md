@@ -31,7 +31,8 @@ CI runs these on every PR; they must pass.
 pnpm lint         # Biome lint + format check (biome ci)
 pnpm format       # auto-fix formatting and safe lint issues
 pnpm typecheck    # React Router typegen + tsc
-pnpm run build    # production build
+pnpm test         # Vitest
+pnpm build        # production build
 ```
 
 ## Code style
@@ -61,7 +62,7 @@ the changelog — there is no separate security-advisory file.
 
 1. Branch off `main`.
 2. Make your change; keep commits focused and Conventionally named.
-3. Ensure `pnpm lint`, `pnpm typecheck`, and `pnpm run build` pass.
+3. Ensure `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build` pass.
 4. Open a PR against `main` with a short description of what and why.
 
 ## Releasing (maintainers)
@@ -70,11 +71,14 @@ Releases are cut manually:
 
 1. Update the version in `package.json` and add a section to `CHANGELOG.md`
    (group changes under Added / Changed / Fixed / Security).
-2. Merge to `main`.
-3. Tag and push: `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`.
-4. Create a GitHub Release for the tag, using the changelog section as the notes.
+2. Check `pnpm audit` is clean. An advisory with no published fix is recorded
+   in `pnpm.auditConfig` with the reason it does not apply, so that a red audit
+   always means something new.
+3. Merge to `main`.
+4. Tag and push: `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`.
+5. Create a GitHub Release for the tag, using the changelog section as the notes.
 
-The in-app version (shown in the header) is read from `package.json` at build
+The in-app version (System Info popup) is read from `package.json` at build
 time, so bumping `package.json` is enough to update it.
 
 ## Project layout
@@ -87,9 +91,12 @@ app/                  React Router (SSR) frontend
   lib/                shared client helpers (clipboard, socket, constants)
 server/               Node backend
   index.ts            Express + Socket.IO entry
+  auth.ts             access password, sessions, handshake gate
+  presence.ts         one device at a time
   pty-manager.ts      node-pty terminal sessions
   socket-handlers.ts  realtime terminal I/O
   proxy.ts            reverse proxy
   tunnel.ts           Cloudflare quick-tunnel management
+  uploads.ts          streamed and chunked uploads
 start.sh              builds, installs cloudflared, runs server + tunnel
 ```

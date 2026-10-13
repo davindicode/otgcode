@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/github/package-json/v/davindicode/otgcode?color=blue" alt="Version">
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status: alpha">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
-  <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen" alt="Node >= 20">
+  <img src="https://img.shields.io/badge/node-%3E%3D20.19-brightgreen" alt="Node >= 20.19">
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20WSL2-lightgrey" alt="Platform: Linux, macOS, WSL2">
   <img src="https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/React_Router-v7-red?logo=reactrouter&logoColor=white" alt="React Router">
@@ -43,22 +43,25 @@ Every release is described in [CHANGELOG.md](CHANGELOG.md).
 
 One pane with a single tab strip, VS Code style. Tabs come in four kinds — **Terminal**, **tmux session**, **Explorer**, and the **viewer/editor** tabs that open when you pick a file in an explorer. A tmux tab *is* its session: it runs tmux rather than a shell, so a reconnect re-attaches instead of dropping you into a shell outside it. `+` asks which kind to create; file tabs are spawned by the explorer, so an explorer always stays a file browser, and a file opens next to the explorer it came from. **Drag a tab to reorder it** — by hold-and-drag on a phone, so a swipe still scrolls the strip.
 
-Each tab's controls sit in the bottom bar and change with the tab. Localhost previews, system info and settings live in popups under the header icons. Every tab stays mounted in the DOM with CSS visibility toggling, preserving terminal state and WebSocket connections across switches. A fresh start opens on an empty board rather than a shell you did not ask for. Everything routes through a single Cloudflare Quick Tunnel.
+Each tab's controls sit in the bottom bar and change with the tab. Localhost previews, system info, settings and your account live in popups under the header icons. Every tab stays mounted in the DOM with CSS visibility toggling, preserving terminal state and WebSocket connections across switches. A fresh start opens on an empty board rather than a shell you did not ask for. Everything routes through a single Cloudflare Quick Tunnel.
 
 Install it to a home screen and it runs standalone like a native app; the layout, open tabs and your preferences are saved on the host, so a refresh or a reconnect from another device puts you back where you were.
+
+**One device at a time.** The open tabs and their terminals are a single workspace on the host, so a second device is told who holds the session and waits for it rather than taking it — nothing reachable from the tunnel URL can pull a live terminal away from whoever is using it. Signing out, closing the tab or letting the session expire frees it. tmux sessions keep running either way, which is what to use for two devices on one terminal.
 
 ### Terminal & tmux
 - Terminal tabs run your shell. **tmux tabs run tmux** (`tmux new -A`), so a dropped phone or a closed laptop re-attaches to the same session instead of landing in a fresh shell beside it
 - Picking **tmux session** from `+` opens a picker: attach to a running session, start a new one, or kill one. Closing a tmux tab detaches; the session keeps running
 - **Renaming a tmux tab renames the session.** The tab title, tmux itself, and the name a reconnect attaches by are one value, so the picker and the strip can never disagree
-- **Composer tabs** under the terminal, coloured by what they drive — session (green), shell (blue), CLI (purple):
-  - **tmux** — in-session controls grouped by sector: windows (new, next, prev, 0–5, rename, kill, list), panes (split, cycle, zoom, kill) and copy mode. Only present on a tmux tab, so tmux keys can never be typed into a plain shell
-  - **text** — the input area and send, with nav keys alongside: Enter, Bksp, arrows, Esc, Tab, PgUp/PgDn, and y/n for CLI prompts
-  - **cmds** — common shell commands (ls, top, df, free, nvidia-smi…), plus **your own**: add, edit and remove, saved on the host
-  - **cd** — directory picker with server-side CWD detection, so it follows you inside tmux too
-  - **combos** — sticky modifiers (Ctrl, Ctrl+Shift, Alt, Alt+Shift) over five sets: numbers, letters, nav, function and symbol keys
-  - **code** — Claude Code, Codex and OpenCode launchers with permission presets, and **slash commands you can add per CLI**, kept separately for each
-  - **git** — status, log, diff, add, fetch, pull, push, stash, branch, commit with a message, and `user.name` / `user.email` setup
+- **Composer tabs** under the terminal, changing with the tab they belong to:
+  - **keyboard** — the input and send, over one row of keys that never grows. A mode picks what those keys are: `main` for the terminal itself, a keyboard per coding CLI (claude, codex, opencode), or git
+    - **main** carries a key set — nav, numbers, letters, function, symbols — and a sticky modifier beside it: Shift, Ctrl, Ctrl+Shift, Alt or Alt+Shift
+    - a **CLI** keyboard leads with Enter, then Bksp and the arrows for its prompts, then its own shortcuts, a bare launch button, and **slash commands you can add per CLI**, kept separately for each
+    - **git** — status, log, diff, add, fetch, pull, push, stash, branch, commit with a message, and `user.name` / `user.email` setup
+  - **commands** — common shell commands (ls, top, df, free, nvidia-smi…), plus **your own**: add, edit and remove, saved on the host
+  - **navigate** — directory picker with server-side CWD detection, so it follows you inside tmux too
+  - **tmux session** — in-session controls, only on a tmux tab, so tmux keys can never be typed into a plain shell: windows (new, next, prev, last, rename, kill, list, and any index by number), panes (split, select, cycle, zoom, kill, layout) and copy mode
+- **Closing a tab asks first** where it costs something — a terminal takes its processes and scrollback with it, a tmux tab only detaches, a file with unsaved edits says so
 - **Every tab keeps its own composer state** — switching tabs leaves your half-typed command, open group and chosen CLI where they were, rather than carrying them to another session
 - System info popup with OS, kernel, CPU, memory, GPU, and connection latency to the host
 - Tool version detection (tmux, claude, codex, opencode)
@@ -70,22 +73,25 @@ Install it to a home screen and it runs standalone like a native app; the layout
 - Context menu (right-click / long-press), selectable/scrollable file paths
 - Drag-and-drop file upload with progress tracking and per-file cancel
 - Chunked upload for large files (>80 MB) to bypass Cloudflare's 100 MB request limit
+- **Reload a file in place** from its own bar, for every type. The editor also carries the version it read, so a save that would land on a file something else has changed since is refused rather than quietly winning
 - Failures say what actually went wrong — `"TODO.md" is a file, not a folder`, `No such folder "saves"`, `Permission denied` — rather than relaying an errno and a syscall name
 - **Built-in viewers & editors:**
-  - **Code Editor** — Monaco with syntax highlighting and word wrap. **Ctrl/Cmd+S saves** instead of opening the browser's save dialog, undo/redo have buttons for phones, and Edit / Plain / Preview is a dropdown so the path still fits beside it
+  - **Code Editor** — Monaco with syntax highlighting and word wrap. Text opens in Plain and markdown in Preview; Edit is a deliberate switch. **Ctrl/Cmd+S saves** instead of opening the browser's save dialog, and undo/redo have buttons for phones
   - **Markdown Preview** — GitHub-flavored with prose styling
   - **Jupyter Notebook** — cells with type badges, rendered markdown, code, and outputs
   - **HTML Preview** — live rendered in sandboxed iframe
-  - **PDF Viewer** — inline rendering with zoom and pinch-to-zoom
-  - **Image Viewer** — zoom controls with full pan/scroll at any zoom level, pinch-to-zoom
+  - **PDF Viewer** — pages render as they scroll into view, sized to the pane, with zoom and pinch-to-zoom
+  - **Image Viewer** — 100% is the scale at which the whole image is visible, measured from the pane, with zoom, pinch-to-zoom and drag-to-pan
   - **Video Player** — mp4, webm, ogg, mov, mkv, avi
   - **Audio Player** — mp3, wav, ogg, flac, aac, m4a
+  - Anything else — HEIC off an iPhone, a `.docx`, a format this browser cannot decode — gets one screen naming the file and its size, saying why, and offering the download or the raw bytes
 
 ### Security
 - **Access password, set up on first run.** A fresh install asks for one before the app opens; declining takes a deliberate second step that repeats what the tunnel exposes. Either way the choice is remembered, and you can change it later from the Settings cog
 - Enforced on the server for every request, the localhost proxy (HTTP + WebSocket) and the Socket.IO handshake — not just the UI
 - Salted **scrypt** hash stored in `~/.otgcode/config.json` (mode 600); sessions are signed HttpOnly cookies, and changing or removing the password signs every device out
 - Failed logins back off exponentially rather than locking out, so a stranger with the URL can't deny you access to your own machine
+- **Your account popup** in the header shows the user the shell runs as, how long the session has been open, and signs you out
 - **Stay signed in until I close the browser** on the login screen. Nothing is written to disk either way, so closing the browser always ends the session; unticked, it also expires after 30 minutes so coming back later asks again
 
 ### Localhost Preview
@@ -114,7 +120,7 @@ Native Windows is not supported: the terminal rests on a Linux/macOS pty. `start
 
 macOS needs no setup beyond Node and pnpm — `node-pty` ships a binary for it, and `start.sh` clears the Gatekeeper quarantine flag on it for you.
 
-- **Node.js** 20 or newer
+- **Node.js** 20.19 or newer
 - **pnpm** 10 or newer — `npm install -g pnpm`
 - **A C/C++ toolchain and Python 3** on Linux, and anywhere else `node-pty` has no prebuilt binary. It compiles `pty.node` from source there, and without it the terminal cannot start. `node-gyp` itself is a pinned devDependency, so you do not need one installed:
 
@@ -156,6 +162,9 @@ cp .env.example .env
 
 # Install, build, start, and open a Cloudflare tunnel
 ./start.sh
+
+# ...or on another port
+./start.sh --port 8080
 ```
 
 On Windows, run those inside WSL2 — see [Requirements](#requirements). First start asks you to set an access password before the app opens.
@@ -256,7 +265,11 @@ Then re-run `./start.sh`.
 | `pnpm build` | Production build |
 | `pnpm start` | Production server |
 | `pnpm start:tunnel` | Production server + Cloudflare tunnel |
-| `./start.sh` | Install + build + start + tunnel (all-in-one) |
+| `./start.sh` | Install + build + start + tunnel (all-in-one); `--port N` to move off 7777 |
+| `pnpm typecheck` | React Router typegen + `tsc` |
+| `pnpm test` | Vitest |
+| `pnpm lint` | Biome lint + format check |
+| `pnpm format` | Biome write |
 
 ## Architecture
 
@@ -267,7 +280,7 @@ Express (port 7777)
 ├── Auth gate — optional access password, ahead of every route below
 ├── Workspace API — layout, open tabs and preferences in ~/.otgcode/workspace.json
 ├── React Router v7 — UI (SSR shell + client-side app)
-├── Socket.IO — real-time terminal I/O via node-pty
+├── Socket.IO — real-time terminal I/O via node-pty, admitting one device at a time
 ├── REST API — file operations (list, read, write, rename, delete, upload, download, mkdir)
 ├── Reverse Proxy — /proxy/:port/* forwards HTTP + WebSocket to localhost services
 └── Cloudflare Tunnel — single optional tunnel via cloudflared (all traffic)
@@ -297,6 +310,10 @@ React Router v7, Express, Socket.IO, node-pty, xterm.js, Monaco Editor, Zustand,
 - **The code editor loads from a CDN.** Monaco is fetched from jsDelivr at
   runtime rather than bundled, so the editor needs internet access even though
   everything else works offline.
+- **A zip of a tree you cannot fully read fails late.** The archive streams as
+  it is built, so a permission error partway through arrives after the response
+  has started and the download ends truncated rather than with a message.
+  Download the readable folders individually.
 
 ## License
 
