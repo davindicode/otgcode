@@ -310,10 +310,6 @@ React Router v7, Express, Socket.IO, node-pty, xterm.js, Monaco Editor, Zustand,
 - **The code editor loads from a CDN.** Monaco is fetched from jsDelivr at
   runtime rather than bundled, so the editor needs internet access even though
   everything else works offline.
-- **A zip of a tree you cannot fully read fails late.** The archive streams as
-  it is built, so a permission error partway through arrives after the response
-  has started and the download ends truncated rather than with a message.
-  Download the readable folders individually.
 
 ## License
 

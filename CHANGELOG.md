@@ -198,6 +198,18 @@ workspace that is saved on the host rather than in the browser.
   or a shared `node_modules` repairs itself.
 - A missing toolchain stops with the install command for your distro, and a
   note for machines without `sudo`, rather than a page of compiler output.
+- **One unreadable file broke a whole folder download.** The archive streams as
+  it is built and an entry it cannot read is fatal, so the response was
+  destroyed part-way through the body — leaving a `.zip` with no central
+  directory, which will not open at all. Everything that had already streamed
+  was lost with it, and nothing was reported at either end. The tree is walked
+  before any of it is written now: unreadable files and folders are left out,
+  named in an `UNREADABLE.txt` inside the archive, and the rest arrives intact.
+- **A symlinked file in a folder download arrived as the link, not the file** —
+  a few bytes of target path in place of the content, extracting to a link that
+  pointed at a path on the host. Its bytes are copied instead. A link to a
+  directory is left out rather than followed, since one pointing back up its
+  own tree would recurse until the archive filled the disk.
 - **A slash-command chip never ran its command.** It sent the text and a newline
   in one write, which a coding CLI reads as a prompt rather than a submit.
 - **A new tab could take a name already on the strip** — closing Explorer 1
