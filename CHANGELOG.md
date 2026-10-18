@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-10-13
+## [0.2.0] - 2026-10-18
 
 A rebuilt interface: one tabbed pane in place of the split panels, tmux as a
 tab kind, an access password on by default, light and dark themes, and a
