@@ -311,6 +311,8 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const stopInputReporting = useTerminalStore((s) => s.stopInputReporting);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
+  /** Which tab is on screen, which is what makes this one's drawer visible. */
+  const activeId = useTabsStore((s) => s.activeId);
 
   // Close vendor dropdown on outside click
 
@@ -540,43 +542,58 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
       setActiveGroup(null);
     } else {
       setActiveGroup(id);
-      if (id === CD_TAB) fetchDirs();
     }
   };
 
   // cd directory picker — always scoped to the currently-active terminal session
-  const fetchDirs = async (dir?: string) => {
-    if (!sessionId) return;
-    setCdLoading(true);
-    try {
-      // If no dir specified, detect this terminal's actual CWD first
-      let targetDir = dir;
-      if (!targetDir) {
-        try {
-          const cwdData = await (await fetch(`/api/terminal/cwd?sessionId=${sessionId}`)).json();
-          if (cwdData.cwd) targetDir = cwdData.cwd;
-        } catch {}
+  const fetchDirs = useCallback(
+    async (dir?: string) => {
+      if (!sessionId) return;
+      setCdLoading(true);
+      try {
+        // If no dir specified, detect this terminal's actual CWD first
+        let targetDir = dir;
+        if (!targetDir) {
+          try {
+            const cwdData = await (await fetch(`/api/terminal/cwd?sessionId=${sessionId}`)).json();
+            if (cwdData.cwd) targetDir = cwdData.cwd;
+          } catch {}
+        }
+        const query = targetDir ? `?dir=${encodeURIComponent(targetDir)}&showHidden=false` : "?showHidden=false";
+        const res = await fetch(`/api/files/list${query}`);
+        const data = await res.json();
+        if (data.error) {
+          showToast(data.error);
+        } else if (useTerminalStore.getState().sessions[sessionId]) {
+          // Drop the result if the tab was closed while we were fetching.
+          setCdCwd(sessionId, data.dir);
+          setCdDirs(
+            (data.entries || [])
+              .filter((e: { isDirectory: boolean }) => e.isDirectory)
+              .map((e: { name: string }) => e.name),
+          );
+        }
+      } catch {
+        setCdDirs([]);
+        showToast("Could not reach the server");
       }
-      const query = targetDir ? `?dir=${encodeURIComponent(targetDir)}&showHidden=false` : "?showHidden=false";
-      const res = await fetch(`/api/files/list${query}`);
-      const data = await res.json();
-      if (data.error) {
-        showToast(data.error);
-      } else if (useTerminalStore.getState().sessions[sessionId]) {
-        // Drop the result if the tab was closed while we were fetching.
-        setCdCwd(sessionId, data.dir);
-        setCdDirs(
-          (data.entries || [])
-            .filter((e: { isDirectory: boolean }) => e.isDirectory)
-            .map((e: { name: string }) => e.name),
-        );
-      }
-    } catch {
-      setCdDirs([]);
-      showToast("Could not reach the server");
-    }
-    setCdLoading(false);
-  };
+      setCdLoading(false);
+    },
+    [sessionId, setCdCwd],
+  );
+
+  /**
+   * The listing is a snapshot of where the terminal was, and the terminal moves
+   * without saying so — a typed `cd`, a program that changes directory, a tmux
+   * window switch. So the trigger is the panel being on screen rather than the
+   * tap that opened it: the drawer stays open across a tab switch, and coming
+   * back used to re-show the directory the tab was in when it was first
+   * opened, which on a fresh tab is the login directory.
+   */
+  useEffect(() => {
+    if (drawerGroup !== CD_TAB || activeId !== sessionId) return;
+    fetchDirs();
+  }, [drawerGroup, activeId, sessionId, fetchDirs]);
 
   const handleCdTo = (dir: string) => {
     if (!sessionId) return;
@@ -736,7 +753,10 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                   {cdCwd}
                 </span>
               </div>
-              {cdLoading ? (
+              {/* Only on the first fetch. The re-check on coming back to the
+                  tab usually lands on the same directory, and replacing the
+                  chips with "Loading..." each time made returning flicker. */}
+              {cdLoading && cdDirs.length === 0 ? (
                 <span className="text-[11px] text-ink-faint">Loading...</span>
               ) : (
                 <div className="chip-rows flex flex-wrap gap-1">

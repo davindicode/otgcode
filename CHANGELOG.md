@@ -279,6 +279,12 @@ workspace that is saved on the host rather than in the browser.
 - Breadcrumb navigation is disabled while the path is being edited, so the tree
   cannot desync from the field, and a Go button submits it on a phone.
 - A file with no extension no longer reports its whole path as its type.
+- **The navigate drawer showed the directory a terminal tab started in.** Its
+  listing was fetched once, when the drawer was tapped open, and the drawer
+  stays open across a tab switch — so returning to a tab re-showed the login
+  directory however far the shell had moved. The directory is re-detected
+  whenever the drawer is on screen, from the live pty or, on a tmux tab, from
+  the window that tab's own client is looking at.
 
 ### Security
 
