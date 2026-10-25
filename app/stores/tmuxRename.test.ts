@@ -29,8 +29,8 @@ function stubBrokenApi(status: number) {
 function seedTmuxTab(session: string) {
   useToastStore.setState({ toasts: [] });
   useTabsStore.setState({
-    tabs: [{ id: "tab-1", kind: "tmux", title: session, tmuxSession: session }],
-    activeId: "tab-1",
+    tabs: [{ id: "tab-1", kind: "tmux", title: session, tmuxSession: session, pane: 0 }],
+    activeIds: ["tab-1", null],
   });
   useTerminalStore.setState({
     sessions: {
@@ -106,7 +106,10 @@ describe("renaming a tmux tab", () => {
   });
 
   it("does not touch tmux for a plain terminal tab", async () => {
-    useTabsStore.setState({ tabs: [{ id: "t", kind: "terminal", title: "Terminal 1" }], activeId: "t" });
+    useTabsStore.setState({
+      tabs: [{ id: "t", kind: "terminal", title: "Terminal 1", pane: 0 }],
+      activeIds: ["t", null],
+    });
     const calls = stubApi({ name: "nope" });
 
     await useTabsStore.getState().rename("t", "builds");

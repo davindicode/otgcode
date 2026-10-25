@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { insertIndexFor, nextTitle, reorder, type Tab } from "./tabsStore";
 
-const explorer = (id: string): Tab => ({ id, kind: "explorer", title: id });
-const named = (kind: Tab["kind"], title: string): Tab => ({ id: title, kind, title }) as Tab;
-const terminal = (id: string): Tab => ({ id, kind: "terminal", title: id });
+const explorer = (id: string): Tab => ({ id, kind: "explorer", title: id, pane: 0 });
+const named = (kind: Tab["kind"], title: string): Tab => ({ id: title, kind, title, pane: 0 }) as Tab;
+const terminal = (id: string): Tab => ({ id, kind: "terminal", title: id, pane: 0 });
 const viewer = (id: string, openedFrom?: string): Tab => ({
   id,
   kind: "viewer",
   title: id,
   path: `/tmp/${id}`,
   openedFrom,
+  pane: 0,
 });
 
 describe("insertIndexFor", () => {

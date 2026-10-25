@@ -3,7 +3,7 @@ import RefreshIcon from "~/components/RefreshIcon";
 import { apiPost } from "~/lib/api";
 import { errorMessage } from "~/lib/errors";
 import { shellQuote } from "~/lib/shell";
-import { useTabsStore } from "~/stores/tabsStore";
+import { isTabVisible, useTabsStore } from "~/stores/tabsStore";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { showToast } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
@@ -221,8 +221,12 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const stopInputReporting = useTerminalStore((s) => s.stopInputReporting);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
-  /** Which tab is on screen, which is what makes this one's drawer visible. */
-  const activeId = useTabsStore((s) => s.activeId);
+  /**
+   * Whether this tab is the one its pane is drawing — which is what makes this
+   * drawer visible. Not the focused tab: in a split the other pane's composer
+   * is on screen too, and its listing goes stale the same way.
+   */
+  const visible = useTabsStore((s) => isTabVisible(s, sessionId));
 
   // Close vendor dropdown on outside click
 
@@ -501,9 +505,9 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
    * opened, which on a fresh tab is the login directory.
    */
   useEffect(() => {
-    if (drawerGroup !== CD_TAB || activeId !== sessionId) return;
+    if (drawerGroup !== CD_TAB || !visible) return;
     fetchDirs();
-  }, [drawerGroup, activeId, sessionId, fetchDirs]);
+  }, [drawerGroup, visible, fetchDirs]);
 
   const handleCdTo = (dir: string) => {
     if (!sessionId) return;

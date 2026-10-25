@@ -1,6 +1,6 @@
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type FileKind, fileKind } from "~/lib/fileTypes";
-import { type Tab, useTabsStore } from "~/stores/tabsStore";
+import { type PaneIndex, type Tab, useTabsStore } from "~/stores/tabsStore";
 import ConfirmDialog from "./ConfirmDialog";
 import RenamableTab from "./RenamableTab";
 import TmuxPicker from "./TmuxPicker";
@@ -245,6 +245,7 @@ function dropIndex(others: HTMLElement[], x: number): number {
  */
 function useTabReorder(stripRef: RefObject<HTMLDivElement | null>) {
   const move = useTabsStore((s) => s.move);
+  const moveToPane = useTabsStore((s) => s.moveToPane);
   const [dragId, setDragId] = useState<string | null>(null);
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -275,8 +276,28 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>) {
         if (holdFirst) return end();
         start();
       }
-      const others = [...strip.querySelectorAll<HTMLElement>("[data-tab-id]")].filter((el) => el.dataset.tabId !== id);
-      move(id, dropIndex(others, ev.clientX));
+      // Which strip the pointer is over, so dragging a tab onto the other
+      // pane's strip hands it over rather than doing nothing. Both strips are
+      // in the document, so this is a hit test rather than a drop target.
+      const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>("[data-pane-strip]")
+        ?.dataset.paneStrip;
+      const landing =
+        over === undefined ? strip : (document.querySelector<HTMLElement>(`[data-pane-strip="${over}"]`) ?? strip);
+      const others = [...landing.querySelectorAll<HTMLElement>("[data-tab-id]")].filter(
+        (el) => el.dataset.tabId !== id,
+      );
+      const at = dropIndex(others, ev.clientX);
+      // `at` indexes the landing strip; `move` and `moveToPane` both take an
+      // index into the whole strip, which is where the neighbour it lands
+      // before actually sits.
+      const before = others[at]?.dataset.tabId;
+      const all = useTabsStore.getState().tabs;
+      const global = before ? all.filter((t) => t.id !== id).findIndex((t) => t.id === before) : all.length - 1;
+      if (over !== undefined && Number(over) !== useTabsStore.getState().tabs.find((t) => t.id === id)?.pane) {
+        moveToPane(id, Number(over) === 1 ? 1 : 0, global);
+      } else {
+        move(id, global);
+      }
     };
 
     // Dragging and scrolling are the same gesture to the browser; the drag wins
@@ -305,12 +326,23 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>) {
 }
 
 /**
- * One strip for every tab in the app. Replaces the old per-pane tab rows and
- * the mobile footer: there is a single pane now, so there is a single strip.
+ * One strip per pane, holding that pane's tabs and its own + button.
+ *
+ * The + belongs to a strip rather than to the app because a new tab has to
+ * open somewhere, and "the pane whose + you pressed" is the only answer that
+ * needs no explaining. In a split, the strip of the pane without the cursor is
+ * dimmed rather than hidden: it is still showing a tab.
  */
-export default function TabBar() {
-  const tabs = useTabsStore((s) => s.tabs);
-  const activeId = useTabsStore((s) => s.activeId);
+export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolean }) {
+  const allTabs = useTabsStore((s) => s.tabs);
+  const activeIds = useTabsStore((s) => s.activeIds);
+  const focusedPane = useTabsStore((s) => s.focusedPane);
+  const focusPane = useTabsStore((s) => s.focusPane);
+  // In a split a strip shows its own pane's tabs. With one pane drawn, every
+  // tab is reachable from it, whichever pane it is assigned to — otherwise
+  // narrowing the window would hide tabs with no way back to them.
+  const tabs = split ? allTabs.filter((t) => t.pane === pane) : allTabs;
+  const activeId = split ? activeIds[pane] : activeIds[focusedPane];
   const setActive = useTabsStore((s) => s.setActive);
   const close = useTabsStore((s) => s.close);
   const rename = useTabsStore((s) => s.rename);
@@ -322,11 +354,14 @@ export default function TabBar() {
   const [closing, setClosing] = useState<Tab | null>(null);
   const unsaved = useTabsStore((s) => s.unsaved);
   const plusRef = useRef<HTMLButtonElement>(null);
+  const dim = split && pane !== focusedPane;
   const stripRef = useRef<HTMLDivElement>(null);
   const { dragId, onPointerDown } = useTabReorder(stripRef);
 
   const pick = (kind: NewKind) => {
     setMenuOpen(false);
+    // Open it here, in the pane whose + was pressed.
+    focusPane(pane);
     // A tmux tab needs its session chosen first — the tab *is* that session.
     if (kind === "tmux") setTmuxPicker(true);
     else if (kind === "terminal") openTerminal();
@@ -350,9 +385,14 @@ export default function TabBar() {
   };
 
   return (
-    <div className="bar-edge relative flex items-center border-b border-line bg-surface shrink-0">
+    <div
+      className={`bar-edge relative flex shrink-0 items-center border-b border-line bg-surface transition-opacity ${
+        dim ? "opacity-60" : ""
+      }`}
+    >
       <div
         ref={stripRef}
+        data-pane-strip={pane}
         onPointerDown={onPointerDown}
         className="flex items-center overflow-x-auto scrollbar-none flex-1 min-w-0"
       >

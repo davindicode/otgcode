@@ -60,6 +60,14 @@ workspace that is saved on the host rather than in the browser.
   follow you across refreshes, reconnects and devices.
 - **Installable as an app** — manifest, standalone display, maskable icons, iOS
   home-screen meta and safe-area padding.
+- **A split view on a wide screen.** Appearance offers one pane or two side by
+  side, with a divider to drag — a file in the left pane and a terminal in the
+  right. Each pane keeps its own tab strip, its own `+` and its own active tab,
+  and a tab moves between them by being dragged onto the other strip. Below
+  900px, or on a screen taller than it is wide, one pane is drawn and the
+  other's tabs stay reachable from the same strip; the arrangement is kept, so
+  turning a tablet landscape restores both columns with everything where it
+  was.
 - **One keyboard in the composer**, with five modes: `main` plus a keyboard per
   CLI — claude, codex, opencode — and git. `main` carries the key set (nav,
   numbers, letters, function, symbols) and a sticky modifier (Shift, Ctrl,

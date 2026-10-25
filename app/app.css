@@ -715,3 +715,36 @@ html.light .glow {
 }
 .animate-toast-in { animation: toast-in 180ms ease-out; }
 .animate-toast-out { animation: toast-out 180ms ease-in forwards; }
+
+/*
+ * The seam between two panes. Zero-width in the grid so the panes meet
+ * exactly where the split says, with the hit area spilling either side
+ * through a negative inset — a six-pixel target is hard to hit with a
+ * trackpad and impossible with a finger.
+ */
+.pane-divider {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  position: relative;
+  width: 0;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 20;
+}
+
+.pane-divider::before {
+  content: "";
+  position: absolute;
+  inset: 0 -5px;
+  background: var(--color-line);
+  transition: background 120ms ease;
+}
+
+.pane-divider:hover::before,
+.pane-divider:focus-visible::before {
+  background: var(--color-accent);
+}
+
+.pane-divider:focus-visible {
+  outline: none;
+}

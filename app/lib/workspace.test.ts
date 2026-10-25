@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_EDITOR_FONT_SIZE,
   DEFAULT_FONT_SIZE,
+  DEFAULT_SPLIT,
   defaultWorkspace,
   MAX_FONT_SIZE,
+  MAX_SPLIT,
   MIN_FONT_SIZE,
+  MIN_SPLIT,
   sanitize,
   type WorkspaceTab,
 } from "./workspace.shared";
@@ -18,6 +21,7 @@ const tab = (over: Partial<WorkspaceTab> = {}): WorkspaceTab => ({
   openedFrom: "",
   tmuxSession: "",
   tmuxSessionId: "",
+  pane: 0,
   ...over,
 });
 
@@ -52,10 +56,10 @@ describe("sanitize", () => {
         tab({ id: "e1", kind: "explorer", title: "Explorer 1", cwd: "/tmp" }),
         tab({ id: "v1", kind: "viewer", title: "main.ts", cwd: "", path: "/tmp/main.ts" }),
       ],
-      activeId: "e1",
+      activeIds: ["e1", null],
     });
     expect(result.tabs.map((t) => t.kind)).toEqual(["terminal", "explorer", "viewer"]);
-    expect(result.activeId).toBe("e1");
+    expect(result.activeIds[0]).toBe("e1");
   });
 
   it("drops malformed tabs", () => {
@@ -68,43 +72,43 @@ describe("sanitize", () => {
         "not an object",
         null,
       ],
-      activeId: null,
+      activeIds: [null, null],
     });
     expect(result.tabs).toHaveLength(1);
     expect(result.tabs[0].id).toBe("t1");
   });
 
   it("drops a viewer tab with no file, since it can't be reopened", () => {
-    const result = sanitize({ tabs: [tab({ id: "v1", kind: "viewer", path: "" })], activeId: null });
+    const result = sanitize({ tabs: [tab({ id: "v1", kind: "viewer", path: "" })], activeIds: [null, null] });
     expect(result.tabs).toEqual([]);
   });
 
-  it("drops an activeId that matches no tab", () => {
-    expect(sanitize({ tabs: [tab()], activeId: "gone" }).activeId).toBeNull();
+  it("drops a pane's active tab when no such tab is in it", () => {
+    expect(sanitize({ tabs: [tab()], activeIds: ["gone", null] }).activeIds[0]).toBeNull();
   });
 
   it("caps tab count and string length so the file can't grow without bound", () => {
     const many = Array.from({ length: 100 }, (_, i) => tab({ id: `t${i}` }));
-    expect(sanitize({ tabs: many, activeId: null }).tabs).toHaveLength(32);
-    const long = sanitize({ tabs: [tab({ cwd: "/".repeat(10_000) })], activeId: null });
+    expect(sanitize({ tabs: many, activeIds: [null, null] }).tabs).toHaveLength(32);
+    const long = sanitize({ tabs: [tab({ cwd: "/".repeat(10_000) })], activeIds: [null, null] });
     expect(long.tabs[0].cwd).toHaveLength(4096);
   });
 
   it("merges a partial update onto the existing state", () => {
-    const base = sanitize({ theme: "light", fontSize: 12, tabs: [tab()], activeId: "t1" });
+    const base = sanitize({ theme: "light", fontSize: 12, tabs: [tab()], activeIds: ["t1", null] });
     const merged = sanitize({ fontSize: 16 }, base);
     expect(merged.fontSize).toBe(16);
     // Untouched keys survive the patch.
     expect(merged.theme).toBe("light");
     expect(merged.tabs).toHaveLength(1);
-    expect(merged.activeId).toBe("t1");
+    expect(merged.activeIds[0]).toBe("t1");
   });
 
   it("lets an explicit empty list close every tab", () => {
-    const base = sanitize({ tabs: [tab()], activeId: "t1" });
-    const cleared = sanitize({ tabs: [], activeId: null }, base);
+    const base = sanitize({ tabs: [tab()], activeIds: ["t1", null] });
+    const cleared = sanitize({ tabs: [], activeIds: [null, null] }, base);
     expect(cleared.tabs).toEqual([]);
-    expect(cleared.activeId).toBeNull();
+    expect(cleared.activeIds[0]).toBeNull();
   });
 
   it("clamps the editor font size independently of the terminal's", () => {
@@ -150,7 +154,7 @@ describe("sanitize", () => {
         tab({ id: "e1", kind: "explorer", title: "Explorer 1", cwd: "/tmp" }),
         tab({ id: "v1", kind: "viewer", title: "main.ts", path: "/tmp/main.ts", openedFrom: "e1" }),
       ],
-      activeId: "v1",
+      activeIds: ["v1", null],
     });
     expect(result.tabs[1].openedFrom).toBe("e1");
   });
@@ -183,5 +187,39 @@ describe("sanitize", () => {
   it("leaves slash commands untouched when the patch omits them", () => {
     const base = sanitize({ customSlash: [{ vendor: "claude", label: "/ship", command: "/ship" }] });
     expect(sanitize({ fontSize: 12 }, base).customSlash).toHaveLength(1);
+  });
+});
+
+describe("layout", () => {
+  it("keeps a tab in the right pane and puts anything else in the left", () => {
+    const result = sanitize({
+      tabs: [tab({ id: "a", pane: 1 }), tab({ id: "b", pane: 0 }), tab({ id: "c", pane: 7 })],
+      activeIds: [null, null],
+    });
+    expect(result.tabs.map((t) => t.pane)).toEqual([1, 0, 0]);
+  });
+
+  it("will not point a pane at a tab that is in the other one", () => {
+    const result = sanitize({
+      tabs: [tab({ id: "a", pane: 0 })],
+      // "a" is in the left pane, so the right pane cannot be showing it.
+      activeIds: ["a", "a"],
+    });
+    expect(result.activeIds).toEqual(["a", null]);
+  });
+
+  it("clamps the split and rejects a junk one", () => {
+    expect(sanitize({ split: 0.95 }).split).toBe(MAX_SPLIT);
+    expect(sanitize({ split: 0.01 }).split).toBe(MIN_SPLIT);
+    expect(sanitize({ split: "half" }).split).toBe(DEFAULT_SPLIT);
+    expect(sanitize({ split: 0.37 }).split).toBe(0.37);
+  });
+
+  it("takes only one or two panes, and only a pane that exists as the focused one", () => {
+    expect(sanitize({ panes: 2 }).panes).toBe(2);
+    expect(sanitize({ panes: 3 }).panes).toBe(1);
+    expect(sanitize({ panes: "two" }).panes).toBe(1);
+    expect(sanitize({ focusedPane: 1 }).focusedPane).toBe(1);
+    expect(sanitize({ focusedPane: 5 }).focusedPane).toBe(0);
   });
 });

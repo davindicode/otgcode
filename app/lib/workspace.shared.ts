@@ -24,6 +24,8 @@ export interface WorkspaceTab {
   tmuxSession: string;
   /** tmux tabs: tmux's own id for the session, stable across renames. */
   tmuxSessionId: string;
+  /** Which pane the tab sits in: 0 is the left pane, 1 the right. */
+  pane: number;
 }
 
 /** A command button the user added to the cmds group. */
@@ -45,7 +47,18 @@ export interface Workspace {
   /** Code editor font size in px. */
   editorFontSize: number;
   tabs: WorkspaceTab[];
-  activeId: string | null;
+  /**
+   * The tab showing in each pane, by pane index, `null` where a pane has none.
+   * One entry per pane rather than a single active tab, because in a split both
+   * panes show something and only one of them has the cursor.
+   */
+  activeIds: (string | null)[];
+  /** How many panes the user wants. A narrow screen still shows one. */
+  panes: PaneCount;
+  /** The left pane's share of the width, as a fraction. */
+  split: number;
+  /** Which pane has the user's attention: where a new tab opens. */
+  focusedPane: number;
   /** Commands the user added to the cmds group. */
   customCommands: CustomCommand[];
   /** Labels of built-in commands the user removed from the cmds group. */
@@ -58,6 +71,24 @@ export interface Workspace {
 
 /** Also enforced server-side in auth.ts. */
 export const MIN_PASSWORD_LENGTH = 6;
+
+/** One pane, or two side by side. Three was not worth two dividers. */
+export type PaneCount = 1 | 2;
+
+/**
+ * Narrower than this and a split is two cramped columns rather than two
+ * usable ones; taller than wide and it is worse still, which is every phone
+ * and a tablet held upright. The preference is kept either way — it applies
+ * again as soon as there is room.
+ */
+export const SPLIT_MIN_WIDTH_PX = 900;
+export const SPLIT_MEDIA_QUERY = `(min-width: ${SPLIT_MIN_WIDTH_PX}px) and (min-aspect-ratio: 1/1)`;
+
+/** A pane narrower than this is not worth keeping open. */
+export const MIN_PANE_PX = 320;
+export const MIN_SPLIT = 0.2;
+export const MAX_SPLIT = 0.8;
+export const DEFAULT_SPLIT = 0.5;
 
 export const MIN_FONT_SIZE = 6;
 export const MAX_FONT_SIZE = 24;
@@ -75,7 +106,10 @@ export function defaultWorkspace(): Workspace {
     fontSize: DEFAULT_FONT_SIZE,
     editorFontSize: DEFAULT_EDITOR_FONT_SIZE,
     tabs: [],
-    activeId: null,
+    activeIds: [null, null],
+    panes: 1,
+    split: DEFAULT_SPLIT,
+    focusedPane: 0,
     customCommands: [],
     hiddenCommands: [],
     customSlash: [],
@@ -116,6 +150,9 @@ function tabs(value: unknown): WorkspaceTab[] {
       // is also true of a tab that has never been opened yet. Reconnecting by
       // name is the behaviour in that window.
       tmuxSessionId: str(tab.tmuxSessionId),
+      // Anything that is not the right pane is the left one. A tab in a pane
+      // that does not exist would be a tab with nowhere to be drawn.
+      pane: tab.pane === 1 ? 1 : 0,
     });
   }
   return out;
@@ -183,21 +220,35 @@ export function sanitize(input: unknown, base: Workspace = defaultWorkspace()): 
   const editorFont = num(raw.editorFontSize);
   const nextTabs = raw.tabs === undefined ? base.tabs : tabs(raw.tabs);
 
-  const activeId =
-    raw.activeId === undefined
-      ? base.activeId && nextTabs.some((t) => t.id === base.activeId)
-        ? base.activeId
-        : null
-      : typeof raw.activeId === "string" && nextTabs.some((t) => t.id === raw.activeId)
-        ? raw.activeId
-        : null;
+  /**
+   * A pane's active tab has to be a tab that exists and is in that pane —
+   * otherwise a pane would be told to show something that is not there, or is
+   * somewhere else, and would draw nothing at all.
+   */
+  const paneActive = (value: unknown, pane: number): string | null =>
+    typeof value === "string" && nextTabs.some((t) => t.id === value && t.pane === pane) ? value : null;
+
+  const rawActive = Array.isArray(raw.activeIds) ? raw.activeIds : null;
+  const activeIds =
+    raw.activeIds === undefined
+      ? [paneActive(base.activeIds[0], 0), paneActive(base.activeIds[1], 1)]
+      : [paneActive(rawActive?.[0], 0), paneActive(rawActive?.[1], 1)];
+
+  const panes: PaneCount = raw.panes === 2 ? 2 : raw.panes === 1 ? 1 : base.panes;
+  const rawSplit = num(raw.split);
+  const split =
+    rawSplit === null ? base.split : Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, Math.round(rawSplit * 1000) / 1000));
+  const focusedPane = raw.focusedPane === 1 ? 1 : raw.focusedPane === 0 ? 0 : base.focusedPane;
 
   return {
     theme: raw.theme === "light" || raw.theme === "dark" ? raw.theme : base.theme,
     fontSize: font === null ? base.fontSize : clamp(font),
     editorFontSize: editorFont === null ? base.editorFontSize : clamp(editorFont),
     tabs: nextTabs,
-    activeId,
+    activeIds,
+    panes,
+    split,
+    focusedPane,
     customCommands: raw.customCommands === undefined ? base.customCommands : commands(raw.customCommands),
     hiddenCommands: raw.hiddenCommands === undefined ? base.hiddenCommands : labels(raw.hiddenCommands),
     customSlash: raw.customSlash === undefined ? base.customSlash : slashCommands(raw.customSlash),

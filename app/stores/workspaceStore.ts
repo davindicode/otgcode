@@ -3,6 +3,10 @@ import {
   type CustomCommand,
   DEFAULT_EDITOR_FONT_SIZE,
   DEFAULT_FONT_SIZE,
+  DEFAULT_SPLIT,
+  MAX_SPLIT,
+  MIN_SPLIT,
+  type PaneCount,
   type SlashCommand,
   type Theme,
   type Workspace,
@@ -22,12 +26,18 @@ interface WorkspaceState {
   hiddenCommands: string[];
   customSlash: SlashCommand[];
   hiddenSlash: string[];
+  /** How many panes the user asked for; a narrow screen still draws one. */
+  panes: PaneCount;
+  /** The left pane's share of the width, as a fraction between the clamps. */
+  split: number;
   restored: Workspace | null;
 
   hydrate: () => Promise<void>;
   setTheme: (theme: Theme) => void;
   setFontSize: (size: number) => void;
   setEditorFontSize: (size: number) => void;
+  setPanes: (panes: PaneCount) => void;
+  setSplit: (split: number) => void;
   addCommand: (command: CustomCommand) => void;
   /** Remove a custom command, or hide a built-in one. */
   removeCommand: (label: string, isCustom: boolean) => void;
@@ -37,7 +47,7 @@ interface WorkspaceState {
   removeSlash: (vendor: string, label: string, isCustom: boolean) => void;
   restoreSlash: (vendor: string, label: string) => void;
   /** Persist the current tab strip. */
-  saveTabs: (patch: Pick<Workspace, "tabs" | "activeId">) => void;
+  saveTabs: (patch: Pick<Workspace, "tabs" | "activeIds" | "focusedPane">) => void;
 }
 
 // Dragging a divider fires continuously; batch writes so the disk sees one.
@@ -110,6 +120,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   hiddenCommands: [],
   customSlash: [],
   hiddenSlash: [],
+  panes: 1,
+  split: DEFAULT_SPLIT,
   restored: null,
 
   hydrate: async () => {
@@ -126,6 +138,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         hiddenCommands: data.hiddenCommands,
         customSlash: data.customSlash,
         hiddenSlash: data.hiddenSlash,
+        panes: data.panes,
+        split: data.split,
         restored: data,
       });
     } catch {
@@ -147,6 +161,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setEditorFontSize: (size) => {
     set({ editorFontSize: size });
     queue({ editorFontSize: size });
+  },
+
+  setPanes: (panes) => {
+    set({ panes });
+    queue({ panes });
+  },
+
+  setSplit: (split) => {
+    const clamped = Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, split));
+    set({ split: clamped });
+    queue({ split: clamped });
   },
 
   addCommand: (command) => {

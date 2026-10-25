@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { MAX_FONT_SIZE, MIN_FONT_SIZE } from "~/lib/constants";
+import { useSplitRoom } from "~/lib/useSplitRoom";
+import { type PaneCount, SPLIT_MIN_WIDTH_PX } from "~/lib/workspace.shared";
 import { useAuthStore } from "~/stores/authStore";
+import { useTabsStore } from "~/stores/tabsStore";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { useToastStore } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
@@ -96,6 +99,83 @@ function Appearance() {
 
       <FontRow label="Terminal font size" value={fontSize} onChange={setFontSize} />
       <FontRow label="Editor font size" value={editorFontSize} onChange={setEditorFontSize} />
+
+      <Layout />
+    </div>
+  );
+}
+
+/**
+ * One pane or two side by side, and — when there is only room to draw one of
+ * the two — which of them that is.
+ *
+ * The split button stays visible on a narrow screen rather than disappearing:
+ * a control that vanishes reads as broken, where a disabled one with a reason
+ * reads as "not here". The preference is kept either way, so a tablet turned
+ * landscape or a window pulled wider comes back to both panes with every tab
+ * where it was left.
+ */
+function Layout() {
+  const panes = useWorkspaceStore((s) => s.panes);
+  const setPanes = useWorkspaceStore((s) => s.setPanes);
+  const hasRoom = useSplitRoom();
+  const focusedPane = useTabsStore((s) => s.focusedPane);
+  const focusPane = useTabsStore((s) => s.focusPane);
+  const tabs = useTabsStore((s) => s.tabs);
+
+  const choice = (value: PaneCount, label: string, hint: string) => {
+    const blocked = value === 2 && !hasRoom;
+    return (
+      <button
+        type="button"
+        onClick={() => setPanes(value)}
+        disabled={blocked}
+        aria-pressed={panes === value}
+        title={blocked ? `Needs a window at least ${SPLIT_MIN_WIDTH_PX}px wide and wider than it is tall` : hint}
+        className={`flex-1 rounded-control px-2 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+          panes === value ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
+        }`}
+      >
+        {label}
+      </button>
+    );
+  };
+
+  return (
+    <div className="space-y-2 border-t border-line pt-3">
+      <span className="text-xs text-ink-dim">Panes</span>
+      <div className="flex gap-1 rounded-control border border-line bg-raised p-1">
+        {choice(1, "Single", "One pane, the full width")}
+        {choice(2, "Split", "Two panes with a divider you can drag")}
+      </div>
+      {panes === 2 &&
+        (hasRoom ? (
+          <p className="text-[11px] leading-relaxed text-ink-ghost">
+            Drag a tab onto the other strip to move it there. Double-click the divider to even the panes up.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            <p className="text-[11px] leading-relaxed text-ink-ghost">
+              Not enough room for two panes, so one is shown at a time. Both keep their tabs.
+            </p>
+            <div className="flex gap-1 rounded-control border border-line bg-raised p-1">
+              {([0, 1] as const).map((pane) => (
+                <button
+                  key={pane}
+                  type="button"
+                  onClick={() => focusPane(pane)}
+                  aria-pressed={focusedPane === pane}
+                  className={`flex-1 rounded-control px-2 py-1.5 text-xs font-medium transition-colors ${
+                    focusedPane === pane ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
+                  }`}
+                >
+                  {pane === 0 ? "Left" : "Right"}
+                  <span className="ml-1 text-ink-ghost">({tabs.filter((t) => t.pane === pane).length})</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
     </div>
   );
 }

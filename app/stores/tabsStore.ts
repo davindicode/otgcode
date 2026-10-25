@@ -19,10 +19,19 @@ import { showToast } from "./toastStore";
  */
 export type TabKind = "terminal" | "explorer" | "viewer" | "tmux";
 
+/** 0 is the left pane, 1 the right. There are only ever the two. */
+export type PaneIndex = 0 | 1;
+
 export interface Tab {
   id: string;
   kind: TabKind;
   title: string;
+  /**
+   * Which pane draws this tab. Every tab has one even when only one pane is
+   * showing: the assignment is what a narrow screen hides rather than
+   * discards, so widening the window puts everything back where it was.
+   */
+  pane: PaneIndex;
   /** Viewer tabs only: absolute path of the file being shown. */
   path?: string;
   /** Viewer tabs only: the explorer tab this file was opened from. */
@@ -39,7 +48,14 @@ export interface Tab {
 
 interface TabsState {
   tabs: Tab[];
-  activeId: string | null;
+  /**
+   * The tab showing in each pane. Two entries rather than one active tab,
+   * because in a split both panes show something at once — and the pane
+   * without the cursor is still drawing its tab, which is the whole point.
+   */
+  activeIds: [string | null, string | null];
+  /** Where a new tab opens, and the only pane a narrow screen shows. */
+  focusedPane: PaneIndex;
   /**
    * Viewer tabs with edits not yet on disk, by tab id.
    *
@@ -70,6 +86,22 @@ interface TabsState {
   setUnsaved: (id: string, unsaved: boolean) => void;
   /** Drag-to-reorder: `toIndex` indexes the strip with this tab taken out. */
   move: (id: string, toIndex: number) => void;
+  /** Hand a tab to the other pane, keeping it the one that pane shows. */
+  moveToPane: (id: string, pane: PaneIndex, toIndex?: number) => void;
+  /** Point the cursor at a pane without changing which tab it shows. */
+  focusPane: (pane: PaneIndex) => void;
+  /**
+   * Remeasure the terminals on screen, for when a pane changed width under
+   * them — the divider moved, the split was turned on or off, or the window
+   * crossed the width where two panes stop fitting. A terminal sizes itself in
+   * whole rows and columns, so it cannot follow a CSS width on its own.
+   */
+  refitVisible: () => void;
+  /**
+   * Bring every tab into the left pane, for leaving the split: a tab in a
+   * pane that is not drawn would be a tab the user cannot reach.
+   */
+  mergePanes: () => void;
   setActive: (id: string) => void;
   /**
    * Renaming a tmux tab renames its session, so it is async and can fail — the
@@ -77,7 +109,7 @@ interface TabsState {
    */
   rename: (id: string, title: string) => Promise<void>;
   /** Replace the whole strip — used when restoring a saved workspace. */
-  restore: (tabs: WorkspaceTab[], activeId: string | null) => void;
+  restore: (tabs: WorkspaceTab[], activeIds: (string | null)[], focusedPane?: number) => void;
 }
 
 let counter = 0;
@@ -125,6 +157,38 @@ export function reorder<T>(items: T[], from: number, to: number): T[] {
  * Every tab is checked, not just this kind: the user reads one strip of tabs,
  * and two tabs reading `Explorer 2` are confusing whatever is behind them.
  */
+/**
+ * Whether this tab is the one its pane is drawing.
+ *
+ * Not the same as having the cursor: in a split, both panes draw a tab and
+ * only one of them is focused. Everything that asks "am I on screen" — a
+ * viewer deciding to watch its file, a composer drawer deciding to re-read a
+ * directory — wants this rather than the focused tab.
+ */
+export function isTabVisible(state: Pick<TabsState, "tabs" | "activeIds">, id: string): boolean {
+  const tab = state.tabs.find((t) => t.id === id);
+  return !!tab && state.activeIds[tab.pane] === id;
+}
+
+/** The tab the user is typing into: the focused pane's. */
+export function focusedTabId(state: Pick<TabsState, "activeIds" | "focusedPane">): string | null {
+  return state.activeIds[state.focusedPane];
+}
+
+/**
+ * The tab a pane should fall back to once `closing` is gone: its neighbour in
+ * the same pane, looking right first and then left. Null when the pane is now
+ * empty, which is a pane with nothing to draw rather than an error.
+ */
+export function neighbourInPane(tabs: Tab[], closing: Tab): string | null {
+  const siblings = tabs.filter((t) => t.pane === closing.pane);
+  const at = siblings.findIndex((t) => t.id === closing.id);
+  if (at === -1) return null;
+  const left = siblings.slice(0, at);
+  const right = siblings.slice(at + 1);
+  return right[0]?.id ?? left[left.length - 1]?.id ?? null;
+}
+
 export function nextTitle(tabs: Tab[], label: string): string {
   const taken = new Set(tabs.map((t) => t.title));
   let n = 1;
@@ -132,16 +196,31 @@ export function nextTitle(tabs: Tab[], label: string): string {
   return `${label} ${n}`;
 }
 
+/** A new tab opens in the pane the user is working in. */
+function showInPane(
+  state: Pick<TabsState, "activeIds">,
+  pane: PaneIndex,
+  id: string | null,
+): [string | null, string | null] {
+  const next: [string | null, string | null] = [state.activeIds[0], state.activeIds[1]];
+  next[pane] = id;
+  return next;
+}
+
 export const useTabsStore = create<TabsState>((set, get) => ({
   tabs: [],
-  activeId: null,
+  activeIds: [null, null],
+  focusedPane: 0,
   unsaved: {},
 
   openTerminal: ({ id, title, cwd } = {}) => {
     const tabId = id ?? nextId("terminal");
     const name = title || nextTitle(get().tabs, "Terminal");
     useTerminalStore.getState().createSession(tabId, name, cwd || undefined);
-    set((s) => ({ tabs: [...s.tabs, { id: tabId, kind: "terminal", title: name }], activeId: tabId }));
+    set((s) => ({
+      tabs: [...s.tabs, { id: tabId, kind: "terminal", title: name, pane: s.focusedPane }],
+      activeIds: showInPane(s, s.focusedPane, tabId),
+    }));
     return tabId;
   },
 
@@ -149,22 +228,29 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     const tabId = id ?? nextId("explorer");
     const name = title || nextTitle(get().tabs, "Explorer");
     useFileStore.getState().createSession(tabId, name, cwd);
-    set((s) => ({ tabs: [...s.tabs, { id: tabId, kind: "explorer", title: name }], activeId: tabId }));
+    set((s) => ({
+      tabs: [...s.tabs, { id: tabId, kind: "explorer", title: name, pane: s.focusedPane }],
+      activeIds: showInPane(s, s.focusedPane, tabId),
+    }));
     return tabId;
   },
 
   openTmux: (session, { id, tmuxSessionId } = {}) => {
     const existing = get().tabs.find((t) => t.kind === "tmux" && t.tmuxSession === session);
     if (existing) {
-      set({ activeId: existing.id });
+      // Already open: show it in whichever pane it is already in, and go there.
+      set((s) => ({ activeIds: showInPane(s, existing.pane, existing.id), focusedPane: existing.pane }));
       syncContentFocus(existing.id, get().tabs);
       return existing.id;
     }
     const tabId = id ?? nextId("tmux");
     useTerminalStore.getState().createSession(tabId, session, undefined, session, tmuxSessionId);
     set((s) => ({
-      tabs: [...s.tabs, { id: tabId, kind: "tmux", title: session, tmuxSession: session, tmuxSessionId }],
-      activeId: tabId,
+      tabs: [
+        ...s.tabs,
+        { id: tabId, kind: "tmux", title: session, tmuxSession: session, tmuxSessionId, pane: s.focusedPane },
+      ],
+      activeIds: showInPane(s, s.focusedPane, tabId),
     }));
     return tabId;
   },
@@ -215,14 +301,22 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     // stacking duplicates of the same document.
     const existing = get().tabs.find((t) => t.kind === "viewer" && t.path === path);
     if (existing) {
-      set({ activeId: existing.id });
+      set((s) => ({ activeIds: showInPane(s, existing.pane, existing.id), focusedPane: existing.pane }));
       return existing.id;
     }
     const tabId = nextId("viewer");
-    const tab: Tab = { id: tabId, kind: "viewer", title: basename(path), path, openedFrom: fromTabId };
+    // Beside the explorer it came from, in that explorer's pane — opening a
+    // file from the left pane should not throw it to the right one.
+    const origin = get().tabs.find((t) => t.id === fromTabId);
+    const pane = origin?.pane ?? get().focusedPane;
+    const tab: Tab = { id: tabId, kind: "viewer", title: basename(path), path, openedFrom: fromTabId, pane };
     set((s) => {
       const at = insertIndexFor(s.tabs, fromTabId);
-      return { tabs: [...s.tabs.slice(0, at), tab, ...s.tabs.slice(at)], activeId: tabId };
+      return {
+        tabs: [...s.tabs.slice(0, at), tab, ...s.tabs.slice(at)],
+        activeIds: showInPane(s, pane, tabId),
+        focusedPane: pane,
+      };
     });
     return tabId;
   },
@@ -236,10 +330,9 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   },
 
   close: (id) => {
-    const { tabs, activeId } = get();
-    const index = tabs.findIndex((t) => t.id === id);
-    if (index === -1) return;
-    const tab = tabs[index];
+    const { tabs, activeIds } = get();
+    const tab = tabs.find((t) => t.id === id);
+    if (!tab) return;
 
     if (tab.kind === "terminal" || tab.kind === "tmux") useTerminalStore.getState().closeSession(id);
     if (tab.kind === "explorer") useFileStore.getState().closeSession(id);
@@ -248,13 +341,15 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
     const remaining = tabs.filter((t) => t.id !== id);
     // Closing a file returns you to the explorer you opened it from; failing
-    // that, the neighbour, rather than dumping you on an unrelated tab.
-    const origin = tab.openedFrom && remaining.some((t) => t.id === tab.openedFrom) ? tab.openedFrom : null;
-    const nextActive =
-      activeId === id ? (origin ?? remaining[index]?.id ?? remaining[index - 1]?.id ?? null) : activeId;
+    // that, the neighbour in the same pane, rather than dumping you on an
+    // unrelated tab or on one the other pane is already showing.
+    const origin =
+      tab.openedFrom && remaining.some((t) => t.id === tab.openedFrom && t.pane === tab.pane) ? tab.openedFrom : null;
+    const was = activeIds[tab.pane];
+    const nextActive = was === id ? (origin ?? neighbourInPane(tabs, tab)) : was;
 
-    set({ tabs: remaining, activeId: nextActive });
-    if (nextActive && nextActive !== activeId) syncContentFocus(nextActive, remaining);
+    set({ tabs: remaining, activeIds: showInPane({ activeIds }, tab.pane, nextActive) });
+    if (nextActive && nextActive !== was) syncContentFocus(nextActive, remaining);
   },
 
   move: (id, toIndex) => {
@@ -266,8 +361,68 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (tabs !== get().tabs) set({ tabs });
   },
 
+  moveToPane: (id, pane, toIndex) => {
+    const tab = get().tabs.find((t) => t.id === id);
+    if (!tab || tab.pane === pane) return;
+    const from = tab.pane;
+    // Reassigning the pane is a style change on a wrapper that stays put in
+    // the tree, so the tab's terminal or editor is never torn down and rebuilt
+    // — it just gets drawn in the other column.
+    let tabs = get().tabs.map((t) => (t.id === id ? { ...t, pane } : t));
+    if (toIndex !== undefined) {
+      tabs = reorder(
+        tabs,
+        tabs.findIndex((t) => t.id === id),
+        toIndex,
+      );
+    }
+    const vacated = get().activeIds[from] === id ? neighbourInPane(get().tabs, tab) : get().activeIds[from];
+    const activeIds: [string | null, string | null] = [get().activeIds[0], get().activeIds[1]];
+    activeIds[from] = vacated;
+    // It arrives as the tab that pane is showing: a tab moved somewhere you
+    // cannot see it has gone missing as far as the user is concerned.
+    activeIds[pane] = id;
+    set({ tabs, activeIds, focusedPane: pane });
+    // It is a different width in its new pane, which only a terminal minds.
+    syncContentFocus(id, tabs);
+    if (vacated) syncContentFocus(vacated, tabs);
+  },
+
+  focusPane: (pane) => {
+    if (get().focusedPane === pane) return;
+    set({ focusedPane: pane });
+    const id = get().activeIds[pane];
+    if (id) syncContentFocus(id, get().tabs);
+  },
+
+  refitVisible: () => {
+    const { activeIds, tabs } = get();
+    for (const id of activeIds) if (id) syncContentFocus(id, tabs);
+  },
+
+  mergePanes: () => {
+    const { tabs, activeIds, focusedPane } = get();
+    if (tabs.every((t) => t.pane === 0)) {
+      set({ focusedPane: 0 });
+      return;
+    }
+    // Left pane's tabs first, then the right pane's, so the strip reads in the
+    // order the two panes were laid out.
+    const merged = [...tabs.filter((t) => t.pane === 0), ...tabs.filter((t) => t.pane === 1)].map((t) => ({
+      ...t,
+      pane: 0 as PaneIndex,
+    }));
+    // Whichever pane had the cursor keeps its tab, so leaving the split does
+    // not move you off what you were working on.
+    const keep = activeIds[focusedPane] ?? activeIds[0] ?? activeIds[1] ?? merged[0]?.id ?? null;
+    set({ tabs: merged, activeIds: [keep, null], focusedPane: 0 });
+    if (keep) syncContentFocus(keep, merged);
+  },
+
   setActive: (id) => {
-    set({ activeId: id });
+    const tab = get().tabs.find((t) => t.id === id);
+    if (!tab) return;
+    set((s) => ({ activeIds: showInPane(s, tab.pane, id), focusedPane: tab.pane }));
     syncContentFocus(id, get().tabs);
   },
 
@@ -296,12 +451,13 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (tab.kind === "explorer") useFileStore.getState().updateSession(id, { name: trimmed });
   },
 
-  restore: (saved, activeId) => {
+  restore: (saved, activeIds, focusedPane = 0) => {
     const tabs: Tab[] = [];
     for (const tab of saved) {
+      const pane: PaneIndex = tab.pane === 1 ? 1 : 0;
       if (tab.kind === "terminal") {
         useTerminalStore.getState().createSession(tab.id, tab.title, tab.cwd || undefined);
-        tabs.push({ id: tab.id, kind: "terminal", title: tab.title });
+        tabs.push({ id: tab.id, kind: "terminal", title: tab.title, pane });
       } else if (tab.kind === "tmux" && tab.tmuxSession) {
         useTerminalStore
           .getState()
@@ -312,10 +468,11 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           title: tab.title,
           tmuxSession: tab.tmuxSession,
           tmuxSessionId: tab.tmuxSessionId || undefined,
+          pane,
         });
       } else if (tab.kind === "explorer") {
         useFileStore.getState().createSession(tab.id, tab.title, tab.cwd);
-        tabs.push({ id: tab.id, kind: "explorer", title: tab.title });
+        tabs.push({ id: tab.id, kind: "explorer", title: tab.title, pane });
       } else if (tab.kind === "viewer" && tab.path) {
         tabs.push({
           id: tab.id,
@@ -323,12 +480,21 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           title: tab.title || basename(tab.path),
           path: tab.path,
           openedFrom: tab.openedFrom || undefined,
+          pane,
         });
       }
     }
-    const active = activeId && tabs.some((t) => t.id === activeId) ? activeId : (tabs[0]?.id ?? null);
-    set({ tabs, activeId: active });
-    if (active) syncContentFocus(active, tabs);
+    // A pane with tabs but no remembered active one shows its first, rather
+    // than an empty column beside a full strip.
+    const forPane = (pane: PaneIndex): string | null => {
+      const saved = activeIds[pane];
+      if (saved && tabs.some((t) => t.id === saved && t.pane === pane)) return saved;
+      return tabs.find((t) => t.pane === pane)?.id ?? null;
+    };
+    const active: [string | null, string | null] = [forPane(0), forPane(1)];
+    const focused: PaneIndex = active[focusedPane === 1 ? 1 : 0] ? (focusedPane === 1 ? 1 : 0) : 0;
+    set({ tabs, activeIds: active, focusedPane: focused });
+    for (const id of active) if (id) syncContentFocus(id, tabs);
   },
 }));
 
@@ -363,6 +529,7 @@ export function toWorkspaceTabs(tabs: Tab[]): WorkspaceTab[] {
           ? (terminals[tab.id]?.cdCwd ?? "")
           : "",
     path: tab.path ?? "",
+    pane: tab.pane,
   }));
 }
 

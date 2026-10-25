@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage } from "~/lib/errors";
 import { getExt, isDirectViewerFile } from "~/lib/fileTypes";
 import { formatSize } from "~/lib/format";
-import { useTabsStore } from "~/stores/tabsStore";
+import { isTabVisible, useTabsStore } from "~/stores/tabsStore";
 import { useToastStore } from "~/stores/toastStore";
 import CannotDisplay from "./files/CannotDisplay";
 import FileViewer from "./files/FileViewer";
@@ -39,7 +39,12 @@ export default function ViewerPane({ tabId, path }: { tabId: string; path: strin
   const [conflict, setConflict] = useState<string | null>(null);
   /** The content that save was carrying, held while the user decides. */
   const [pending, setPending] = useState<string | null>(null);
-  const isActive = useTabsStore((s) => s.activeId === tabId);
+  /**
+   * On screen, not focused. In a split both panes draw a tab at once, and the
+   * one without the cursor is just as stale as the one with it — so the file
+   * watcher follows what is drawn rather than what is being typed into.
+   */
+  const isActive = useTabsStore((s) => isTabVisible(s, tabId));
   const abortRef = useRef<AbortController | null>(null);
 
   /** Set once the user has chosen to see a binary file's bytes as text. */
