@@ -8,6 +8,7 @@ import { useTerminalStore } from "~/stores/terminalStore";
 import { showToast } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
 import CommandChips, { type Chip } from "./CommandChips";
+import { CLI_VENDORS, CODE_COMMON_KEYS, type QuickKey } from "./cliKeys";
 import {
   COMBO_MODES,
   COMBO_SETS,
@@ -20,12 +21,6 @@ import {
 } from "./combos";
 import DropUpSelect from "./DropUpSelect";
 import { dragScroll } from "./dragScroll";
-
-interface QuickKey {
-  label: string;
-  key: string;
-  title: string;
-}
 
 interface QuickKeyGroup {
   label: string;
@@ -68,91 +63,6 @@ const CODE_NAV_KEYS: QuickKey[] = [
   { label: "←", title: "Left" },
   { label: "→", title: "Right" },
 ].map((k) => ({ ...k, key: comboSequence(k.label, "none") }));
-
-// Keys every coding CLI shares, shown with that CLI's own.
-const CODE_COMMON_KEYS: QuickKey[] = [
-  { label: "Ctrl+C", key: "\x03", title: "Cancel / interrupt / quit" },
-  { label: "Ctrl+L", key: "\x0c", title: "Clear screen (Claude/Codex) / View logs (OpenCode)" },
-  { label: "Ctrl+G", key: "\x07", title: "Open external editor (Claude/Codex)" },
-  { label: "Esc Esc", key: "\x1b\x1b", title: "Rewind history (Claude) / Edit prev message (Codex)" },
-];
-
-// Per-vendor CLI groups: keys and slash commands. The vendor name is also the
-// command that starts it.
-interface CliVendor {
-  name: string;
-  keys: QuickKey[];
-  /**
-   * Typed into the CLI *without* a trailing Enter.
-   *
-   * An Enter in the same write as the text does not submit: measured against
-   * opencode, both `/help\n` and `/help\r` leave the command sitting in the
-   * input box, while writing `/help` and then `\r` opens the palette and runs
-   * it. So the command used to end up as prose in a prompt rather than a
-   * command. The Enter button beside these chips is that second write.
-   */
-  slashCmds: { label: string; title: string; command: string }[];
-}
-
-const CLI_VENDORS: CliVendor[] = [
-  {
-    name: "claude",
-    keys: [
-      { label: "Shift+Tab", key: "\x1b[Z", title: "Cycle permission modes" },
-      { label: "Ctrl+O", key: "\x0f", title: "Toggle full transcript view" },
-      { label: "Ctrl+R", key: "\x12", title: "Reverse history search" },
-      { label: "Alt+T", key: "\x1bt", title: "Toggle extended thinking" },
-      { label: "Alt+P", key: "\x1bp", title: "Model picker" },
-    ],
-    slashCmds: [
-      { label: "/clear", title: "Clear conversation context", command: "/clear" },
-      { label: "/compact", title: "Compact conversation to save context", command: "/compact" },
-      { label: "/cost", title: "Show token usage and cost", command: "/cost" },
-      { label: "/help", title: "Show available commands", command: "/help" },
-      { label: "/model", title: "Show or switch model", command: "/model" },
-      { label: "/exit", title: "Exit Claude Code", command: "/exit" },
-      { label: "/config", title: "Open config", command: "/config" },
-      { label: "/memory", title: "Edit CLAUDE.md memory", command: "/memory" },
-      { label: "/review", title: "Review a PR", command: "/review" },
-      { label: "/context", title: "Show context window usage", command: "/context" },
-      { label: "/resume", title: "Resume a past session", command: "/resume" },
-      { label: "/agents", title: "Manage subagents", command: "/agents" },
-      { label: "/status", title: "Show account and system status", command: "/status" },
-      { label: "/vim", title: "Toggle vim mode", command: "/vim" },
-    ],
-  },
-  {
-    name: "codex",
-    keys: [
-      { label: "Shift+Tab", key: "\x1b[Z", title: "Cycle approval modes" },
-      { label: "Ctrl+O", key: "\x0f", title: "Choose environment (cloud)" },
-    ],
-    slashCmds: [
-      { label: "/help", title: "Show available commands", command: "/help" },
-      { label: "/model", title: "Show or switch model", command: "/model" },
-      { label: "/exit", title: "Exit Codex", command: "/exit" },
-      { label: "/clear", title: "Clear conversation", command: "/clear" },
-      { label: "/approval", title: "Change approval mode", command: "/approval" },
-    ],
-  },
-  {
-    name: "opencode",
-    keys: [
-      { label: "Ctrl+O", key: "\x0f", title: "Model selection dialog" },
-      { label: "Ctrl+K", key: "\x0b", title: "Command dialog" },
-      { label: "Ctrl+N", key: "\x0e", title: "New session" },
-      { label: "Ctrl+X", key: "\x18", title: "Cancel generation" },
-      { label: "Ctrl+S", key: "\x13", title: "Send message" },
-      { label: "Ctrl+A", key: "\x01", title: "Switch session" },
-    ],
-    slashCmds: [
-      { label: "/help", title: "Show available commands", command: "/help" },
-      { label: "/exit", title: "Exit OpenCode", command: "/exit" },
-      { label: "/clear", title: "Clear conversation", command: "/clear" },
-      { label: "/compact", title: "Compact context", command: "/compact" },
-    ],
-  },
-];
 
 // Git quick action commands
 const GIT_QUICK_CMDS: { label: string; title: string; command: string }[] = [

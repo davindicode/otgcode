@@ -67,6 +67,11 @@ workspace that is saved on the host rather than in the browser.
   the keyboard cannot change how much terminal you can see.
 - **Bksp and the arrow keys sit beside Enter** in a coding CLI's keys, since its
   prompts are an arrow-key list and its typos are taken back with Bksp.
+- **Each CLI's keys read from what that CLI actually binds.** opencode drives
+  almost everything from a leader key, so its buttons send `ctrl+x` and the key
+  together — the sidebar, sessions, agents, models, compaction, undo and redo
+  are all reachable now. Claude Code gained its todo list, fast mode, queue and
+  send-now, stop-all-agents and undo.
 - **A launch button per CLI**, bare and without permission flags — start it,
   then confirm in the CLI itself.
 - **Custom commands and custom slash commands**, added, edited and removed from
@@ -279,6 +284,11 @@ workspace that is saved on the host rather than in the browser.
 - Breadcrumb navigation is disabled while the path is being edited, so the tree
   cannot desync from the field, and a Go button submits it on a phone.
 - A file with no extension no longer reports its whole path as its type.
+- **Every opencode key did the wrong thing.** They were the old TUI's plain
+  Ctrl chords, and on current builds `Ctrl+X` is the leader rather than cancel,
+  `Ctrl+A` jumps to the start of the line rather than switching session, and
+  the rest reached nothing. `Ctrl+L` is also described correctly now: it clears
+  the input in Claude Code, not the screen.
 - **A file's contents could be served from the browser's cache after it changed
   on disk.** Nothing under `/api` carried a `Cache-Control` header, an ETag or
   a `Last-Modified`, and every request for one file is the same URL — so a
