@@ -754,13 +754,15 @@ html.light .glow {
 
 /*
  * The line. Feathered left and right so it reads as a seam rather than a
- * column of its own; square at top and bottom, where the two halves meet and
- * where the gaps do the work a fade used to.
+ * column of its own; square at top and bottom, where the two halves meet.
+ * Each half fills its row, so together they are one unbroken line from under
+ * the app header to the bottom of the window.
  */
 .pane-seam::after,
 .pane-divider::after {
   content: "";
   position: absolute;
+  inset: 0 -3px;
   background: linear-gradient(
     to right,
     transparent 0%,
@@ -769,16 +771,6 @@ html.light .glow {
     transparent 100%
   );
   transition: background 140ms ease;
-}
-
-/* Clear of the app header, flush at the bottom where the divider takes over. */
-.pane-seam::after {
-  inset: 0.5rem -3px 0;
-}
-
-/* Flush at the top, clear of the composer below. */
-.pane-divider::after {
-  inset: 0 -3px 0.75rem;
 }
 
 /*
