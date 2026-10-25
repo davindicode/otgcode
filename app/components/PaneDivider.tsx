@@ -62,10 +62,6 @@ export default function PaneDivider() {
 
   return (
     <>
-      {/* The strip row's half of the seam: drawn, not draggable. Separate
-          because one element cannot be grabbable in one grid row and inert in
-          another, and over the strips it must be inert. */}
-      <div className="pane-seam" aria-hidden="true" />
       <div
         ref={ref}
         role="separator"
@@ -81,6 +77,11 @@ export default function PaneDivider() {
         title="Drag to resize — double-click to even them up"
         className="pane-divider"
       />
+      {/* The strip row's half of the same line: drawn, never grabbed, and lit
+          by the divider through a sibling rule so the two read as one. After
+          it in the DOM because that rule needs it to be; the grid decides
+          where each of them actually goes. */}
+      <div className="pane-seam" aria-hidden="true" />
     </>
   );
 }
