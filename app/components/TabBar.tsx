@@ -340,6 +340,21 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
       document.removeEventListener("pointercancel", end);
       document.removeEventListener("touchmove", onTouchMove);
       if (!dragging) return;
+
+      // A pointerup over a tab is followed by a click on that tab, and a tab's
+      // click selects it. So letting a drag go anywhere near another tab
+      // landed the dragged one and then showed whichever tab it was dropped
+      // on — most visible across panes, where the pane you had just dragged
+      // into switched to something else as you released. dragScroll has
+      // swallowed its own click all along; this is the reorder's.
+      const swallow = (ev: Event) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+      };
+      document.addEventListener("click", swallow, { capture: true, once: true });
+      // If no click follows, this would otherwise eat the next real one.
+      setTimeout(() => document.removeEventListener("click", swallow, { capture: true }), 100);
+
       // Letting go is what commits the pane: until now the tab has only been
       // drawn in the other strip, and its content has stayed where it was.
       const preview = useTabsStore.getState().drag;
@@ -396,6 +411,30 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
   const plusRef = useRef<HTMLButtonElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
   const { onPointerDown } = useTabReorder(stripRef, activeId);
+
+  /**
+   * Hold each strip's scroll still for the length of a drag.
+   *
+   * A cross-pane preview changes both strips' contents — the tab leaves one
+   * and appears in the other — and a strip that was scrolled has its
+   * scrollLeft clamped the moment its content narrows under it. The browser is
+   * right to do that and there is nothing to scroll back to, but mid-drag it
+   * reads as the strip throwing away the slide position you had set. Nothing
+   * should scroll under a drag that is not itself a pan.
+   */
+  const pinned = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    if (!drag) {
+      pinned.current = null;
+      return;
+    }
+    // Captured on the first render of the drag, which is before any tab has
+    // changed pane — so it is the position the strip had when it began.
+    if (pinned.current === null) pinned.current = el.scrollLeft;
+    else if (el.scrollLeft !== pinned.current) el.scrollLeft = pinned.current;
+  });
 
   const pick = (kind: NewKind) => {
     setMenuOpen(false);
