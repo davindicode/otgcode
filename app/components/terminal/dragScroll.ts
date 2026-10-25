@@ -20,20 +20,28 @@ export function dragScroll(e: React.PointerEvent<HTMLElement>): void {
   if (el.scrollWidth <= el.clientWidth) return;
 
   const startX = e.clientX;
-  const startScroll = el.scrollLeft;
-  let dragged = false;
+  let lastX = startX;
 
   const onMove = (ev: PointerEvent) => {
-    const dx = ev.clientX - startX;
-    if (Math.abs(dx) > DRAG_SLOP_PX) dragged = true;
-    el.scrollLeft = startScroll - dx;
+    // Step by step, not measured from where the press began.
+    //
+    // Against a fixed origin the browser's clamp at either end accumulated:
+    // carry on past the edge and the gesture banks up distance the content
+    // cannot travel, so coming back has to pay all of it off before anything
+    // moves. That is the row sticking at the boundary and then appearing to
+    // run backwards — the pointer and the content had come apart, and only
+    // the pointer knew. An incremental delta cannot bank anything, so the
+    // content turns around in the same pixel the pointer does.
+    el.scrollLeft -= ev.clientX - lastX;
+    lastX = ev.clientX;
   };
 
   const end = () => {
     document.removeEventListener("pointermove", onMove);
     document.removeEventListener("pointerup", end);
     document.removeEventListener("pointercancel", end);
-    if (!dragged) return;
+    // Net travel, so a press that only wobbled still counts as a click.
+    if (Math.abs(lastX - startX) <= DRAG_SLOP_PX) return;
     const swallow = (ev: Event) => {
       ev.stopPropagation();
       ev.preventDefault();

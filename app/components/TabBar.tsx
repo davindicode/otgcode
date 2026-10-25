@@ -412,30 +412,6 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
   const stripRef = useRef<HTMLDivElement>(null);
   const { onPointerDown } = useTabReorder(stripRef, activeId);
 
-  /**
-   * Hold each strip's scroll still for the length of a drag.
-   *
-   * A cross-pane preview changes both strips' contents — the tab leaves one
-   * and appears in the other — and a strip that was scrolled has its
-   * scrollLeft clamped the moment its content narrows under it. The browser is
-   * right to do that and there is nothing to scroll back to, but mid-drag it
-   * reads as the strip throwing away the slide position you had set. Nothing
-   * should scroll under a drag that is not itself a pan.
-   */
-  const pinned = useRef<number | null>(null);
-  useLayoutEffect(() => {
-    const el = stripRef.current;
-    if (!el) return;
-    if (!drag) {
-      pinned.current = null;
-      return;
-    }
-    // Captured on the first render of the drag, which is before any tab has
-    // changed pane — so it is the position the strip had when it began.
-    if (pinned.current === null) pinned.current = el.scrollLeft;
-    else if (el.scrollLeft !== pinned.current) el.scrollLeft = pinned.current;
-  });
-
   const pick = (kind: NewKind) => {
     setMenuOpen(false);
     // Open it here, in the pane whose + was pressed.
