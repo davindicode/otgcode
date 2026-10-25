@@ -722,13 +722,46 @@ html.light .glow {
  * through a negative inset — a six-pixel target is hard to hit with a
  * trackpad and impossible with a finger.
  */
+/*
+ * The seam carried on through the tab strips. Drawn only — never grabbed,
+ * because its own grab area up here is what used to steal presses from the
+ * tabs beside it and resize the panes instead. Inset from the top so it
+ * starts below the app header rather than running into it, which is what
+ * makes it read as a separator under the header.
+ */
+.pane-seam {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  width: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.pane-seam::after {
+  content: "";
+  position: absolute;
+  inset: 0 -3px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    var(--color-line) 42%,
+    var(--color-line) 58%,
+    transparent 100%
+  );
+  /* Fades in under the header and is solid by the bottom, where the
+     draggable half of the seam picks it up. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 0.75rem, black 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 0.75rem, black 100%);
+}
+
 .pane-divider {
   grid-column: 2;
   /*
    * The content row only. Spanning the whole grid put a fourteen-pixel grab
    * area over both tab strips, so pressing a tab near the pane edge grabbed
    * the divider instead and dragging it resized the panes — which reads as the
-   * strip lurching sideways for no reason.
+   * strip lurching sideways for no reason. `.pane-seam` draws the rest.
    */
   grid-row: 2;
   position: relative;
@@ -750,10 +783,9 @@ html.light .glow {
 
 /*
  * What you see: a soft-edged line rather than a bar. The horizontal gradient
- * feathers the sides so it reads as a seam instead of a column of its own,
- * and the mask fades both ends out before they reach the tab strip above and
- * the composer below — butted hard against those, it looked like it was
- * colliding with their buttons.
+ * feathers the sides so it reads as a seam instead of a column of its own.
+ * Solid at the top, where it continues from the strips, and fading out before
+ * it reaches the composer below.
  */
 .pane-divider::after {
   content: "";
@@ -766,8 +798,8 @@ html.light .glow {
     var(--color-line) 58%,
     transparent 100%
   );
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 1.25rem, black calc(100% - 1.25rem), transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0, black 1.25rem, black calc(100% - 1.25rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 0, black calc(100% - 1.5rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, black 0, black calc(100% - 1.5rem), transparent 100%);
   transition: background 140ms ease;
 }
 
@@ -785,3 +817,4 @@ html.light .glow {
 .pane-divider:focus-visible {
   outline: none;
 }
+

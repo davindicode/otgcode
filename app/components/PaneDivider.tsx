@@ -61,20 +61,26 @@ export default function PaneDivider() {
   }, [split]);
 
   return (
-    <div
-      ref={ref}
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize panes"
-      aria-valuenow={Math.round(split * 100)}
-      aria-valuemin={20}
-      aria-valuemax={80}
-      tabIndex={0}
-      onPointerDown={onPointerDown}
-      onKeyDown={onKeyDown}
-      onDoubleClick={() => setSplit(0.5)}
-      title="Drag to resize — double-click to even them up"
-      className="pane-divider"
-    />
+    <>
+      {/* The strip row's half of the seam: drawn, not draggable. Separate
+          because one element cannot be grabbable in one grid row and inert in
+          another, and over the strips it must be inert. */}
+      <div className="pane-seam" aria-hidden="true" />
+      <div
+        ref={ref}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize panes"
+        aria-valuenow={Math.round(split * 100)}
+        aria-valuemin={20}
+        aria-valuemax={80}
+        tabIndex={0}
+        onPointerDown={onPointerDown}
+        onKeyDown={onKeyDown}
+        onDoubleClick={() => setSplit(0.5)}
+        title="Drag to resize — double-click to even them up"
+        className="pane-divider"
+      />
+    </>
   );
 }
