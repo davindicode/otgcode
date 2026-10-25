@@ -31,7 +31,7 @@ describe("CLI key sets", () => {
   });
 
   it("puts the leader first in a chord, so the CLI reads it as a prefix", () => {
-    const chords = all.filter((k) => k.label.startsWith("⌃X "));
+    const chords = all.filter((k) => k.label.startsWith("Ctrl+X "));
     // Both Claude Code and opencode use ctrl+x for this.
     expect(chords.length).toBeGreaterThan(0);
     for (const key of chords) {
@@ -43,6 +43,13 @@ describe("CLI key sets", () => {
   it("toggles the opencode sidebar, which is the leader then b", () => {
     const opencode = CLI_VENDORS.find((v) => v.name === "opencode");
     expect(opencode?.keys.find((k) => k.title.includes("sidebar"))?.key).toBe("\x18b");
+  });
+
+  it("spells Ctrl out, the way every other button in the row does", () => {
+    // A chord used to read "⌃X B" to keep the chip narrow, beside buttons
+    // labelled Ctrl+C and Alt+T — two spellings of the same key in one row,
+    // and the macOS glyph means nothing to a phone.
+    for (const key of all) expect(key.label, key.label).not.toMatch(/[⌃⌥⇧⌘]/);
   });
 
   it("gives every key in a set its own label, so no button is a duplicate", () => {
