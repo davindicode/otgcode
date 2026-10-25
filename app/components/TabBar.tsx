@@ -372,7 +372,6 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
   const [closing, setClosing] = useState<Tab | null>(null);
   const unsaved = useTabsStore((s) => s.unsaved);
   const plusRef = useRef<HTMLButtonElement>(null);
-  const dim = split && pane !== focusedPane;
   const stripRef = useRef<HTMLDivElement>(null);
   const { onPointerDown } = useTabReorder(stripRef);
 
@@ -403,11 +402,12 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
   };
 
   return (
-    <div
-      className={`bar-edge relative flex shrink-0 items-center border-b border-line bg-surface transition-opacity ${
-        dim ? "opacity-60" : ""
-      }`}
-    >
+    // Both strips look the same. The unfocused one used to be held back to
+    // 60% opacity as a focus cue, which dimmed its + along with everything
+    // else and read as a disabled button — and the cue was not needed anyway:
+    // each pane has its own +, so which one you press is which pane it opens
+    // in, and the active tab's own highlight already says where you are.
+    <div className="bar-edge relative flex shrink-0 items-center border-b border-line bg-surface">
       <div
         ref={stripRef}
         data-pane-strip={pane}

@@ -89,6 +89,31 @@ export default function AppShell() {
   const hasRoom = useSplitRoom();
   const split = panes === 2 && hasRoom;
 
+  /**
+   * The tab a pane is drawing, or null when it has nothing to draw.
+   *
+   * One answer for both the tabs and the empty notice, so a pane cannot end up
+   * drawing neither — which is what a blank dark pane was: the notice spanned
+   * both columns and only appeared when the whole app had no tabs, so a pane
+   * that was merely empty itself got nothing at all.
+   */
+  const drawnIn = (pane: PaneIndex): string | null => {
+    if (!split && pane !== focusedPane) return null;
+    const id = activeIds[pane];
+    return id && tabs.some((t) => t.id === id && t.pane === pane) ? id : null;
+  };
+  const drawn: Record<PaneIndex, string | null> = { 0: drawnIn(0), 1: drawnIn(1) };
+  const onScreen = split ? PANES : [focusedPane];
+
+  /**
+   * Which grid track a pane occupies. Not `COLUMN` directly: with one pane
+   * drawn the grid has a single track, so the right pane's column 3 made the
+   * grid invent tracks 2 and 3 beyond the full-width first one — and
+   * everything in them was clipped away by the overflow. Showing the right
+   * pane on a phone was a dark empty viewport for exactly that reason.
+   */
+  const columnOf = (pane: PaneIndex): number => (split ? COLUMN[pane] : 1);
+
   // Leaving the split would otherwise strand the right pane's tabs in a column
   // that is no longer drawn. Narrowing the window must not: that is temporary,
   // and the switcher in Settings reaches the other pane while it lasts.
@@ -192,7 +217,7 @@ export default function AppShell() {
             // the + button, and a + that opens tabs into a column you cannot
             // see is a + that loses them.
             split || pane === focusedPane ? (
-              <div key={`strip-${pane}`} style={{ gridColumn: COLUMN[pane], gridRow: 1 }} className="min-w-0">
+              <div key={`strip-${pane}`} style={{ gridColumn: columnOf(pane), gridRow: 1 }} className="min-w-0">
                 <TabBar pane={pane} split={split} />
               </div>
             ) : null,
@@ -200,43 +225,51 @@ export default function AppShell() {
 
           {split && <PaneDivider />}
 
-          {tabs.length === 0 ? (
-            <div
-              style={{ gridColumn: "1 / -1", gridRow: 2 }}
-              className="flex items-center justify-center text-sm text-ink-faint"
-            >
-              No tabs open
-            </div>
-          ) : (
-            tabs.map((tab) => {
-              const pane = split ? tab.pane : focusedPane;
-              const showing = activeIds[tab.pane] === tab.id && (split || tab.pane === focusedPane);
-              const terminal = tab.kind === "terminal" || tab.kind === "tmux";
-              return (
-                <div
-                  key={tab.id}
-                  className="flex min-h-0 min-w-0 flex-col"
-                  style={{ gridColumn: COLUMN[pane], gridRow: 2, display: showing ? "flex" : "none" }}
-                >
-                  {terminal && <TerminalPane sessionId={tab.id} />}
-                  {tab.kind === "explorer" && <FilesPage sessionId={tab.id} />}
-                  {tab.kind === "viewer" && tab.path && <ViewerPane tabId={tab.id} path={tab.path} />}
-                  {/* The tab's own control surface, below its own pane and
+          {/* Per pane, not once across both: an empty right pane is its own
+              empty pane, and saying nothing there left a dark rectangle that
+              looked broken rather than empty. */}
+          {onScreen.map((pane) =>
+            drawn[pane] === null ? (
+              <div
+                key={`empty-${pane}`}
+                style={{ gridColumn: columnOf(pane), gridRow: 2 }}
+                className="flex flex-col items-center justify-center gap-1 px-4 text-center"
+              >
+                <span className="text-sm text-ink-faint">
+                  {tabs.length === 0 ? "No tabs open" : "Nothing in this pane"}
+                </span>
+                <span className="text-[11px] text-ink-ghost">Use + above to open a tab here</span>
+              </div>
+            ) : null,
+          )}
+
+          {tabs.map((tab) => {
+            const showing = drawn[tab.pane] === tab.id;
+            const terminal = tab.kind === "terminal" || tab.kind === "tmux";
+            return (
+              <div
+                key={tab.id}
+                className="flex min-h-0 min-w-0 flex-col"
+                style={{ gridColumn: columnOf(tab.pane), gridRow: 2, display: showing ? "flex" : "none" }}
+              >
+                {terminal && <TerminalPane sessionId={tab.id} />}
+                {tab.kind === "explorer" && <FilesPage sessionId={tab.id} />}
+                {tab.kind === "viewer" && tab.path && <ViewerPane tabId={tab.id} path={tab.path} />}
+                {/* The tab's own control surface, below its own pane and
                       nowhere else. One shared composer bound to the active
                       session carried the open drawer and the typed text
                       across tabs, and could leave a tmux drawer open on a tab
                       with no tmux session behind it. The terminal gives up the
                       height when a drawer opens, which its ResizeObserver
                       turns into a refit. */}
-                  {terminal && (
-                    <div className="min-w-0 shrink-0">
-                      <InputBox sessionId={tab.id} />
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
+                {terminal && (
+                  <div className="min-w-0 shrink-0">
+                    <InputBox sessionId={tab.id} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
       {/* Over the app, not instead of it. Returning a different tree here
