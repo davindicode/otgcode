@@ -208,9 +208,11 @@ function NewTabMenu({
       style={{ left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? "visible" : "hidden" }}
       className="fixed z-50 w-56 overflow-hidden glass rounded-panel py-1"
     >
-      {item("terminal", "Terminal tab", "A new shell session", <TerminalIcon />)}
-      {item("tmux", "tmux session", "Attach to a session that survives reconnects", <TmuxIcon />)}
-      {item("explorer", "Explorer tab", "Browse files and folders", <ExplorerIcon />)}
+      {/* The menu already says "New tab", so each item saying "tab" again was
+          three words doing the work of one. */}
+      {item("terminal", "Terminal", "A new shell session", <TerminalIcon />)}
+      {item("tmux", "tmux", "Attach to a session that survives reconnects", <TmuxIcon />)}
+      {item("explorer", "Explorer", "Browse files and folders", <ExplorerIcon />)}
     </div>
   );
 }
@@ -246,7 +248,7 @@ function dropIndex(others: HTMLElement[], x: number): number {
 function useTabReorder(stripRef: RefObject<HTMLDivElement | null>) {
   const move = useTabsStore((s) => s.move);
   const moveToPane = useTabsStore((s) => s.moveToPane);
-  const [dragId, setDragId] = useState<string | null>(null);
+  const setDrag = useTabsStore((s) => s.setDrag);
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
@@ -262,10 +264,12 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>) {
     let dragging = false;
     let hold: ReturnType<typeof setTimeout> | null = null;
 
+    const own = useTabsStore.getState().tabs.find((t) => t.id === id)?.pane ?? 0;
+
     const start = () => {
       hold = null;
       dragging = true;
-      setDragId(id);
+      setDrag({ id, pane: own });
     };
 
     const onMove = (ev: PointerEvent) => {
@@ -277,27 +281,28 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>) {
         start();
       }
       // Which strip the pointer is over, so dragging a tab onto the other
-      // pane's strip hands it over rather than doing nothing. Both strips are
-      // in the document, so this is a hit test rather than a drop target.
-      const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>("[data-pane-strip]")
+      // pane's strip previews it there rather than doing nothing. Both strips
+      // are in the document, so this is a hit test rather than a drop target.
+      const under = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>("[data-pane-strip]")
         ?.dataset.paneStrip;
-      const landing =
-        over === undefined ? strip : (document.querySelector<HTMLElement>(`[data-pane-strip="${over}"]`) ?? strip);
+      // Off both strips, it keeps the pane it was last over: dragging through
+      // the gap between them should not snap it back and forth.
+      const over = under === undefined ? (useTabsStore.getState().drag?.pane ?? own) : under === "1" ? 1 : 0;
+      setDrag({ id, pane: over });
+
+      // The ordering preview is the real thing moving, as it always was — the
+      // strip is its own preview. Only the pane is held back.
+      const landing = document.querySelector<HTMLElement>(`[data-pane-strip="${over}"]`) ?? strip;
       const others = [...landing.querySelectorAll<HTMLElement>("[data-tab-id]")].filter(
         (el) => el.dataset.tabId !== id,
       );
       const at = dropIndex(others, ev.clientX);
-      // `at` indexes the landing strip; `move` and `moveToPane` both take an
-      // index into the whole strip, which is where the neighbour it lands
-      // before actually sits.
+      // `at` indexes the landing strip; `move` takes an index into the whole
+      // strip, which is where the neighbour it lands before actually sits.
       const before = others[at]?.dataset.tabId;
       const all = useTabsStore.getState().tabs;
       const global = before ? all.filter((t) => t.id !== id).findIndex((t) => t.id === before) : all.length - 1;
-      if (over !== undefined && Number(over) !== useTabsStore.getState().tabs.find((t) => t.id === id)?.pane) {
-        moveToPane(id, Number(over) === 1 ? 1 : 0, global);
-      } else {
-        move(id, global);
-      }
+      move(id, global);
     };
 
     // Dragging and scrolling are the same gesture to the browser; the drag wins
@@ -312,7 +317,17 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>) {
       document.removeEventListener("pointerup", end);
       document.removeEventListener("pointercancel", end);
       document.removeEventListener("touchmove", onTouchMove);
-      if (dragging) setDragId(null);
+      if (!dragging) return;
+      // Letting go is what commits the pane: until now the tab has only been
+      // drawn in the other strip, and its content has stayed where it was.
+      const preview = useTabsStore.getState().drag;
+      setDrag(null);
+      if (preview && preview.pane !== own) {
+        // The preview is what the user was looking at, so it is what commits —
+        // including the index the ordering preview already settled on.
+        const order = useTabsStore.getState().tabs.findIndex((t) => t.id === preview.id);
+        moveToPane(preview.id, preview.pane, order);
+      }
     }
 
     if (holdFirst) hold = setTimeout(start, TOUCH_HOLD_MS);
@@ -322,7 +337,7 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>) {
     document.addEventListener("touchmove", onTouchMove, { passive: false });
   };
 
-  return { dragId, onPointerDown };
+  return { onPointerDown };
 }
 
 /**
@@ -341,7 +356,10 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
   // In a split a strip shows its own pane's tabs. With one pane drawn, every
   // tab is reachable from it, whichever pane it is assigned to — otherwise
   // narrowing the window would hide tabs with no way back to them.
-  const tabs = split ? allTabs.filter((t) => t.pane === pane) : allTabs;
+  const drag = useTabsStore((s) => s.drag);
+  // A tab being dragged shows in the strip it is over, not the one it still
+  // belongs to — which is the whole preview.
+  const tabs = split ? allTabs.filter((t) => (drag?.id === t.id ? drag.pane : t.pane) === pane) : allTabs;
   const activeId = split ? activeIds[pane] : activeIds[focusedPane];
   const setActive = useTabsStore((s) => s.setActive);
   const close = useTabsStore((s) => s.close);
@@ -356,7 +374,7 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
   const plusRef = useRef<HTMLButtonElement>(null);
   const dim = split && pane !== focusedPane;
   const stripRef = useRef<HTMLDivElement>(null);
-  const { dragId, onPointerDown } = useTabReorder(stripRef);
+  const { onPointerDown } = useTabReorder(stripRef);
 
   const pick = (kind: NewKind) => {
     setMenuOpen(false);
@@ -400,7 +418,7 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
           <RenamableTab
             key={tab.id}
             id={tab.id}
-            dragging={tab.id === dragId}
+            dragging={tab.id === drag?.id}
             name={tab.title}
             isActive={tab.id === activeId}
             // A viewer tab is named by its file; renaming it would be a lie.

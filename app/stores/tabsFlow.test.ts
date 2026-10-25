@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { focusedTabId, type PaneIndex, useTabsStore } from "~/stores/tabsStore";
+import { focusedTabId, type PaneIndex, stripPane, type Tab, useTabsStore } from "~/stores/tabsStore";
 
 // Exercises the real store, so ordering and focus are checked together.
 function reset() {
@@ -171,5 +171,34 @@ describe("two panes", () => {
     useTabsStore.getState().restore(saved, ["gone", "r2"], 1);
     expect(useTabsStore.getState().activeIds).toEqual(["l1", "r2"]);
     expect(useTabsStore.getState().focusedPane).toBe(1);
+  });
+});
+
+describe("dragging a tab between panes", () => {
+  it("shows it in the strip it is over without moving it there yet", () => {
+    reset();
+    const a = useTabsStore.getState().openTerminal();
+    const b = useTabsStore.getState().openTerminal();
+
+    useTabsStore.getState().setDrag({ id: b, pane: 1 });
+    const state = useTabsStore.getState();
+    // The strip draws it on the right...
+    expect(stripPane(state, state.tabs.find((t) => t.id === b) as Tab)).toBe(1);
+    // ...while the tab, and so its content, is still on the left.
+    expect(state.tabs.find((t) => t.id === b)?.pane).toBe(0);
+    expect(state.activeIds).toEqual([b, null]);
+    expect(stripPane(state, state.tabs.find((t) => t.id === a) as Tab)).toBe(0);
+  });
+
+  it("leaves nothing behind when the drag is abandoned", () => {
+    reset();
+    const t = useTabsStore.getState().openTerminal();
+    useTabsStore.getState().setDrag({ id: t, pane: 1 });
+    useTabsStore.getState().setDrag(null);
+
+    const state = useTabsStore.getState();
+    expect(state.drag).toBeNull();
+    expect(state.tabs.find((x) => x.id === t)?.pane).toBe(0);
+    expect(state.activeIds).toEqual([t, null]);
   });
 });

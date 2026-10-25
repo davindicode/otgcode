@@ -3,7 +3,7 @@ import { MAX_FONT_SIZE, MIN_FONT_SIZE } from "~/lib/constants";
 import { useSplitRoom } from "~/lib/useSplitRoom";
 import { type PaneCount, SPLIT_MIN_WIDTH_PX } from "~/lib/workspace.shared";
 import { useAuthStore } from "~/stores/authStore";
-import { useTabsStore } from "~/stores/tabsStore";
+import { type PaneIndex, useTabsStore } from "~/stores/tabsStore";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { useToastStore } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
@@ -12,11 +12,12 @@ import PasswordSetup from "./PasswordSetup";
 
 const MIN_PASSWORD_LENGTH = 6;
 
-function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+/** `description` is for a section whose controls need one. Most do not. */
+function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div className="px-3 py-3">
       <h3 className="text-xs font-medium text-ink-muted">{title}</h3>
-      <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">{description}</p>
+      {description && <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">{description}</p>}
       <div className="mt-3">{children}</div>
     </div>
   );
@@ -107,7 +108,7 @@ function Appearance() {
 
 /**
  * One pane or two side by side, and — when there is only room to draw one of
- * the two — which of them that is.
+ * the two — which of them is on screen.
  *
  * The split button stays visible on a narrow screen rather than disappearing:
  * a control that vanishes reads as broken, where a disabled one with a reason
@@ -123,60 +124,57 @@ function Layout() {
   const focusPane = useTabsStore((s) => s.focusPane);
   const tabs = useTabsStore((s) => s.tabs);
 
-  const choice = (value: PaneCount, label: string, hint: string) => {
-    const blocked = value === 2 && !hasRoom;
-    return (
-      <button
-        type="button"
-        onClick={() => setPanes(value)}
-        disabled={blocked}
-        aria-pressed={panes === value}
-        title={blocked ? `Needs a window at least ${SPLIT_MIN_WIDTH_PX}px wide and wider than it is tall` : hint}
-        className={`flex-1 rounded-control px-2 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-          panes === value ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
-        }`}
-      >
-        {label}
-      </button>
-    );
-  };
+  const pick = <T,>(value: T, current: T, onPick: (v: T) => void, label: string, disabled = false, hint?: string) => (
+    <button
+      type="button"
+      onClick={() => onPick(value)}
+      disabled={disabled}
+      aria-pressed={current === value}
+      title={hint}
+      className={`rounded-control px-2.5 py-0.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+        current === value ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  const row = (label: string, controls: React.ReactNode) => (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-[11px] text-ink-dim">{label}</span>
+      <div className="flex items-center gap-1 rounded-control border border-line bg-raised p-0.5">{controls}</div>
+    </div>
+  );
 
   return (
-    <div className="space-y-2 border-t border-line pt-3">
-      <span className="text-xs text-ink-dim">Panes</span>
-      <div className="flex gap-1 rounded-control border border-line bg-raised p-1">
-        {choice(1, "Single", "One pane, the full width")}
-        {choice(2, "Split", "Two panes with a divider you can drag")}
-      </div>
+    <>
+      {row(
+        "Panes",
+        <>
+          {pick(1 as PaneCount, panes, setPanes, "Single")}
+          {pick(
+            2 as PaneCount,
+            panes,
+            setPanes,
+            "Split",
+            !hasRoom,
+            `Needs a window at least ${SPLIT_MIN_WIDTH_PX}px wide and wider than it is tall`,
+          )}
+        </>,
+      )}
+      {/* Only when the split is wanted but cannot be drawn: with both panes on
+          screen there is nothing to choose, and with one pane there is no
+          other pane to choose between. */}
       {panes === 2 &&
-        (hasRoom ? (
-          <p className="text-[11px] leading-relaxed text-ink-ghost">
-            Drag a tab onto the other strip to move it there. Double-click the divider to even the panes up.
-          </p>
-        ) : (
-          <div className="space-y-1.5">
-            <p className="text-[11px] leading-relaxed text-ink-ghost">
-              Not enough room for two panes, so one is shown at a time. Both keep their tabs.
-            </p>
-            <div className="flex gap-1 rounded-control border border-line bg-raised p-1">
-              {([0, 1] as const).map((pane) => (
-                <button
-                  key={pane}
-                  type="button"
-                  onClick={() => focusPane(pane)}
-                  aria-pressed={focusedPane === pane}
-                  className={`flex-1 rounded-control px-2 py-1.5 text-xs font-medium transition-colors ${
-                    focusedPane === pane ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
-                  }`}
-                >
-                  {pane === 0 ? "Left" : "Right"}
-                  <span className="ml-1 text-ink-ghost">({tabs.filter((t) => t.pane === pane).length})</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-    </div>
+        !hasRoom &&
+        row(
+          "Showing",
+          <>
+            {pick(0 as PaneIndex, focusedPane, focusPane, `Left (${tabs.filter((t) => t.pane === 0).length})`)}
+            {pick(1 as PaneIndex, focusedPane, focusPane, `Right (${tabs.filter((t) => t.pane === 1).length})`)}
+          </>,
+        )}
+    </>
   );
 }
 
@@ -439,10 +437,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-line/60">
-        <Section
-          title="Appearance"
-          description="Theme and terminal text size. Saved on the host, so they follow you across refreshes and devices."
-        >
+        <Section title="Appearance">
           <Appearance />
         </Section>
 

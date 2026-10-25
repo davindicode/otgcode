@@ -57,6 +57,18 @@ interface TabsState {
   /** Where a new tab opens, and the only pane a narrow screen shows. */
   focusedPane: PaneIndex;
   /**
+   * The tab under the pointer during a drag, and the pane it would land in.
+   *
+   * Transient, and in the store rather than in the strip because both strips
+   * have to see it: the one the tab came from to shade it, the one it is over
+   * to show it sitting there. Only the preview — the tab still belongs to its
+   * own pane, and still draws its content there, until the drag is let go. A
+   * cross-pane move used to commit on every pointermove, which switched the
+   * other pane to the dragged tab and refitted its terminal, over and over,
+   * on the way across.
+   */
+  drag: { id: string; pane: PaneIndex } | null;
+  /**
    * Viewer tabs with edits not yet on disk, by tab id.
    *
    * The editor owns the edits; the strip owns the X that would throw them
@@ -88,6 +100,8 @@ interface TabsState {
   move: (id: string, toIndex: number) => void;
   /** Hand a tab to the other pane, keeping it the one that pane shows. */
   moveToPane: (id: string, pane: PaneIndex, toIndex?: number) => void;
+  /** Preview a drag, or clear it with null. */
+  setDrag: (drag: { id: string; pane: PaneIndex } | null) => void;
   /** Point the cursor at a pane without changing which tab it shows. */
   focusPane: (pane: PaneIndex) => void;
   /**
@@ -170,6 +184,16 @@ export function isTabVisible(state: Pick<TabsState, "tabs" | "activeIds">, id: s
   return !!tab && state.activeIds[tab.pane] === id;
 }
 
+/**
+ * Which pane's strip a tab appears in right now — the pane it is being
+ * dragged over, if it is, and otherwise the one it belongs to. Only the strips
+ * use this: the panes themselves keep drawing the tab where it still lives, so
+ * nothing moves until the drag is let go.
+ */
+export function stripPane(state: Pick<TabsState, "drag">, tab: Tab): PaneIndex {
+  return state.drag?.id === tab.id ? state.drag.pane : tab.pane;
+}
+
 /** The tab the user is typing into: the focused pane's. */
 export function focusedTabId(state: Pick<TabsState, "activeIds" | "focusedPane">): string | null {
   return state.activeIds[state.focusedPane];
@@ -211,6 +235,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   tabs: [],
   activeIds: [null, null],
   focusedPane: 0,
+  drag: null,
   unsaved: {},
 
   openTerminal: ({ id, title, cwd } = {}) => {
@@ -387,6 +412,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     syncContentFocus(id, tabs);
     if (vacated) syncContentFocus(vacated, tabs);
   },
+
+  setDrag: (drag) => set({ drag }),
 
   focusPane: (pane) => {
     if (get().focusedPane === pane) return;

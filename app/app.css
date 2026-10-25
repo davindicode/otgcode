@@ -732,17 +732,48 @@ html.light .glow {
   z-index: 20;
 }
 
+/*
+ * What you grab: wider than what you see, and transparent. A line thin
+ * enough to look right is too thin to hit with a trackpad.
+ */
 .pane-divider::before {
   content: "";
   position: absolute;
-  inset: 0 -5px;
-  background: var(--color-line);
-  transition: background 120ms ease;
+  inset: 0 -7px;
 }
 
-.pane-divider:hover::before,
-.pane-divider:focus-visible::before {
-  background: var(--color-accent);
+/*
+ * What you see: a soft-edged line rather than a bar. The horizontal gradient
+ * feathers the sides so it reads as a seam instead of a column of its own,
+ * and the mask fades both ends out before they reach the tab strip above and
+ * the composer below — butted hard against those, it looked like it was
+ * colliding with their buttons.
+ */
+.pane-divider::after {
+  content: "";
+  position: absolute;
+  inset: 0 -3px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    var(--color-line) 42%,
+    var(--color-line) 58%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 2.25rem, black calc(100% - 2.25rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 2.25rem, black calc(100% - 2.25rem), transparent 100%);
+  transition: background 140ms ease;
+}
+
+.pane-divider:hover::after,
+.pane-divider:focus-visible::after {
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    var(--color-accent) 38%,
+    var(--color-accent) 62%,
+    transparent 100%
+  );
 }
 
 .pane-divider:focus-visible {

@@ -179,7 +179,12 @@ export default function AppShell() {
           className="grid min-h-0 flex-1 overflow-hidden"
           style={{
             gridTemplateColumns: split ? `${splitFraction * 100}% 0px ${(1 - splitFraction) * 100}%` : "100%",
-            gridTemplateRows: "auto minmax(0, 1fr) auto",
+            // Two rows, not three. A row for the composers would have been one
+            // height shared by both columns, so opening the keyboard in one
+            // pane shrank the other pane's terminal with it. Each tab's
+            // composer sits inside its own cell instead, where only that
+            // pane's content gives up the space.
+            gridTemplateRows: "auto minmax(0, 1fr)",
           }}
         >
           {PANES.map((pane) =>
@@ -206,40 +211,32 @@ export default function AppShell() {
             tabs.map((tab) => {
               const pane = split ? tab.pane : focusedPane;
               const showing = activeIds[tab.pane] === tab.id && (split || tab.pane === focusedPane);
+              const terminal = tab.kind === "terminal" || tab.kind === "tmux";
               return (
                 <div
                   key={tab.id}
                   className="flex min-h-0 min-w-0 flex-col"
                   style={{ gridColumn: COLUMN[pane], gridRow: 2, display: showing ? "flex" : "none" }}
                 >
-                  {(tab.kind === "terminal" || tab.kind === "tmux") && <TerminalPane sessionId={tab.id} />}
+                  {terminal && <TerminalPane sessionId={tab.id} />}
                   {tab.kind === "explorer" && <FilesPage sessionId={tab.id} />}
                   {tab.kind === "viewer" && tab.path && <ViewerPane tabId={tab.id} path={tab.path} />}
+                  {/* The tab's own control surface, below its own pane and
+                      nowhere else. One shared composer bound to the active
+                      session carried the open drawer and the typed text
+                      across tabs, and could leave a tmux drawer open on a tab
+                      with no tmux session behind it. The terminal gives up the
+                      height when a drawer opens, which its ResizeObserver
+                      turns into a refit. */}
+                  {terminal && (
+                    <div className="min-w-0 shrink-0">
+                      <InputBox sessionId={tab.id} />
+                    </div>
+                  )}
                 </div>
               );
             })
           )}
-
-          {/* One control surface per terminal or tmux tab, in its own pane's
-              column, hidden unless that tab is the one showing. Sharing one
-              bound to the active session carried the open drawer and the typed
-              text across tabs, and could leave a tmux drawer open on a tab
-              with no tmux session behind it. */}
-          {tabs
-            .filter((tab) => tab.kind === "terminal" || tab.kind === "tmux")
-            .map((tab) => {
-              const pane = split ? tab.pane : focusedPane;
-              const showing = activeIds[tab.pane] === tab.id && (split || tab.pane === focusedPane);
-              return (
-                <div
-                  key={tab.id}
-                  style={{ gridColumn: COLUMN[pane], gridRow: 3, display: showing ? "block" : "none" }}
-                  className="min-w-0"
-                >
-                  <InputBox sessionId={tab.id} />
-                </div>
-              );
-            })}
         </div>
       </div>
       {/* Over the app, not instead of it. Returning a different tree here

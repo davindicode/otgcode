@@ -610,7 +610,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
             windows. A tmux tab then also gets its session's controls, last
             because they act on the session rather than on a directory. */}
             {tabBtn(CD_TAB, "navigate", "Move to another directory", !sessionId)}
-            {tmuxSession && tabBtn(TMUX_TAB, "tmux session", `Controls for session "${tmuxSession}"`, false, "app")}
+            {tmuxSession && tabBtn(TMUX_TAB, "tmux", `Controls for session "${tmuxSession}"`, false, "app")}
           </div>
         </div>
 
