@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { MAX_FONT_SIZE, MIN_FONT_SIZE } from "~/lib/constants";
 import { useSplitRoom } from "~/lib/useSplitRoom";
-import { type PaneCount, SPLIT_MIN_WIDTH_PX } from "~/lib/workspace.shared";
+import type { PaneCount } from "~/lib/workspace.shared";
 import { useAuthStore } from "~/stores/authStore";
 import { type PaneIndex, useTabsStore } from "~/stores/tabsStore";
 import { useTerminalStore } from "~/stores/terminalStore";
 import { useToastStore } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
+import ConfirmDialog from "./ConfirmDialog";
 import PasswordField from "./PasswordField";
 import PasswordSetup from "./PasswordSetup";
 
@@ -110,11 +111,11 @@ function Appearance() {
  * One pane or two side by side, and — when there is only room to draw one of
  * the two — which of them is on screen.
  *
- * The split button stays visible on a narrow screen rather than disappearing:
- * a control that vanishes reads as broken, where a disabled one with a reason
- * reads as "not here". The preference is kept either way, so a tablet turned
- * landscape or a window pulled wider comes back to both panes with every tab
- * where it was left.
+ * Split is offered on a phone too, where it cannot be drawn. Not because two
+ * columns would be any use there, but because the state is reachable anyway:
+ * set the split on a laptop and the same workspace opens on the phone already
+ * in it. One control that always behaves the same way beats a control that is
+ * there on one device and missing on another.
  */
 function Layout() {
   const panes = useWorkspaceStore((s) => s.panes);
@@ -123,15 +124,24 @@ function Layout() {
   const focusedPane = useTabsStore((s) => s.focusedPane);
   const focusPane = useTabsStore((s) => s.focusPane);
   const tabs = useTabsStore((s) => s.tabs);
+  const merging = tabs.filter((t) => t.pane === 1).length;
+  const [confirmSingle, setConfirmSingle] = useState(false);
 
-  const pick = <T,>(value: T, current: T, onPick: (v: T) => void, label: string, disabled = false, hint?: string) => (
+  // Going back to one pane gathers both panes' tabs into it. Nothing is
+  // closed, so this is not a dialog about losing work — but it is the one
+  // thing here that cannot be undone by flipping the switch back, since the
+  // arrangement is gone once the panes are one.
+  const choose = (value: PaneCount) => {
+    if (value === 1 && merging > 0) setConfirmSingle(true);
+    else setPanes(value);
+  };
+
+  const pick = <T,>(value: T, current: T, onPick: (v: T) => void, label: string) => (
     <button
       type="button"
       onClick={() => onPick(value)}
-      disabled={disabled}
       aria-pressed={current === value}
-      title={hint}
-      className={`rounded-control px-2.5 py-0.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`rounded-control px-2.5 py-0.5 text-xs transition-colors ${
         current === value ? "bg-hover text-ink" : "text-ink-dim hover:text-ink"
       }`}
     >
@@ -151,15 +161,8 @@ function Layout() {
       {row(
         "Panes",
         <>
-          {pick(1 as PaneCount, panes, setPanes, "Single")}
-          {pick(
-            2 as PaneCount,
-            panes,
-            setPanes,
-            "Split",
-            !hasRoom,
-            `Needs a window at least ${SPLIT_MIN_WIDTH_PX}px wide and wider than it is tall`,
-          )}
+          {pick(1 as PaneCount, panes, choose, "Single")}
+          {pick(2 as PaneCount, panes, choose, "Split")}
         </>,
       )}
       {/* Only when the split is wanted but cannot be drawn: with both panes on
@@ -170,10 +173,22 @@ function Layout() {
         row(
           "Showing",
           <>
-            {pick(0 as PaneIndex, focusedPane, focusPane, `Left (${tabs.filter((t) => t.pane === 0).length})`)}
-            {pick(1 as PaneIndex, focusedPane, focusPane, `Right (${tabs.filter((t) => t.pane === 1).length})`)}
+            {pick(0 as PaneIndex, focusedPane, focusPane, "Left")}
+            {pick(1 as PaneIndex, focusedPane, focusPane, "Right")}
           </>,
         )}
+      {confirmSingle && (
+        <ConfirmDialog
+          title="Use one pane?"
+          body={`The right pane's ${merging === 1 ? "tab moves" : `${merging} tabs move`} into it. Nothing is closed and no edits are lost, but which pane each tab was in is forgotten — splitting again starts them all on the left.`}
+          confirmLabel="Use one pane"
+          onConfirm={() => {
+            setPanes(1);
+            setConfirmSingle(false);
+          }}
+          onCancel={() => setConfirmSingle(false)}
+        />
+      )}
     </>
   );
 }
