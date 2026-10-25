@@ -202,3 +202,25 @@ describe("dragging a tab between panes", () => {
     expect(state.activeIds).toEqual([t, null]);
   });
 });
+
+describe("reopening a file that is already open", () => {
+  it("brings its tab to the pane that asked, rather than jumping you to it", () => {
+    reset();
+    const left = useTabsStore.getState().openExplorer();
+    const a = useTabsStore.getState().openViewer("/tmp/a.ts", left);
+
+    // A second explorer in the right pane asks for the same file.
+    const right = useTabsStore.getState().openExplorer();
+    useTabsStore.getState().moveToPane(right, 1);
+    const again = useTabsStore.getState().openViewer("/tmp/a.ts", right);
+
+    expect(again).toBe(a);
+    // Still one tab for the file: two editors over it would be two unsaved
+    // buffers racing to write it.
+    expect(useTabsStore.getState().tabs.filter((t) => t.kind === "viewer")).toHaveLength(1);
+    // And it is here, in the pane that asked, not where it was.
+    expect(useTabsStore.getState().tabs.find((t) => t.id === a)?.pane).toBe(1);
+    expect(useTabsStore.getState().activeIds[1]).toBe(a);
+    expect(useTabsStore.getState().focusedPane).toBe(1);
+  });
+});

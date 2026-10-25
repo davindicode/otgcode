@@ -322,18 +322,25 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   },
 
   openViewer: (path, fromTabId) => {
-    // Reopening a file that's already in a tab just focuses it, rather than
-    // stacking duplicates of the same document.
-    const existing = get().tabs.find((t) => t.kind === "viewer" && t.path === path);
-    if (existing) {
-      set((s) => ({ activeIds: showInPane(s, existing.pane, existing.id), focusedPane: existing.pane }));
-      return existing.id;
-    }
-    const tabId = nextId("viewer");
     // Beside the explorer it came from, in that explorer's pane — opening a
     // file from the left pane should not throw it to the right one.
     const origin = get().tabs.find((t) => t.id === fromTabId);
     const pane = origin?.pane ?? get().focusedPane;
+
+    // Reopening a file that's already in a tab just focuses it, rather than
+    // stacking duplicates of the same document. One file is one tab across
+    // both panes, not one per pane: two editors over one file would be two
+    // unsaved buffers racing each other to write it.
+    const existing = get().tabs.find((t) => t.kind === "viewer" && t.path === path);
+    if (existing) {
+      // It comes to the pane that asked for it. Focusing it where it already
+      // sits meant opening a file from the right pane's explorer jumped you to
+      // the left pane — the file arrived, somewhere you were not looking.
+      if (existing.pane !== pane) get().moveToPane(existing.id, pane);
+      else set((s) => ({ activeIds: showInPane(s, pane, existing.id), focusedPane: pane }));
+      return existing.id;
+    }
+    const tabId = nextId("viewer");
     const tab: Tab = { id: tabId, kind: "viewer", title: basename(path), path, openedFrom: fromTabId, pane };
     set((s) => {
       const at = insertIndexFor(s.tabs, fromTabId);
