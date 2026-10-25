@@ -39,6 +39,17 @@ async function main() {
   // the app is locked, and ahead of the auth router so that changing the
   // password still requires a valid session once one is set.
   app.use(authGate);
+  // Every /api response is a snapshot of the filesystem or the live host, so a
+  // reused one is wrong by definition. None of them said so: no Cache-Control,
+  // no ETag, no Last-Modified — which leaves a browser free to answer from the
+  // copy it already has, the URL being identical every time. That is what made
+  // a reloaded file show its old contents and a changed-on-disk check keep
+  // reporting the version it first saw. Set here rather than per route so a
+  // route added later cannot forget it.
+  app.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
   // Reads the live pty table, so it lives here rather than in a route.
   mountCwdRoute(app);
   mountAuthRoutes(app);

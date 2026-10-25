@@ -30,6 +30,11 @@ async function main() {
 
   // Optional access password — same gate as production so dev behaves the same.
   app.use(authGate);
+  // A cached /api response is a stale filesystem — see server/index.ts.
+  app.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
   // Reads the live pty table, so it lives here rather than in a route.
   mountCwdRoute(app);
   mountAuthRoutes(app);

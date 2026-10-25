@@ -279,6 +279,17 @@ workspace that is saved on the host rather than in the browser.
 - Breadcrumb navigation is disabled while the path is being edited, so the tree
   cannot desync from the field, and a Go button submits it on a phone.
 - A file with no extension no longer reports its whole path as its type.
+- **A file's contents could be served from the browser's cache after it changed
+  on disk.** Nothing under `/api` carried a `Cache-Control` header, an ETag or
+  a `Last-Modified`, and every request for one file is the same URL — so a
+  browser was free to answer a re-read from the copy it already had. A reloaded
+  file showed its old contents, and the changed-on-disk watcher could keep
+  reporting the version it first saw, which is why the notification sometimes
+  never arrived. Nothing under `/api` is cacheable now; it all answers from the
+  filesystem or the live host.
+- Reloading a file always re-seeds the editor. A reload that read back the same
+  bytes left the editor untouched, so discarding unsaved edits by reloading
+  kept the edits when the file on disk had not moved.
 - **The navigate drawer showed the directory a terminal tab started in.** Its
   listing was fetched once, when the drawer was tapped open, and the drawer
   stays open across a tab switch — so returning to a tab re-showed the login

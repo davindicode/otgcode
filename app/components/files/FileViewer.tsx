@@ -331,6 +331,7 @@ export default function FileViewer({
         content={content}
         onSave={onSave}
         onReload={onReload}
+        reloadCount={version}
         stale={stale}
         onDirtyChange={onDirtyChange}
       />

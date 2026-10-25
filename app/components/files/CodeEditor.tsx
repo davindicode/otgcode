@@ -16,6 +16,8 @@ interface CodeEditorProps {
   onSave: (content: string) => void;
   /** Re-read the file from disk; it may have changed since the tab opened. */
   onReload: () => void;
+  /** Bumped per reload, so one that reads identical bytes still lands here. */
+  reloadCount: number;
   /** It already has, and the pane is saying so. */
   stale: boolean;
   /** Told whenever there are edits not on disk — the same fact the save
@@ -218,7 +220,15 @@ interface MonacoHandle {
   addCommand: (keybinding: number, handler: () => void) => void;
 }
 
-export default function CodeEditor({ path, content, onSave, onReload, stale, onDirtyChange }: CodeEditorProps) {
+export default function CodeEditor({
+  path,
+  content,
+  onSave,
+  onReload,
+  reloadCount,
+  stale,
+  onDirtyChange,
+}: CodeEditorProps) {
   const ext = getExt(path);
   const canPreview = PREVIEWABLE.has(ext);
   const [value, setValue] = useState(content);
@@ -243,11 +253,18 @@ export default function CodeEditor({ path, content, onSave, onReload, stale, onD
 
   // `value` is only seeded from `content` at mount, so a reload has to be taken
   // up here. Keeps the chosen mode and zoom, which a remount would reset.
+  //
+  // Keyed on the reload counter as well as the content, because a reload whose
+  // bytes match what is already loaded leaves `content` identical — and then
+  // this did nothing at all. Discarding edits by reloading was the visible
+  // case: the file on disk still held what the tab had read, so the editor kept
+  // the unsaved changes the second tap had just agreed to throw away.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadCount is the trigger, not a value the effect reads
   useEffect(() => {
     setValue(content);
     setDirty(false);
     setDiscardArmed(false);
-  }, [content]);
+  }, [content, reloadCount]);
 
   // Reported rather than read: the tab strip needs it to know whether its X
   // would throw work away, and it is derived state here, not there.
