@@ -223,15 +223,20 @@ const DRAG_SLOP_PX = 6;
 /** How long a finger has to rest on a tab before it picks it up. */
 const TOUCH_HOLD_MS = 300;
 
+/** How close to an end of the strip starts it creeping, and by how much. */
+const EDGE_PX = 36;
+const EDGE_SPEED_PX = 10;
+
 /**
  * Where the dragged tab belongs now, as an index into the strip *without* it —
  * before the first remaining tab whose middle the pointer hasn't passed.
+ *
+ * Takes geometry rather than elements so it can be checked on its own: the
+ * one thing this has to be is monotonic in x, since it runs again on every
+ * pointermove against a strip it has just reordered.
  */
-function dropIndex(others: HTMLElement[], x: number): number {
-  const at = others.findIndex((el) => {
-    const rect = el.getBoundingClientRect();
-    return x < rect.left + rect.width / 2;
-  });
+export function dropIndex(others: { left: number; width: number }[], x: number): number {
+  const at = others.findIndex((r) => x < r.left + r.width / 2);
   return at === -1 ? others.length : at;
 }
 
@@ -280,6 +285,9 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
     const holdFirst = e.pointerType !== "mouse";
     let dragging = false;
     let hold: ReturnType<typeof setTimeout> | null = null;
+    /** Where the pointer last was, so the edge creep can keep going without it. */
+    let at: { x: number; y: number } | null = null;
+    let creep = 0;
 
     const own = useTabsStore.getState().tabs.find((t) => t.id === id)?.pane ?? 0;
 
@@ -287,6 +295,56 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
       hold = null;
       dragging = true;
       setDrag({ id, pane: own });
+    };
+
+    /**
+     * The whole decision, from a pointer position — so the edge creep below
+     * can run it again while the pointer sits still.
+     */
+    const place = (x: number, y: number) => {
+      at = { x, y };
+      // Which strip the pointer is over, so dragging a tab onto the other
+      // pane's strip previews it there rather than doing nothing. Both strips
+      // are in the document, so this is a hit test rather than a drop target.
+      const under = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-pane-strip]")?.dataset.paneStrip;
+      // Off both strips, it keeps the pane it was last over: dragging through
+      // the gap between them should not snap it back and forth.
+      const over = under === undefined ? (useTabsStore.getState().drag?.pane ?? own) : under === "1" ? 1 : 0;
+      setDrag({ id, pane: over });
+
+      // The ordering preview is the real thing moving, as it always was — the
+      // strip is its own preview. Only the pane is held back.
+      const landing = document.querySelector<HTMLElement>(`[data-pane-strip="${over}"]`) ?? strip;
+
+      // At the end of a strip with more tabs than fit, the tab you mean to
+      // drop in front of is off-screen, so there is nothing to point at and
+      // the drag just stops short. Creep while the pointer rests near an end,
+      // then measure, so the index is read off where the tabs ended up.
+      const box = landing.getBoundingClientRect();
+      const dir = x < box.left + EDGE_PX ? -1 : x > box.right - EDGE_PX ? 1 : 0;
+      if (dir !== 0 && landing.scrollWidth > landing.clientWidth) {
+        landing.scrollLeft += dir * EDGE_SPEED_PX;
+        creep ||= requestAnimationFrame(() => {
+          creep = 0;
+          if (at) place(at.x, at.y);
+        });
+      }
+
+      const others = [...landing.querySelectorAll<HTMLElement>("[data-tab-id]")]
+        .filter((el) => el.dataset.tabId !== id)
+        .map((el) => ({ id: el.dataset.tabId, ...el.getBoundingClientRect() }));
+      const index = dropIndex(others, x);
+      // `at` indexes the landing strip, but `move` wants an index into the one
+      // array both panes share — so the drop position has to be expressed as a
+      // neighbour and then looked up there. Past the strip's last tab it is
+      // *after that tab*, not the end of the array: the end of the array is
+      // behind the other pane's tabs, which is how dropping at the right edge
+      // of the left strip used to fling a tab across the whole order.
+      const rest = useTabsStore.getState().tabs.filter((t) => t.id !== id);
+      const indexOf = (tabId: string | undefined) => (tabId ? rest.findIndex((t) => t.id === tabId) : -1);
+      const before = indexOf(others[index]?.id);
+      const afterLast = indexOf(others[others.length - 1]?.id);
+      move(id, before !== -1 ? before : afterLast !== -1 ? afterLast + 1 : rest.length);
     };
 
     const onMove = (ev: PointerEvent) => {
@@ -297,34 +355,7 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
         if (holdFirst) return end();
         start();
       }
-      // Which strip the pointer is over, so dragging a tab onto the other
-      // pane's strip previews it there rather than doing nothing. Both strips
-      // are in the document, so this is a hit test rather than a drop target.
-      const under = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>("[data-pane-strip]")
-        ?.dataset.paneStrip;
-      // Off both strips, it keeps the pane it was last over: dragging through
-      // the gap between them should not snap it back and forth.
-      const over = under === undefined ? (useTabsStore.getState().drag?.pane ?? own) : under === "1" ? 1 : 0;
-      setDrag({ id, pane: over });
-
-      // The ordering preview is the real thing moving, as it always was — the
-      // strip is its own preview. Only the pane is held back.
-      const landing = document.querySelector<HTMLElement>(`[data-pane-strip="${over}"]`) ?? strip;
-      const others = [...landing.querySelectorAll<HTMLElement>("[data-tab-id]")].filter(
-        (el) => el.dataset.tabId !== id,
-      );
-      const at = dropIndex(others, ev.clientX);
-      // `at` indexes the landing strip, but `move` wants an index into the one
-      // array both panes share — so the drop position has to be expressed as a
-      // neighbour and then looked up there. Past the strip's last tab it is
-      // *after that tab*, not the end of the array: the end of the array is
-      // behind the other pane's tabs, which is how dropping at the right edge
-      // of the left strip used to fling a tab across the whole order.
-      const rest = useTabsStore.getState().tabs.filter((t) => t.id !== id);
-      const indexOf = (tabId: string | undefined) => (tabId ? rest.findIndex((t) => t.id === tabId) : -1);
-      const before = indexOf(others[at]?.dataset.tabId);
-      const afterLast = indexOf(others[others.length - 1]?.dataset.tabId);
-      move(id, before !== -1 ? before : afterLast !== -1 ? afterLast + 1 : rest.length);
+      place(ev.clientX, ev.clientY);
     };
 
     // Dragging and scrolling are the same gesture to the browser; the drag wins
@@ -335,6 +366,8 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
 
     function end() {
       if (hold) clearTimeout(hold);
+      if (creep) cancelAnimationFrame(creep);
+      at = null;
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", end);
       document.removeEventListener("pointercancel", end);
@@ -396,7 +429,28 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
   const drag = useTabsStore((s) => s.drag);
   // A tab being dragged shows in the strip it is over, not the one it still
   // belongs to — which is the whole preview.
-  const tabs = split ? allTabs.filter((t) => (drag?.id === t.id ? drag.pane : t.pane) === pane) : allTabs;
+  const live = split ? allTabs.filter((t) => (drag?.id === t.id ? drag.pane : t.pane) === pane) : allTabs;
+  // Is one of our tabs currently being previewed in the other pane?
+  const lent = split && !!drag && drag.pane !== pane && allTabs.some((t) => t.id === drag.id && t.pane === pane);
+  /*
+   * While it is, this strip holds still: it keeps the tab in the slot it came
+   * from, drawn as a gap, and ignores the reordering going on in the other
+   * pane until the drag is over.
+   *
+   * It has to. The preview used to take the tab out of this strip's DOM, so
+   * the content it scrolls got one tab shorter — and a browser clamps a
+   * scroll offset its content can no longer reach. Nothing restores that
+   * clamp when the tab comes back, so crossing the divider with this strip
+   * scrolled shifted every tab in it by a tab's width, under a cursor that
+   * was in the other pane and had not moved. That is the lurch, and it only
+   * showed near an end of a strip because only a scrolled strip has an offset
+   * to lose. Holding the width removes the reason for the clamp rather than
+   * trying to put it back afterwards.
+   */
+  const held = useRef<Tab[] | null>(null);
+  if (!lent) held.current = null;
+  else held.current ??= allTabs.filter((t) => t.pane === pane);
+  const tabs = held.current ?? live;
   const activeId = split ? activeIds[pane] : activeIds[focusedPane];
   const setActive = useTabsStore((s) => s.setActive);
   const close = useTabsStore((s) => s.close);
@@ -456,7 +510,10 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
           <RenamableTab
             key={tab.id}
             id={tab.id}
-            dragging={tab.id === drag?.id}
+            dragging={tab.id === drag?.id && !lent}
+            // The gap it left behind: still taking up its width, so the strip
+            // it came from cannot change size while it is away.
+            lent={lent && tab.id === drag?.id}
             name={tab.title}
             isActive={tab.id === activeId}
             // A viewer tab is named by its file; renaming it would be a lie.
