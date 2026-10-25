@@ -66,13 +66,12 @@ export default function RenamableTab({
       }}
       title={title}
       className={`flex shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-control px-3 py-1.5 text-sm my-1 ml-1 ${
-        // Both pills are outlined; only the selected one is filled. An
-        // unselected tab used to have no edge at all, so a strip of them read
-        // as a row of words rather than a row of tabs — and nothing showed
-        // where a carried tab could be dropped.
+        // Only the selected tab is drawn as a pill. Outlining the others was
+        // tried and read as busier, not clearer — the strip is short enough
+        // that the filled one is unambiguous on its own.
         isActive
           ? "relief text-ink ring-1 ring-inset ring-blue-500/45"
-          : "text-ink-dim ring-1 ring-inset ring-blue-400/25 transition-colors hover:bg-surface/60 hover:text-ink hover:ring-blue-400/50"
+          : "text-ink-dim transition-colors hover:bg-surface/60 hover:text-ink"
       } ${dragging ? "opacity-60 ring-1 ring-inset ring-blue-400/70" : ""}`}
     >
       {icon}
@@ -87,7 +86,25 @@ export default function RenamableTab({
           }}
           onBlur={commit}
           onClick={(e) => e.stopPropagation()}
-          className="field w-20 px-1 py-0.5 text-xs"
+          /*
+           * Deliberately the same type as the label it replaces, and the same
+           * line box: it was `text-xs` against the tab's `text-sm`, so
+           * double-tapping a tab shrank its name, and `py-0.5` plus the
+           * field's border made the tab taller at the same time.
+           *
+           * `font: inherit` from the preflight carries the tab's 14px/20px
+           * down, so dropping the size class is enough. The pill is then two
+           * pixels taller than that line box — the border — and one pixel of
+           * negative margin each way hands those back, so the outline sits
+           * just outside the name without the tab growing around it. A fixed
+           * height would have done the same arithmetic by clipping the
+           * descenders instead.
+           */
+          className="field -mx-1 -my-px px-1 py-0 leading-5"
+          // Tracks the name rather than sitting at a fixed width, which would
+          // stretch a short tab the moment it was renamed. Capped at the same
+          // 80px the label truncates to.
+          style={{ width: `min(88px, ${Math.max(editValue.length, 4) + 2}ch)` }}
         />
       ) : (
         <span className="truncate max-w-[80px]">{name}</span>
