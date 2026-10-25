@@ -419,7 +419,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       ref={panelRef}
       role="dialog"
       aria-label="Settings"
-      className="absolute right-2 top-10 z-50 flex max-h-[min(26rem,calc(100vh-4rem))] w-80 max-w-[calc(100vw-1rem)] flex-col overflow-hidden glass rounded-panel"
+      className="absolute right-2 top-8 z-50 flex max-h-[min(26rem,calc(100vh-4rem))] w-80 max-w-[calc(100vw-1rem)] flex-col overflow-hidden glass rounded-panel"
     >
       <div className="flex shrink-0 items-center justify-between border-b border-line px-3 py-2">
         <span className="text-xs font-medium text-ink-muted">Settings</span>

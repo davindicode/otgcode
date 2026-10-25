@@ -76,7 +76,7 @@ export default function AccountPopup({ onClose }: { onClose: () => void }) {
       ref={panelRef}
       role="dialog"
       aria-label="Account"
-      className="glass absolute right-2 top-10 z-50 w-64 max-w-[calc(100vw-1rem)] overflow-hidden rounded-panel"
+      className="glass absolute right-2 top-8 z-50 w-64 max-w-[calc(100vw-1rem)] overflow-hidden rounded-panel"
     >
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <span className="text-xs font-medium text-ink-muted">Account</span>

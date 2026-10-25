@@ -724,7 +724,13 @@ html.light .glow {
  */
 .pane-divider {
   grid-column: 2;
-  grid-row: 1 / -1;
+  /*
+   * The content row only. Spanning the whole grid put a fourteen-pixel grab
+   * area over both tab strips, so pressing a tab near the pane edge grabbed
+   * the divider instead and dragging it resized the panes — which reads as the
+   * strip lurching sideways for no reason.
+   */
+  grid-row: 2;
   position: relative;
   width: 0;
   cursor: col-resize;
@@ -760,8 +766,8 @@ html.light .glow {
     var(--color-line) 58%,
     transparent 100%
   );
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 2.25rem, black calc(100% - 2.25rem), transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0, black 2.25rem, black calc(100% - 2.25rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 1.25rem, black calc(100% - 1.25rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 1.25rem, black calc(100% - 1.25rem), transparent 100%);
   transition: background 140ms ease;
 }
 

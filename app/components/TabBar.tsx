@@ -314,12 +314,17 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
         (el) => el.dataset.tabId !== id,
       );
       const at = dropIndex(others, ev.clientX);
-      // `at` indexes the landing strip; `move` takes an index into the whole
-      // strip, which is where the neighbour it lands before actually sits.
-      const before = others[at]?.dataset.tabId;
-      const all = useTabsStore.getState().tabs;
-      const global = before ? all.filter((t) => t.id !== id).findIndex((t) => t.id === before) : all.length - 1;
-      move(id, global);
+      // `at` indexes the landing strip, but `move` wants an index into the one
+      // array both panes share — so the drop position has to be expressed as a
+      // neighbour and then looked up there. Past the strip's last tab it is
+      // *after that tab*, not the end of the array: the end of the array is
+      // behind the other pane's tabs, which is how dropping at the right edge
+      // of the left strip used to fling a tab across the whole order.
+      const rest = useTabsStore.getState().tabs.filter((t) => t.id !== id);
+      const indexOf = (tabId: string | undefined) => (tabId ? rest.findIndex((t) => t.id === tabId) : -1);
+      const before = indexOf(others[at]?.dataset.tabId);
+      const afterLast = indexOf(others[others.length - 1]?.dataset.tabId);
+      move(id, before !== -1 ? before : afterLast !== -1 ? afterLast + 1 : rest.length);
     };
 
     // Dragging and scrolling are the same gesture to the browser; the drag wins

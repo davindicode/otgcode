@@ -89,7 +89,7 @@ function SystemInfoPopup({ onClose }: { onClose: () => void }) {
   return (
     <div
       ref={popupRef}
-      className="absolute right-2 top-10 z-50 flex max-h-80 w-72 flex-col overflow-hidden glass rounded-panel"
+      className="absolute right-2 top-8 z-50 flex max-h-80 w-72 flex-col overflow-hidden glass rounded-panel"
     >
       <div className="flex shrink-0 items-center justify-between px-3 py-2 border-b border-line">
         <span className="text-xs font-medium text-ink-muted">System Info</span>
