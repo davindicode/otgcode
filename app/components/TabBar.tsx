@@ -406,14 +406,15 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
    * What closing this tab costs, or null when it costs nothing and the X
    * should simply work.
    *
-   * A viewer tab is the one that usually costs nothing: closing it returns you
-   * to the explorer it came from, and the file is still there. Unless it has
-   * edits that are not — the same state the save button in its header shows.
+   * A tmux tab costs nothing: the session keeps running on the host, so
+   * closing the tab detaches from it and the + picker reattaches. Asking first
+   * implied otherwise. A viewer tab is usually free too — closing it returns
+   * you to the explorer it came from and the file is still there — unless it
+   * has edits that are not, which is the state its save button shows.
    */
   const closeCost = (tab: Tab): string | null => {
     if (tab.kind === "terminal") return "Its shell and anything running in it stop, and the scrollback goes with them.";
-    if (tab.kind === "tmux")
-      return "The tmux session keeps running on the host — this only detaches from it, and the + picker reattaches.";
+    if (tab.kind === "tmux") return null;
     if (tab.kind === "viewer") return unsaved[tab.id] ? "This file has edits that are not saved. They are lost." : null;
     return "";
   };
@@ -436,10 +437,6 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
             key={tab.id}
             id={tab.id}
             dragging={tab.id === drag?.id}
-            // While one tab is being carried, the others show their outlines:
-            // the slots it can drop into, which are otherwise invisible
-            // because an unselected tab has no edge of its own.
-            sorting={!!drag && drag.id !== tab.id}
             name={tab.title}
             isActive={tab.id === activeId}
             // A viewer tab is named by its file; renaming it would be a lie.

@@ -46,10 +46,10 @@ workspace that is saved on the host rather than in the browser.
   using it — so the second device waits, with **Check now** to ask again. tmux
   sessions keep running throughout, and two devices on one terminal is what a
   tmux tab is for.
-- **A confirmation before a close that cannot be undone.** A terminal says it
-  takes its processes and scrollback with it; a tmux tab says it only detaches;
-  killing a session from the picker gets a red button. Closing a file just
-  closes, unless it holds unsaved edits.
+- **A confirmation before a close that cannot be undone, and only then.** A
+  terminal says it takes its processes and scrollback with it, a file with
+  unsaved edits says they are lost, and killing a session from the picker gets
+  a red button. A tmux tab and a file with nothing unsaved just close.
 - **Light theme**, with a Dark/Light switch in Settings. Every colour resolves
   to a semantic token defined once, including the terminal and editor palettes,
   and the theme is rendered server-side so there is no flash of the wrong one

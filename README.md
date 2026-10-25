@@ -63,7 +63,7 @@ Install it to a home screen and it runs standalone like a native app; the layout
   - **commands** — common shell commands (ls, top, df, free, nvidia-smi…), plus **your own**: add, edit and remove, saved on the host
   - **navigate** — directory picker with server-side CWD detection, so it follows you inside tmux too
   - **tmux session** — in-session controls, only on a tmux tab, so tmux keys can never be typed into a plain shell: windows (new, next, prev, last, rename, kill, list, and any index by number), panes (split, select, cycle, zoom, kill, layout) and copy mode
-- **Closing a tab asks first** where it costs something — a terminal takes its processes and scrollback with it, a tmux tab only detaches, a file with unsaved edits says so
+- **Closing a tab asks first** only where it costs something — a terminal takes its processes and scrollback with it, a file with unsaved edits says so. A tmux tab closes without asking: the session keeps running on the host
 - **Every tab keeps its own composer state** — switching tabs leaves your half-typed command, open group and chosen CLI where they were, rather than carrying them to another session
 - System info popup with OS, kernel, CPU, memory, GPU, and connection latency to the host
 - Tool version detection (tmux, claude, codex, opencode)

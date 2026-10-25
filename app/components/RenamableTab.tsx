@@ -5,8 +5,6 @@ interface RenamableTabProps {
   id?: string;
   /** True while this tab is the one being dragged. */
   dragging?: boolean;
-  /** A reorder is under way and this is not the tab being carried. */
-  sorting?: boolean;
   name: string;
   isActive: boolean;
   existingNames: string[];
@@ -24,7 +22,6 @@ interface RenamableTabProps {
 export default function RenamableTab({
   id,
   dragging = false,
-  sorting = false,
   name,
   isActive,
   existingNames,
@@ -69,13 +66,13 @@ export default function RenamableTab({
       }}
       title={title}
       className={`flex shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-control px-3 py-1.5 text-sm my-1 ml-1 ${
+        // Both pills are outlined; only the selected one is filled. An
+        // unselected tab used to have no edge at all, so a strip of them read
+        // as a row of words rather than a row of tabs — and nothing showed
+        // where a carried tab could be dropped.
         isActive
           ? "relief text-ink ring-1 ring-inset ring-blue-500/45"
-          : `text-ink-dim transition-colors hover:bg-surface/60 hover:text-ink ${
-              // Unfilled, but with its edge drawn, so the slots a carried tab
-              // can drop into are visible while it is being carried.
-              sorting ? "ring-1 ring-inset ring-line" : ""
-            }`
+          : "text-ink-dim ring-1 ring-inset ring-blue-400/25 transition-colors hover:bg-surface/60 hover:text-ink hover:ring-blue-400/50"
       } ${dragging ? "opacity-60 ring-1 ring-inset ring-blue-400/70" : ""}`}
     >
       {icon}
