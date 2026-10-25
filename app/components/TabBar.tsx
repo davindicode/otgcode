@@ -4,6 +4,7 @@ import { type PaneIndex, type Tab, useTabsStore } from "~/stores/tabsStore";
 import ConfirmDialog from "./ConfirmDialog";
 import RenamableTab from "./RenamableTab";
 import TmuxPicker from "./TmuxPicker";
+import { dragScroll } from "./terminal/dragScroll";
 
 type NewKind = "terminal" | "explorer" | "tmux";
 
@@ -235,29 +236,45 @@ function dropIndex(others: HTMLElement[], x: number): number {
 }
 
 /**
- * Drag-to-reorder, one code path for mouse and touch.
+ * Drag-to-reorder on the selected tab; drag-to-pan on everything else.
  *
- * Touch waits for a hold before taking the tab, so a swipe still scrolls the
- * strip; a mouse starts as soon as it has moved too far to be a click. Once
- * dragging, touchmove is cancelled by hand: `touch-action` is read when the
- * gesture begins, so it cannot call off a scroll already under way.
+ * The strip has two jobs for one gesture — reordering a tab, and scrolling
+ * itself when there are more tabs than fit. Splitting them by *which* tab is
+ * under the pointer settles it without a mode: only the tab you have already
+ * selected can be picked up, and dragging any other one slides the strip, the
+ * way the composer's key rows already work. A plain mouse has no sideways
+ * gesture, so before this the overflowing half of a long strip was simply out
+ * of reach on the desktop.
+ *
+ * Touch still waits for a hold before taking the selected tab, so a swipe that
+ * happens to start on it scrolls rather than reorders. Once dragging,
+ * touchmove is cancelled by hand: `touch-action` is read when the gesture
+ * begins, so it cannot call off a scroll already under way.
  *
  * The tab moves as you drag rather than following the pointer under a ghost —
  * the strip itself is the preview.
  */
-function useTabReorder(stripRef: RefObject<HTMLDivElement | null>) {
+function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: string | null) {
   const move = useTabsStore((s) => s.move);
   const moveToPane = useTabsStore((s) => s.moveToPane);
   const setDrag = useTabsStore((s) => s.setDrag);
 
-  const onPointerDown = (e: React.PointerEvent) => {
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     const target = e.target as Element;
     // The close button, the + and the rename input own their own gestures.
     if (target.closest("button, input")) return;
     const id = target.closest<HTMLElement>("[data-tab-id]")?.dataset.tabId;
     const strip = stripRef.current;
-    if (!id || !strip) return;
+    if (!strip) return;
+    // Anything but the selected tab — another tab, or the bare strip beside
+    // them — pans instead. Touch scrolls the strip natively, so this is the
+    // mouse's version of that; dragScroll bows out on its own when there is
+    // nothing to scroll.
+    if (!id || id !== activeId) {
+      dragScroll(e);
+      return;
+    }
 
     const { pointerId, clientX: startX } = e;
     const holdFirst = e.pointerType !== "mouse";
@@ -373,7 +390,7 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
   const unsaved = useTabsStore((s) => s.unsaved);
   const plusRef = useRef<HTMLButtonElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
-  const { onPointerDown } = useTabReorder(stripRef);
+  const { onPointerDown } = useTabReorder(stripRef, activeId);
 
   const pick = (kind: NewKind) => {
     setMenuOpen(false);
@@ -419,6 +436,10 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
             key={tab.id}
             id={tab.id}
             dragging={tab.id === drag?.id}
+            // While one tab is being carried, the others show their outlines:
+            // the slots it can drop into, which are otherwise invisible
+            // because an unselected tab has no edge of its own.
+            sorting={!!drag && drag.id !== tab.id}
             name={tab.title}
             isActive={tab.id === activeId}
             // A viewer tab is named by its file; renaming it would be a lie.
