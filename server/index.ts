@@ -86,7 +86,20 @@ async function main() {
     next();
   });
 
-  // React Router request handler
+  // React Router request handler.
+  //
+  // Its responses carry no Cache-Control of their own, and the document is the
+  // one file that names the hashed assets — so a browser that keeps a copy
+  // keeps the whole build it came from, assets included, since those are
+  // served immutable for a year quite correctly. Safari does keep one: it will
+  // cache a 200 with no validators on a heuristic, which is how a rebuilt app
+  // kept coming up as the previous version there while Chrome picked up the
+  // new one. Mounted after the static handlers so the hashed assets keep their
+  // year.
+  app.use((_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
   const { createRequestHandler } = await import("@react-router/express");
   app.all("/{*splat}", createRequestHandler({ build }));
 
