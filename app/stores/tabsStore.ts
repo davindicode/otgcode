@@ -57,17 +57,26 @@ interface TabsState {
   /** Where a new tab opens, and the only pane a narrow screen shows. */
   focusedPane: PaneIndex;
   /**
-   * The tab under the pointer during a drag, and the pane it would land in.
+   * Where the tab being dragged would land: which pane's strip, the tab the
+   * caret sits in front of (null for the end of that strip), and the index in
+   * this array that amounts to.
    *
-   * Transient, and in the store rather than in the strip because both strips
-   * have to see it: the one the tab came from to shade it, the one it is over
-   * to show it sitting there. Only the preview — the tab still belongs to its
-   * own pane, and still draws its content there, until the drag is let go. A
-   * cross-pane move used to commit on every pointermove, which switched the
-   * other pane to the dragged tab and refitted its terminal, over and over,
-   * on the way across.
+   * Nothing is applied while the drag is going on. It used to be — the strip
+   * reordered itself on every pointermove and the tab was redrawn in whichever
+   * strip the pointer was over — and that made the gesture measure a layout it
+   * was itself changing: a tab leaving a strip shortened the content that
+   * strip scrolls, the browser clamped a scroll offset that content could no
+   * longer reach, and the next pointermove read the tabs off their new
+   * positions. The row of keyboard buttons in the composer has never had any
+   * of this trouble because it only ever scrolls. So now this is the whole
+   * preview, the strips are still underneath it, and the single move happens
+   * when the drag is let go.
+   *
+   * Transient, and in the store rather than the strip because both strips have
+   * to see it: the one the tab came from shades it, the one it is over draws
+   * the caret.
    */
-  drag: { id: string; pane: PaneIndex } | null;
+  drag: { id: string; pane: PaneIndex; before: string | null; index: number } | null;
   /**
    * Viewer tabs with edits not yet on disk, by tab id.
    *
@@ -101,7 +110,7 @@ interface TabsState {
   /** Hand a tab to the other pane, keeping it the one that pane shows. */
   moveToPane: (id: string, pane: PaneIndex, toIndex?: number) => void;
   /** Preview a drag, or clear it with null. */
-  setDrag: (drag: { id: string; pane: PaneIndex } | null) => void;
+  setDrag: (drag: TabsState["drag"]) => void;
   /** Point the cursor at a pane without changing which tab it shows. */
   focusPane: (pane: PaneIndex) => void;
   /**
@@ -182,16 +191,6 @@ export function reorder<T>(items: T[], from: number, to: number): T[] {
 export function isTabVisible(state: Pick<TabsState, "tabs" | "activeIds">, id: string): boolean {
   const tab = state.tabs.find((t) => t.id === id);
   return !!tab && state.activeIds[tab.pane] === id;
-}
-
-/**
- * Which pane's strip a tab appears in right now — the pane it is being
- * dragged over, if it is, and otherwise the one it belongs to. Only the strips
- * use this: the panes themselves keep drawing the tab where it still lives, so
- * nothing moves until the drag is let go.
- */
-export function stripPane(state: Pick<TabsState, "drag">, tab: Tab): PaneIndex {
-  return state.drag?.id === tab.id ? state.drag.pane : tab.pane;
 }
 
 /** The tab the user is typing into: the focused pane's. */

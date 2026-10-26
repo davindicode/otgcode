@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { focusedTabId, type PaneIndex, stripPane, type Tab, useTabsStore } from "~/stores/tabsStore";
+import { focusedTabId, type PaneIndex, useTabsStore } from "~/stores/tabsStore";
 
 // Exercises the real store, so ordering and focus are checked together.
 function reset() {
@@ -175,31 +175,46 @@ describe("two panes", () => {
 });
 
 describe("dragging a tab between panes", () => {
-  it("shows it in the strip it is over without moving it there yet", () => {
+  it("offers a landing place without moving anything", () => {
     reset();
     const a = useTabsStore.getState().openTerminal();
     const b = useTabsStore.getState().openTerminal();
 
-    useTabsStore.getState().setDrag({ id: b, pane: 1 });
+    useTabsStore.getState().setDrag({ id: b, pane: 1, before: null, index: 1 });
     const state = useTabsStore.getState();
-    // The strip draws it on the right...
-    expect(stripPane(state, state.tabs.find((t) => t.id === b) as Tab)).toBe(1);
-    // ...while the tab, and so its content, is still on the left.
+    // Nothing has happened yet: the tab, its order and both panes are as they
+    // were. A drag that rearranged the strip as it went was measuring a layout
+    // it was changing underneath itself.
+    expect(state.tabs.map((t) => t.id)).toEqual([a, b]);
     expect(state.tabs.find((t) => t.id === b)?.pane).toBe(0);
     expect(state.activeIds).toEqual([b, null]);
-    expect(stripPane(state, state.tabs.find((t) => t.id === a) as Tab)).toBe(0);
   });
 
   it("leaves nothing behind when the drag is abandoned", () => {
     reset();
     const t = useTabsStore.getState().openTerminal();
-    useTabsStore.getState().setDrag({ id: t, pane: 1 });
+    useTabsStore.getState().setDrag({ id: t, pane: 1, before: null, index: 0 });
     useTabsStore.getState().setDrag(null);
 
     const state = useTabsStore.getState();
     expect(state.drag).toBeNull();
     expect(state.tabs.find((x) => x.id === t)?.pane).toBe(0);
     expect(state.activeIds).toEqual([t, null]);
+  });
+
+  it("commits the pane and the place in one go when it is let go", () => {
+    reset();
+    const a = useTabsStore.getState().openTerminal();
+    const b = useTabsStore.getState().openTerminal();
+    const c = useTabsStore.getState().openTerminal();
+    useTabsStore.getState().moveToPane(c, 1);
+
+    // Dropped in front of c, in the right pane — what the caret was showing.
+    useTabsStore.getState().moveToPane(a, 1, 1);
+    const state = useTabsStore.getState();
+    expect(state.tabs.map((t) => t.id)).toEqual([b, a, c]);
+    expect(state.tabs.find((t) => t.id === a)?.pane).toBe(1);
+    expect(state.activeIds).toEqual([b, a]);
   });
 });
 

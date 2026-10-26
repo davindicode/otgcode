@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type FileKind, fileKind } from "~/lib/fileTypes";
 import { type PaneIndex, type Tab, useTabsStore } from "~/stores/tabsStore";
 import ConfirmDialog from "./ConfirmDialog";
@@ -223,6 +223,22 @@ const DRAG_SLOP_PX = 6;
 /** How long a finger has to rest on a tab before it picks it up. */
 const TOUCH_HOLD_MS = 300;
 
+/**
+ * Where a dragged tab would land. A line between two tabs rather than a gap
+ * opened up between them: a gap means every tab in the strip moves while you
+ * are still deciding, and moving them is what the drag used to get wrong.
+ *
+ * It takes up no width at all — the line is drawn outside a zero-width box —
+ * so putting it in cannot change how much content the strip has to scroll.
+ * Two pixels would be enough to clamp the scroll offset of a strip that is
+ * already at its end, which is the whole bug this caret replaced.
+ */
+const DropCaret = () => (
+  <div aria-hidden="true" className="relative w-0 shrink-0 self-stretch">
+    <div className="absolute inset-y-1.5 -left-px w-0.5 rounded-full bg-blue-400" />
+  </div>
+);
+
 /** How close to an end of the strip starts it creeping, and by how much. */
 const EDGE_PX = 36;
 const EDGE_SPEED_PX = 10;
@@ -256,8 +272,15 @@ export function dropIndex(others: { left: number; width: number }[], x: number):
  * touchmove is cancelled by hand: `touch-action` is read when the gesture
  * begins, so it cannot call off a scroll already under way.
  *
- * The tab moves as you drag rather than following the pointer under a ghost —
- * the strip itself is the preview.
+ * **The drag changes nothing until it is let go.** It reads the strip, works
+ * out where the tab would land, and says so with a caret; the tabs themselves
+ * hold still. Reordering as you went looked better and was the cause of every
+ * jump at the ends of the strip: the gesture was measuring a layout it was
+ * changing underneath itself, and once a strip's content got shorter or longer
+ * the browser clamped its scroll offset and every tab in it shifted. The
+ * composer's key rows have always worked because they only ever scroll — this
+ * now does the same, and does the arithmetic on top of a strip that is sitting
+ * still.
  */
 function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: string | null) {
   const move = useTabsStore((s) => s.move);
@@ -294,32 +317,28 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
     const start = () => {
       hold = null;
       dragging = true;
-      setDrag({ id, pane: own });
     };
 
     /**
-     * The whole decision, from a pointer position — so the edge creep below
-     * can run it again while the pointer sits still.
+     * Work out where the tab would land and say so. Called again by the edge
+     * creep below while the pointer sits still, which is why it takes a
+     * position rather than an event.
      */
     const place = (x: number, y: number) => {
       at = { x, y };
       // Which strip the pointer is over, so dragging a tab onto the other
-      // pane's strip previews it there rather than doing nothing. Both strips
-      // are in the document, so this is a hit test rather than a drop target.
+      // pane's strip offers to put it there. Both strips are in the document,
+      // so this is a hit test rather than a drop target.
       const under = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-pane-strip]")?.dataset.paneStrip;
-      // Off both strips, it keeps the pane it was last over: dragging through
-      // the gap between them should not snap it back and forth.
+      // Off both strips it keeps the pane it was last over: dragging through
+      // the gap between them should not snap back and forth.
       const over = under === undefined ? (useTabsStore.getState().drag?.pane ?? own) : under === "1" ? 1 : 0;
-      setDrag({ id, pane: over });
-
-      // The ordering preview is the real thing moving, as it always was — the
-      // strip is its own preview. Only the pane is held back.
       const landing = document.querySelector<HTMLElement>(`[data-pane-strip="${over}"]`) ?? strip;
 
       // At the end of a strip with more tabs than fit, the tab you mean to
       // drop in front of is off-screen, so there is nothing to point at and
       // the drag just stops short. Creep while the pointer rests near an end,
-      // then measure, so the index is read off where the tabs ended up.
+      // then measure, so the caret is read off where the tabs ended up.
       const box = landing.getBoundingClientRect();
       const dir = x < box.left + EDGE_PX ? -1 : x > box.right - EDGE_PX ? 1 : 0;
       if (dir !== 0 && landing.scrollWidth > landing.clientWidth) {
@@ -330,21 +349,26 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
         });
       }
 
-      const others = [...landing.querySelectorAll<HTMLElement>("[data-tab-id]")]
-        .filter((el) => el.dataset.tabId !== id)
-        .map((el) => ({ id: el.dataset.tabId, ...el.getBoundingClientRect() }));
-      const index = dropIndex(others, x);
-      // `at` indexes the landing strip, but `move` wants an index into the one
-      // array both panes share — so the drop position has to be expressed as a
-      // neighbour and then looked up there. Past the strip's last tab it is
-      // *after that tab*, not the end of the array: the end of the array is
-      // behind the other pane's tabs, which is how dropping at the right edge
-      // of the left strip used to fling a tab across the whole order.
+      const others = [...landing.querySelectorAll<HTMLElement>("[data-tab-id]")].filter(
+        (el) => el.dataset.tabId !== id,
+      );
+      const slot = dropIndex(
+        others.map((el) => el.getBoundingClientRect()),
+        x,
+      );
+      // `slot` indexes the landing strip; `index` is the same place in the one
+      // array both panes share, reached through a neighbour. Past the strip's
+      // last tab it is *after that tab*, not the end of the array: the end of
+      // the array is behind the other pane's tabs, which is how dropping at
+      // the right edge of the left strip used to fling a tab across the whole
+      // order.
       const rest = useTabsStore.getState().tabs.filter((t) => t.id !== id);
-      const indexOf = (tabId: string | undefined) => (tabId ? rest.findIndex((t) => t.id === tabId) : -1);
-      const before = indexOf(others[index]?.id);
-      const afterLast = indexOf(others[others.length - 1]?.id);
-      move(id, before !== -1 ? before : afterLast !== -1 ? afterLast + 1 : rest.length);
+      const indexOf = (tabId: string | null | undefined) => (tabId ? rest.findIndex((t) => t.id === tabId) : -1);
+      const before = others[slot]?.dataset.tabId ?? null;
+      const ahead = indexOf(before);
+      const afterLast = indexOf(others[others.length - 1]?.dataset.tabId);
+      const index = ahead !== -1 ? ahead : afterLast !== -1 ? afterLast + 1 : rest.length;
+      setDrag({ id, pane: over, before, index });
     };
 
     const onMove = (ev: PointerEvent) => {
@@ -388,16 +412,12 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
       // If no click follows, this would otherwise eat the next real one.
       setTimeout(() => document.removeEventListener("click", swallow, { capture: true }), 100);
 
-      // Letting go is what commits the pane: until now the tab has only been
-      // drawn in the other strip, and its content has stayed where it was.
-      const preview = useTabsStore.getState().drag;
+      // The one change the whole gesture makes.
+      const drop = useTabsStore.getState().drag;
       setDrag(null);
-      if (preview && preview.pane !== own) {
-        // The preview is what the user was looking at, so it is what commits —
-        // including the index the ordering preview already settled on.
-        const order = useTabsStore.getState().tabs.findIndex((t) => t.id === preview.id);
-        moveToPane(preview.id, preview.pane, order);
-      }
+      if (!drop) return;
+      if (drop.pane === own) move(drop.id, drop.index);
+      else moveToPane(drop.id, drop.pane, drop.index);
     }
 
     if (holdFirst) hold = setTimeout(start, TOUCH_HOLD_MS);
@@ -427,31 +447,15 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
   // tab is reachable from it, whichever pane it is assigned to — otherwise
   // narrowing the window would hide tabs with no way back to them.
   const drag = useTabsStore((s) => s.drag);
-  // A tab being dragged shows in the strip it is over, not the one it still
-  // belongs to — which is the whole preview.
-  const live = split ? allTabs.filter((t) => (drag?.id === t.id ? drag.pane : t.pane) === pane) : allTabs;
-  // Is one of our tabs currently being previewed in the other pane?
-  const lent = split && !!drag && drag.pane !== pane && allTabs.some((t) => t.id === drag.id && t.pane === pane);
-  /*
-   * While it is, this strip holds still: it keeps the tab in the slot it came
-   * from, drawn as a gap, and ignores the reordering going on in the other
-   * pane until the drag is over.
-   *
-   * It has to. The preview used to take the tab out of this strip's DOM, so
-   * the content it scrolls got one tab shorter — and a browser clamps a
-   * scroll offset its content can no longer reach. Nothing restores that
-   * clamp when the tab comes back, so crossing the divider with this strip
-   * scrolled shifted every tab in it by a tab's width, under a cursor that
-   * was in the other pane and had not moved. That is the lurch, and it only
-   * showed near an end of a strip because only a scrolled strip has an offset
-   * to lose. Holding the width removes the reason for the clamp rather than
-   * trying to put it back afterwards.
-   */
-  const held = useRef<Tab[] | null>(null);
-  if (!lent) held.current = null;
-  else held.current ??= allTabs.filter((t) => t.pane === pane);
-  const tabs = held.current ?? live;
+  // In a split a strip shows its own pane's tabs, and that is all it shows:
+  // the dragged tab stays here, shaded, while a caret in the other strip
+  // offers to take it. Redrawing it in the strip it was over changed how much
+  // content each strip had to scroll in the middle of the gesture, which is
+  // what used to make the other pane lurch.
+  const tabs = split ? allTabs.filter((t) => t.pane === pane) : allTabs;
   const activeId = split ? activeIds[pane] : activeIds[focusedPane];
+  /** Where a dragged tab would land, drawn in the strip it is over. */
+  const caret = drag?.pane === pane ? drag.before : undefined;
   const setActive = useTabsStore((s) => s.setActive);
   const close = useTabsStore((s) => s.close);
   const rename = useTabsStore((s) => s.rename);
@@ -507,25 +511,26 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
         className="flex items-center overflow-x-auto scrollbar-none flex-1 min-w-0"
       >
         {tabs.map((tab) => (
-          <RenamableTab
-            key={tab.id}
-            id={tab.id}
-            dragging={tab.id === drag?.id && !lent}
-            // The gap it left behind: still taking up its width, so the strip
-            // it came from cannot change size while it is away.
-            lent={lent && tab.id === drag?.id}
-            name={tab.title}
-            isActive={tab.id === activeId}
-            // A viewer tab is named by its file; renaming it would be a lie.
-            renamable={tab.kind !== "viewer"}
-            existingNames={tabs.filter((t) => t.id !== tab.id).map((t) => t.title)}
-            onRename={(name) => rename(tab.id, name)}
-            onClick={() => setActive(tab.id)}
-            onClose={() => (closeCost(tab) === null ? close(tab.id) : setClosing(tab))}
-            title={tab.kind === "viewer" ? tab.path : undefined}
-            icon={tabIcon(tab)}
-          />
+          <Fragment key={tab.id}>
+            {caret === tab.id && <DropCaret />}
+            <RenamableTab
+              id={tab.id}
+              dragging={tab.id === drag?.id}
+              name={tab.title}
+              isActive={tab.id === activeId}
+              // A viewer tab is named by its file; renaming it would be a lie.
+              renamable={tab.kind !== "viewer"}
+              existingNames={tabs.filter((t) => t.id !== tab.id).map((t) => t.title)}
+              onRename={(name) => rename(tab.id, name)}
+              onClick={() => setActive(tab.id)}
+              onClose={() => (closeCost(tab) === null ? close(tab.id) : setClosing(tab))}
+              title={tab.kind === "viewer" ? tab.path : undefined}
+              icon={tabIcon(tab)}
+            />
+          </Fragment>
         ))}
+        {/* Past the last tab, so dropping at the end of the strip shows up too. */}
+        {caret === null && <DropCaret />}
         {closing && (
           <ConfirmDialog
             title={`Close ${closing.title}?`}

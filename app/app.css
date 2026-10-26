@@ -86,6 +86,7 @@
   --t-glass-edge: rgba(255, 255, 255, 0.07);
   --t-glass-blur: 18px;
   --t-glass-shadow: 0 18px 44px -14px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --t-glass-glow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 22px -4px rgba(140, 170, 255, 0.16);
 
   /* Top-edge highlight that separates stacked bars (header, toolbars). */
   --t-bar-edge: rgba(255, 255, 255, 0.045);
@@ -167,6 +168,7 @@ html.light {
   --t-glass-edge: rgba(255, 255, 255, 0.8);
   --t-glass-blur: 18px;
   --t-glass-shadow: 0 18px 44px -16px rgba(23, 27, 40, 0.3), 0 2px 8px rgba(23, 27, 40, 0.1);
+  --t-glass-glow: 0 0 0 1px rgba(23, 27, 40, 0.07), 0 0 22px -6px rgba(23, 27, 40, 0.14);
 
   --t-bar-edge: rgba(255, 255, 255, 0.7);
 }
@@ -524,7 +526,10 @@ button:disabled {
   background-color: var(--t-glass-bg);
   backdrop-filter: blur(var(--t-glass-blur)) saturate(140%);
   border: 1px solid var(--t-glass-border);
-  box-shadow: inset 0 1px 0 var(--t-glass-edge), var(--t-glass-shadow);
+  /* A hairline ring and a soft halo just outside the border, so a popover
+     reads as lifted off the lines of the app behind it rather than sitting
+     among them. */
+  box-shadow: inset 0 1px 0 var(--t-glass-edge), var(--t-glass-glow), var(--t-glass-shadow);
 }
 
 /* Browsers without backdrop-filter get an opaque panel rather than an

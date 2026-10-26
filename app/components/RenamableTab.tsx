@@ -5,8 +5,6 @@ interface RenamableTabProps {
   id?: string;
   /** True while this tab is the one being dragged. */
   dragging?: boolean;
-  /** True while this tab is being previewed in the other pane: hold its space. */
-  lent?: boolean;
   name: string;
   isActive: boolean;
   existingNames: string[];
@@ -24,7 +22,6 @@ interface RenamableTabProps {
 export default function RenamableTab({
   id,
   dragging = false,
-  lent = false,
   name,
   isActive,
   existingNames,
@@ -75,7 +72,7 @@ export default function RenamableTab({
         isActive
           ? "relief text-ink ring-1 ring-inset ring-blue-500/45"
           : "text-ink-dim transition-colors hover:bg-surface/60 hover:text-ink"
-      } ${dragging ? "opacity-60 ring-1 ring-inset ring-blue-400/70" : ""} ${lent ? "invisible" : ""}`}
+      } ${dragging ? "opacity-60 ring-1 ring-inset ring-blue-400/70" : ""}`}
     >
       {icon}
       {editing && renamable ? (
