@@ -222,6 +222,8 @@ function NewTabMenu({
 const DRAG_SLOP_PX = 6;
 /** How long a finger has to rest on a tab before it picks it up. */
 const TOUCH_HOLD_MS = 300;
+/** Under this a finger is resting, not moving. */
+const TOUCH_JITTER_PX = 2;
 
 /**
  * Where a dragged tab would land. A line between two tabs rather than a gap
@@ -374,9 +376,18 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
     const onMove = (ev: PointerEvent) => {
       if (ev.pointerId !== pointerId) return;
       if (!dragging) {
-        if (Math.abs(ev.clientX - startX) <= DRAG_SLOP_PX) return;
-        // A finger that moves before the hold is through is scrolling.
-        if (holdFirst) return end();
+        const moved = Math.abs(ev.clientX - startX);
+        // A finger that moves at all before the hold is through is scrolling,
+        // and the scroll has already started: `touch-action` is read when the
+        // gesture begins, so preventDefault cannot call it off afterwards. The
+        // slop below used to apply here too, which let the hold fire under a
+        // finger that had crept a few pixels — and then the strip was being
+        // scrolled by the browser and reordered by us at the same time, off
+        // positions that were moving under both. Giving the gesture up is the
+        // only way to have one of them. A couple of pixels of jitter is not
+        // movement.
+        if (holdFirst) return moved > TOUCH_JITTER_PX ? end() : undefined;
+        if (moved <= DRAG_SLOP_PX) return;
         start();
       }
       place(ev.clientX, ev.clientY);
@@ -504,64 +515,73 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
     // each pane has its own +, so which one you press is which pane it opens
     // in, and the active tab's own highlight already says where you are.
     <div className="bar-edge relative flex shrink-0 items-center border-b border-line bg-surface">
+      {/* The scroller and the row it scrolls are two elements, the way the
+          composer's key rows have always had them. A flex container that is
+          also the scroll container measures its own scrollable overflow
+          differently in Safari, which is the one difference between this strip
+          and the rows in the composer that have never had any of this trouble
+          — and the drag reads scrollWidth, clientWidth and scrollLeft off this
+          element to decide everything. */}
       <div
         ref={stripRef}
         data-pane-strip={pane}
         onPointerDown={onPointerDown}
-        className="flex items-center overflow-x-auto scrollbar-none flex-1 min-w-0"
+        className="overflow-x-auto scrollbar-none flex-1 min-w-0"
       >
-        {tabs.map((tab) => (
-          <Fragment key={tab.id}>
-            {caret === tab.id && <DropCaret />}
-            <RenamableTab
-              id={tab.id}
-              dragging={tab.id === drag?.id}
-              name={tab.title}
-              isActive={tab.id === activeId}
-              // A viewer tab is named by its file; renaming it would be a lie.
-              renamable={tab.kind !== "viewer"}
-              existingNames={tabs.filter((t) => t.id !== tab.id).map((t) => t.title)}
-              onRename={(name) => rename(tab.id, name)}
-              onClick={() => setActive(tab.id)}
-              onClose={() => (closeCost(tab) === null ? close(tab.id) : setClosing(tab))}
-              title={tab.kind === "viewer" ? tab.path : undefined}
-              icon={tabIcon(tab)}
-            />
-          </Fragment>
-        ))}
-        {/* Past the last tab, so dropping at the end of the strip shows up too. */}
-        {caret === null && <DropCaret />}
-        {closing && (
-          <ConfirmDialog
-            title={`Close ${closing.title}?`}
-            body={closeCost(closing)}
-            confirmLabel={unsaved[closing.id] ? "Discard and close" : "Close tab"}
-            danger={closing.kind === "terminal" || !!unsaved[closing.id]}
-            onConfirm={() => {
-              close(closing.id);
-              setClosing(null);
-            }}
-            onCancel={() => setClosing(null)}
-          />
-        )}
-        <button
-          ref={plusRef}
-          type="button"
-          data-new-tab-trigger=""
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          aria-label="New tab"
-          title="New tab"
-          className={`relief shrink-0 m-1.5 p-1.5 rounded-control ${
-            menuOpen ? "text-ink" : "text-ink-dim hover:text-ink"
-          }`}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
+        <div className="flex w-max items-center">
+          {tabs.map((tab) => (
+            <Fragment key={tab.id}>
+              {caret === tab.id && <DropCaret />}
+              <RenamableTab
+                id={tab.id}
+                dragging={tab.id === drag?.id}
+                name={tab.title}
+                isActive={tab.id === activeId}
+                // A viewer tab is named by its file; renaming it would be a lie.
+                renamable={tab.kind !== "viewer"}
+                existingNames={tabs.filter((t) => t.id !== tab.id).map((t) => t.title)}
+                onRename={(name) => rename(tab.id, name)}
+                onClick={() => setActive(tab.id)}
+                onClose={() => (closeCost(tab) === null ? close(tab.id) : setClosing(tab))}
+                title={tab.kind === "viewer" ? tab.path : undefined}
+                icon={tabIcon(tab)}
+              />
+            </Fragment>
+          ))}
+          {/* Past the last tab, so dropping at the end of the strip shows up too. */}
+          {caret === null && <DropCaret />}
+          <button
+            ref={plusRef}
+            type="button"
+            data-new-tab-trigger=""
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label="New tab"
+            title="New tab"
+            className={`relief shrink-0 m-1.5 p-1.5 rounded-control ${
+              menuOpen ? "text-ink" : "text-ink-dim hover:text-ink"
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        </div>
       </div>
+      {closing && (
+        <ConfirmDialog
+          title={`Close ${closing.title}?`}
+          body={closeCost(closing)}
+          confirmLabel={unsaved[closing.id] ? "Discard and close" : "Close tab"}
+          danger={closing.kind === "terminal" || !!unsaved[closing.id]}
+          onConfirm={() => {
+            close(closing.id);
+            setClosing(null);
+          }}
+          onCancel={() => setClosing(null)}
+        />
+      )}
       {menuOpen && <NewTabMenu anchor={plusRef} onPick={pick} onClose={() => setMenuOpen(false)} />}
       {tmuxPicker && <TmuxPicker onClose={() => setTmuxPicker(false)} />}
     </div>
