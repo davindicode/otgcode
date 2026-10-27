@@ -127,16 +127,6 @@ export default function AppShell() {
     if (panes === 1) mergePanes();
   }, [panes, mergePanes]);
 
-  // Opening or closing the split halves or doubles a pane's width, and a
-  // terminal in it measures itself in whole rows and columns — so it has to be
-  // told. The divider handles its own drags; this is the on/off, which
-  // includes the window crossing the width where two panes stop fitting.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: split is the trigger, not a value the effect reads
-  useEffect(() => {
-    const id = setTimeout(() => useTabsStore.getState().refitVisible(), 60);
-    return () => clearTimeout(id);
-  }, [split]);
-
   useEffect(() => {
     // Installed before anything fetches, so an expiry noticed by any request
     // shows the lock screen rather than a toast nobody can act on.

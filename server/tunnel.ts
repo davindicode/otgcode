@@ -1,7 +1,7 @@
-import { type ChildProcess, spawn } from "child_process";
-import { existsSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+import { type ChildProcess, spawn } from "node:child_process";
+import { existsSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { isPasswordEnabled, localUsername } from "./auth.js";
 import { dim, green, link, probe, TICK, WARN, yellow } from "./cli.js";
 import { type Progress, startProgress } from "./progress.js";

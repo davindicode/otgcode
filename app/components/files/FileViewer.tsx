@@ -22,7 +22,7 @@ const END_MARGIN_S = 2;
 interface FileViewerProps {
   path: string;
   content: string | null;
-  onSave: (content: string) => void;
+  onSave: (content: string) => Promise<boolean>;
   /** Re-read the file: it may have changed on disk since the tab opened. */
   onReload: () => void;
   /** Bumped per reload, so a cached media URL is not reused. */

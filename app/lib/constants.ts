@@ -12,7 +12,7 @@ function getAppPort(): number {
 }
 
 export function isPortBlocked(port: number): string | null {
-  if (isNaN(port) || port < 1 || port > 65535) {
+  if (Number.isNaN(port) || port < 1 || port > 65535) {
     return "Invalid port number";
   }
   // Privileged ports (except 80, 443)

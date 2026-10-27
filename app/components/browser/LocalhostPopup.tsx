@@ -79,7 +79,7 @@ function PortRow({ tab }: { tab: BrowserTab }) {
       {state.status === "unreachable" && (
         <div
           className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 cursor-pointer"
-          title={state.message + " — click to recheck"}
+          title={`${state.message} — click to recheck`}
           onClick={retry}
         />
       )}

@@ -306,7 +306,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const session = sessions[data.sessionId];
       if (!session) return;
 
-      const errorMsg = "\r\n\x1b[1;31mError: " + data.error + "\x1b[0m";
+      const errorMsg = `\r\n\x1b[1;31mError: ${data.error}\x1b[0m`;
       if (session.terminal) {
         session.terminal.write(errorMsg);
       }
@@ -328,7 +328,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const session = sessions[data.sessionId];
       if (!session) return;
 
-      const msg = "\r\n\x1b[1;33mSession closed (exit " + data.exitCode + ").\x1b[0m";
+      const msg = `\r\n\x1b[1;33mSession closed (exit ${data.exitCode}).\x1b[0m`;
       if (session.terminal) {
         session.terminal.write(msg);
       }

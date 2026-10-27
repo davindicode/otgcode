@@ -1,18 +1,21 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { MIN_PANE_PX } from "~/lib/workspace.shared";
-import { useTabsStore } from "~/stores/tabsStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
-
-const refitVisible = () => useTabsStore.getState().refitVisible();
 
 /**
  * The draggable seam between the two panes.
  *
  * Reports a fraction rather than a pixel width, so the split survives the
  * window being resized, and clamps against a minimum pane in pixels so
- * neither side can be dragged down to a sliver. Terminals are refitted once
- * the drag ends rather than on every move: a fit remeasures the grid and
- * reflows the rows, which is not work to do sixty times a second.
+ * neither side can be dragged down to a sliver.
+ *
+ * Nothing here refits a terminal. It used to, on a timer after the drag and
+ * again after a keyboard nudge, and so did the split being switched on — three
+ * guesses at when the layout would settle, all of them for a measurement that
+ * `TerminalPanel` already takes properly: it keeps a `ResizeObserver` on the
+ * terminal's own element, and every one of these moves that element. The
+ * observer fires when the box has actually changed rather than when a timeout
+ * hoped it had.
  */
 export default function PaneDivider() {
   const split = useWorkspaceStore((s) => s.split);
@@ -36,7 +39,6 @@ export default function PaneDivider() {
       document.removeEventListener("pointerup", end);
       document.removeEventListener("pointercancel", end);
       delete el.dataset.dragging;
-      refitVisible();
     };
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", end);
@@ -55,14 +57,6 @@ export default function PaneDivider() {
     else return;
     e.preventDefault();
   };
-
-  // Covers the keyboard nudges, which have no release to refit on. Trailing,
-  // so holding an arrow down fits once at the end rather than per repeat.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: split is the trigger, not a value the effect reads
-  useEffect(() => {
-    const id = setTimeout(refitVisible, 150);
-    return () => clearTimeout(id);
-  }, [split]);
 
   return (
     <>

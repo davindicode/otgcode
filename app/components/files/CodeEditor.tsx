@@ -4,7 +4,7 @@ import DownloadIcon from "~/components/DownloadIcon";
 import RefreshIcon from "~/components/RefreshIcon";
 import { clearDraft, readDraft, writeDraft } from "~/lib/drafts";
 import { isSaveShortcut } from "~/lib/keys";
-import { rewriteLocalAssets } from "~/lib/markdown";
+import { rewriteLocalAssets, sanitizeHtml } from "~/lib/markdown";
 import { readView, saveView } from "~/lib/viewState";
 import { showToast } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
@@ -15,7 +15,12 @@ const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 interface CodeEditorProps {
   path: string;
   content: string;
-  onSave: (content: string) => void;
+  /**
+   * Writes the file, answering whether it got there. A refusal — the file
+   * changed on disk, the write failed — has to be distinguishable, because
+   * the editor clears its unsaved state on the strength of it.
+   */
+  onSave: (content: string) => Promise<boolean>;
   /** Re-read the file from disk; it may have changed since the tab opened. */
   onReload: () => void;
   /** Bumped per reload, so one that reads identical bytes still lands here. */
@@ -72,7 +77,8 @@ function getLanguage(path: string): string {
 function MarkdownPreview({ content, fontSize, path }: { content: string; fontSize: number; path: string }) {
   const html = useMemo(() => {
     marked.setOptions({ breaks: true, gfm: true });
-    return rewriteLocalAssets(marked.parse(content) as string, path);
+    // Sanitised before the rewrite, which re-serialises what is left of it.
+    return rewriteLocalAssets(sanitizeHtml(marked.parse(content) as string), path);
   }, [content, path]);
 
   return (
@@ -162,7 +168,7 @@ function NotebookPreview({ content, fontSize }: { content: string; fontSize: num
               <div
                 className="prose prose-invert prose-sm max-w-none p-3"
                 dangerouslySetInnerHTML={{
-                  __html: marked.parse(joinSource(cell.source)) as string,
+                  __html: sanitizeHtml(marked.parse(joinSource(cell.source)) as string),
                 }}
               />
             ) : (
@@ -174,7 +180,8 @@ function NotebookPreview({ content, fontSize }: { content: string; fontSize: num
             <div className="border-t border-line bg-app p-3">
               {cell.outputs.map((output, j) => {
                 const text = joinSource(output.text) || joinSource(output.data?.["text/plain"]) || "";
-                const html = joinSource(output.data?.["text/html"]);
+                // A notebook's own HTML output, which is as arbitrary as its source.
+                const html = sanitizeHtml(joinSource(output.data?.["text/html"]));
                 const imgRaw = output.data?.["image/png"];
                 const imgData = Array.isArray(imgRaw) ? imgRaw[0] : imgRaw;
 
@@ -417,9 +424,20 @@ export default function CodeEditor({
     };
   }, [modeMenu]);
 
-  const handleSave = () => {
-    onSave(value);
-    setDirty(false);
+  /**
+   * Only clean once the file is actually written.
+   *
+   * This used to clear the unsaved mark the moment it asked. A save the server
+   * refused because the file had moved on disk raises a dialog with an
+   * Overwrite and a Keep editing — and taking Keep editing left an editor with
+   * no asterisk, a disabled save button, and edits that were still only in it.
+   * Then the browser copy was cleared on the same signal, which turned that
+   * into losing them. The forced save from that dialog is answered for too:
+   * the file it writes comes back down as new content, and the effect that
+   * follows a changed file clears the mark.
+   */
+  const handleSave = async () => {
+    if (await onSave(value)) setDirty(false);
   };
 
   /**

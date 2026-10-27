@@ -1,5 +1,5 @@
+import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import type { Express, Request } from "express";
-import type { IncomingMessage, Server, ServerResponse } from "http";
 import { createProxyMiddleware, type RequestHandler } from "http-proxy-middleware";
 import { isRequestAuthenticated } from "./auth.js";
 
@@ -115,7 +115,7 @@ export function mountProxy(app: Express, httpServer: Server, otgPort: number): v
 
   app.use("/proxy/:port", (req, res, next) => {
     const port = parseInt(req.params.port, 10);
-    if (isNaN(port) || BLOCKED_PORTS.has(port)) {
+    if (Number.isNaN(port) || BLOCKED_PORTS.has(port)) {
       res.status(403).json({ error: `Port ${port} is not allowed` });
       return;
     }

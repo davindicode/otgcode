@@ -78,7 +78,7 @@ export default function Breadcrumbs({ path, onNavigate, onGoUp, canGoUp, disable
             /
           </button>
           {parts.map((part, i) => {
-            const fullPath = "/" + parts.slice(0, i + 1).join("/");
+            const fullPath = `/${parts.slice(0, i + 1).join("/")}`;
             const isLast = i === parts.length - 1;
             return (
               <span key={fullPath} className="flex items-center gap-0.5 shrink-0">

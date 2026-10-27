@@ -111,7 +111,7 @@ function detectCwd(sessionId: string | undefined): TerminalPlace {
         const name = readComm(candidate);
         if (name !== "tmux" && !name.startsWith("tmux:")) continue;
         const tty = readTty(candidate);
-        if (!tty || !tty.startsWith("/dev/")) continue;
+        if (!tty?.startsWith("/dev/")) continue;
         const match = listTmuxClients().find((client) => client.tty === tty);
         if (match) {
           return {

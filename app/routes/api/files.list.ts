@@ -1,5 +1,5 @@
-import { readdir, stat } from "fs/promises";
-import { join } from "path";
+import { readdir, stat } from "node:fs/promises";
+import { join } from "node:path";
 import { fsErrorMessage } from "~/lib/errors";
 import { basename } from "~/lib/paths";
 import type { Route } from "./+types/files.list";

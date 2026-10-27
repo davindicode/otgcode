@@ -1,4 +1,4 @@
-import { rename } from "fs/promises";
+import { rename } from "node:fs/promises";
 import { fsErrorMessage } from "~/lib/errors";
 import type { Route } from "./+types/files.rename";
 

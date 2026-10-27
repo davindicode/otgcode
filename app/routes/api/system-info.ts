@@ -1,5 +1,5 @@
-import { execSync } from "child_process";
-import { arch, cpus, freemem, hostname, platform, release, totalmem, uptime } from "os";
+import { execSync } from "node:child_process";
+import { arch, cpus, freemem, hostname, platform, release, totalmem, uptime } from "node:os";
 import type { Route } from "./+types/system-info";
 
 function run(cmd: string): string {

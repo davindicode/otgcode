@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rewriteLocalAssets } from "./markdown";
+import { rewriteLocalAssets, sanitizeHtml } from "./markdown";
 
 const FILE = "/home/user/repo/README.md";
 
@@ -34,5 +34,31 @@ describe("rewriteLocalAssets", () => {
 
   it("leaves in-page anchors untouched", () => {
     expect(rewriteLocalAssets('<a href="#usage">Usage</a>', FILE)).toContain('href="#usage"');
+  });
+});
+
+describe("sanitising rendered markup", () => {
+  it("drops a script a file brought with it", () => {
+    const out = sanitizeHtml('<h1>Hi</h1><script>fetch("/api/files/read")</script>');
+    expect(out).toContain("<h1>Hi</h1>");
+    expect(out).not.toContain("script");
+  });
+
+  it("drops an event handler, which is the one that does not look dangerous", () => {
+    // `marked` emits this verbatim from a markdown file, and it needs no
+    // <script> tag to run: the browser fires it when the load fails.
+    const out = sanitizeHtml('<img src=x onerror="alert(1)">');
+    expect(out).toContain("<img");
+    expect(out.toLowerCase()).not.toContain("onerror");
+  });
+
+  it("refuses javascript: in a link while keeping ordinary ones", () => {
+    expect(sanitizeHtml('<a href="javascript:alert(1)">x</a>').toLowerCase()).not.toContain("javascript:");
+    expect(sanitizeHtml('<a href="https://example.com">x</a>')).toContain("https://example.com");
+  });
+
+  it("leaves the markup a README is actually made of alone", () => {
+    const md = '<h2>Install</h2><pre><code>pnpm i</code></pre><ul><li><em>a</em></li></ul><img src="./a.png">';
+    expect(sanitizeHtml(md)).toBe(md);
   });
 });

@@ -1,4 +1,4 @@
-import { execFileSync, execSync } from "child_process";
+import { execFileSync, execSync } from "node:child_process";
 import type { Route } from "./+types/tmux.sessions";
 
 function getTmuxVersion(): string | null {

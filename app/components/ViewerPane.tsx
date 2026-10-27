@@ -140,7 +140,7 @@ export default function ViewerPane({ tabId, path }: { tabId: string; path: strin
    * overwrite. Without it the server refuses when the file has moved, which is
    * the only place that check cannot race another writer.
    */
-  const handleSave = async (content: string, force = false) => {
+  const handleSave = async (content: string, force = false): Promise<boolean> => {
     try {
       const res = await fetch("/api/files/write", {
         method: "POST",
@@ -155,21 +155,25 @@ export default function ViewerPane({ tabId, path }: { tabId: string; path: strin
       if (data.conflict) {
         setPending(content);
         setConflict(data.error ?? "This file changed on disk");
-        return;
+        return false;
       }
       if (data.error) {
         showToast(data.error);
-        return;
+        return false;
       }
       // Saving makes this the version on disk, so the tab stops calling itself
-      // stale and the next save is checked against what it just wrote.
-      if (load.status === "ready") setLoad({ ...load, version: data.version ?? null });
+      // stale and the next save is checked against what it just wrote. The
+      // content goes with it: this is now what the file holds, which is what
+      // makes an overwrite from the conflict dialog settle the editor too.
+      if (load.status === "ready") setLoad({ ...load, content, version: data.version ?? null });
       setOnDisk(null);
       setConflict(null);
       setPending(null);
       showToast(`Saved ${path.split("/").pop()}`, "info");
+      return true;
     } catch (err: unknown) {
       showToast(errorMessage(err, "Save failed"));
+      return false;
     }
   };
 

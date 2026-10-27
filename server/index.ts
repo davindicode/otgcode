@@ -1,6 +1,6 @@
 import "dotenv/config";
+import { createServer } from "node:http";
 import express from "express";
-import { createServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import { isPasswordEnabled } from "./auth.js";
 import { authGate, gateSocketIO, mountAuthRoutes } from "./auth-routes.js";

@@ -1,4 +1,4 @@
-import { existsSync } from "fs";
+import { existsSync } from "node:fs";
 import * as pty from "node-pty";
 
 function getDefaultShell(): string {

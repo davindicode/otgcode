@@ -1,4 +1,4 @@
-import { mkdir } from "fs/promises";
+import { mkdir } from "node:fs/promises";
 import { fsErrorMessage } from "~/lib/errors";
 import type { Route } from "./+types/files.mkdir";
 

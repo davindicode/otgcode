@@ -115,13 +115,6 @@ interface TabsState {
   /** Point the cursor at a pane without changing which tab it shows. */
   focusPane: (pane: PaneIndex) => void;
   /**
-   * Remeasure the terminals on screen, for when a pane changed width under
-   * them — the divider moved, the split was turned on or off, or the window
-   * crossed the width where two panes stop fitting. A terminal sizes itself in
-   * whole rows and columns, so it cannot follow a CSS width on its own.
-   */
-  refitVisible: () => void;
-  /**
    * Bring every tab into the left pane, for leaving the split: a tab in a
    * pane that is not drawn would be a tab the user cannot reach.
    */
@@ -434,11 +427,6 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     set({ focusedPane: pane });
     const id = get().activeIds[pane];
     if (id) syncContentFocus(id, get().tabs);
-  },
-
-  refitVisible: () => {
-    const { activeIds, tabs } = get();
-    for (const id of activeIds) if (id) syncContentFocus(id, tabs);
   },
 
   mergePanes: () => {

@@ -238,7 +238,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   // --- Handlers ---
   const handleSend = () => {
     if (!sessionId || !text) return;
-    sendInput(sessionId, text + "\n");
+    sendInput(sessionId, `${text}\n`);
     setText("");
     textareaRef.current?.focus();
   };

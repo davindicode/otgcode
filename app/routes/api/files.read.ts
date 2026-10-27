@@ -1,4 +1,4 @@
-import { readFile, stat } from "fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { lookup } from "mime-types";
 import { fsErrorMessage } from "~/lib/errors";
 import { looksBinary } from "~/lib/fileTypes";
