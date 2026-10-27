@@ -41,7 +41,7 @@ Every release is described in [CHANGELOG.md](CHANGELOG.md).
 </table>
 
 
-Tabs in one strip, VS Code style. Tabs come in four kinds — **Terminal**, **tmux session**, **Explorer**, and the **viewer/editor** tabs that open when you pick a file in an explorer. A tmux tab *is* its session: it runs tmux rather than a shell, so a reconnect re-attaches instead of dropping you into a shell outside it. `+` asks which kind to create; file tabs are spawned by the explorer, so an explorer always stays a file browser, and a file opens next to the explorer it came from. **Drag a tab to reorder it** — by hold-and-drag on a phone, so a swipe still scrolls the strip.
+Tabs in one strip, VS Code style. Tabs come in four kinds — **Terminal**, **tmux session**, **Explorer**, and the **viewer/editor** tabs that open when you pick a file in an explorer. A tmux tab *is* its session: it runs tmux rather than a shell, so a reconnect re-attaches instead of dropping you into a shell outside it. `+` asks which kind to create; file tabs are spawned by the explorer, so an explorer always stays a file browser, and a file opens next to the explorer it came from. **Drag the selected tab to reorder it**; dragging any other tab slides the whole strip, for when there are more tabs than fit. On a phone the selected tab needs a hold first, so a swipe still scrolls.
 
 On a wide screen you can **split the view in two**, from Settings → Appearance: a file on the left and a terminal on the right, with a divider to drag (double-click it to even the panes up). Each pane has its own tab strip, its own `+` and its own active tab, and a tab moves across by being dragged onto the other strip. On a phone — or any screen under 900px or taller than it is wide — one pane is drawn and every tab stays reachable from the same strip, so the split costs nothing on mobile and is waiting when you dock.
 
@@ -56,7 +56,7 @@ Install it to a home screen and it runs standalone like a native app; the layout
 - Picking **tmux session** from `+` opens a picker: attach to a running session, start a new one, or kill one. Closing a tmux tab detaches; the session keeps running
 - **Renaming a tmux tab renames the session.** The tab title, tmux itself, and the name a reconnect attaches by are one value, so the picker and the strip can never disagree
 - **Composer tabs** under the terminal, changing with the tab they belong to:
-  - **keyboard** — the input and send, over one row of keys that never grows. A mode picks what those keys are: `main` for the terminal itself, a keyboard per coding CLI (claude, codex, opencode), or git
+  - **keyboard** — the input and send, over one row of keys that never grows. Any row longer than the screen can be dragged sideways, or scrolled with a wheel on a desktop. A mode picks what those keys are: `main` for the terminal itself, a keyboard per coding CLI (claude, codex, opencode), or git
     - **main** carries a key set — nav, numbers, letters, function, symbols — and a sticky modifier beside it: Shift, Ctrl, Ctrl+Shift, Alt or Alt+Shift
     - a **CLI** keyboard leads with Enter, then Bksp and the arrows for its prompts, then its own shortcuts, a bare launch button, and **slash commands you can add per CLI**, kept separately for each
     - **git** — status, log, diff, add, fetch, pull, push, stash, branch, commit with a message, and `user.name` / `user.email` setup
