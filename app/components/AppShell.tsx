@@ -61,7 +61,11 @@ function watchTabs(): () => void {
 const PANES: PaneIndex[] = [0, 1];
 /** Column 2 is the divider, so the right pane is the third track. */
 const COLUMN: Record<PaneIndex, number> = { 0: 1, 1: 3 };
-/** The divider's own column, wide enough to grab without reaching into a pane. */
+/**
+ * The divider's own column, wide enough to grab without reaching into a pane.
+ * Taken out of the left pane alone: that is the side where something — an
+ * editor's scrollbar — actually sits against the edge.
+ */
 const GUTTER_PX = 12;
 
 export default function AppShell() {
@@ -212,10 +216,12 @@ export default function AppShell() {
             // open. A column of its own means nothing from either pane is
             // ever beneath it, and the clearance is symmetric by construction
             // rather than by two insets that have to agree.
+            // All of it comes off the left pane. The right pane never puts
+            // anything against this edge — its own content is already inset
+            // from it — so clearance there bought nothing and only moved the
+            // line off the boundary.
             gridTemplateColumns: split
-              ? `calc(${splitFraction * 100}% - ${GUTTER_PX / 2}px) ${GUTTER_PX}px calc(${
-                  (1 - splitFraction) * 100
-                }% - ${GUTTER_PX / 2}px)`
+              ? `calc(${splitFraction * 100}% - ${GUTTER_PX}px) ${GUTTER_PX}px ${(1 - splitFraction) * 100}%`
               : "100%",
             // Two rows, not three. A row for the composers would have been one
             // height shared by both columns, so opening the keyboard in one

@@ -766,7 +766,10 @@ html.light .glow {
 .pane-divider::after {
   content: "";
   position: absolute;
-  inset: 0 3px;
+  /* Flush with the right pane, with the grab area's slack to its left: the
+     column is clearance the left pane gave up, so the line belongs at the far
+     end of it rather than floating in the middle. */
+  inset: 0 0 0 6px;
   background: linear-gradient(
     to right,
     transparent 0%,
