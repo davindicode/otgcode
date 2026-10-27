@@ -6,8 +6,8 @@ let cached = "";
  * A stable id for this browser, so the server can tell a refresh apart from a
  * second device and let the same one reclaim its session without asking.
  *
- * localStorage is the only state the app keeps in the browser, and only this:
- * it identifies the device, it is not a credential. Where storage is blocked
+ * One of only two things the app keeps in the browser, the other being an
+ * editor's unsaved buffer: this identifies the device, it is not a credential. Where storage is blocked
  * (a private window, blocked site data) the id lasts for the page instead,
  * which costs one extra tap on "Take over" after a refresh.
  */

@@ -2,6 +2,7 @@ import { marked } from "marked";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DownloadIcon from "~/components/DownloadIcon";
 import RefreshIcon from "~/components/RefreshIcon";
+import { clearDraft, readDraft, writeDraft } from "~/lib/drafts";
 import { isSaveShortcut } from "~/lib/keys";
 import { rewriteLocalAssets } from "~/lib/markdown";
 import { showToast } from "~/stores/toastStore";
@@ -199,6 +200,9 @@ function NotebookPreview({ content, fontSize }: { content: string; fontSize: num
   );
 }
 
+/** Quiet period before a keystroke reaches storage. */
+const DRAFT_DEBOUNCE_MS = 500;
+
 const MODES = ["edit", "plain", "preview"] as const;
 type Mode = (typeof MODES)[number];
 
@@ -231,14 +235,27 @@ export default function CodeEditor({
 }: CodeEditorProps) {
   const ext = getExt(path);
   const canPreview = PREVIEWABLE.has(ext);
-  const [value, setValue] = useState(content);
-  const [dirty, setDirty] = useState(false);
+  /**
+   * What was being typed when the page last went away, read once at mount.
+   *
+   * Restored rather than offered: the file is on screen either way, and a
+   * prompt asking whether to keep your own unsaved work is a question with
+   * one sensible answer. It comes back dirty, with the save button lit and
+   * the asterisk in the header, so what is on screen is not what is on disk
+   * and the editor says so. A draft that matches the file exactly is not
+   * worth restoring — it is what someone else already saved.
+   */
+  const [draft] = useState(() => readDraft(path));
+  const [value, setValue] = useState(draft ?? content);
+  const [dirty, setDirty] = useState(draft !== null && draft !== content);
   // Opening a file shows it; editing it is a choice you make. Markdown and
   // friends have a rendered form, everything else gets plain text — so what
   // you land in never depends on the extension beyond that.
   const [mode, setMode] = useState<Mode>(canPreview ? "preview" : "plain");
   const [modeMenu, setModeMenu] = useState(false);
   const modeMenuRef = useRef<HTMLDivElement>(null);
+  /** False until the first render's effects have run. */
+  const mounted = useRef(false);
   const monacoRef = useRef<MonacoHandle | null>(null);
   // Reloading over unsaved work would throw it away silently, so the first tap
   // only warns. Clears itself, so an armed button cannot sit waiting.
@@ -259,12 +276,41 @@ export default function CodeEditor({
   // this did nothing at all. Discarding edits by reloading was the visible
   // case: the file on disk still held what the tab had read, so the editor kept
   // the unsaved changes the second tap had just agreed to throw away.
+  // Not on the first run, which is what the state above is already set to —
+  // and which would otherwise overwrite a restored draft with the file.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reloadCount is the trigger, not a value the effect reads
   useEffect(() => {
-    setValue(content);
-    setDirty(false);
-    setDiscardArmed(false);
+    if (mounted.current) {
+      setValue(content);
+      setDirty(false);
+      setDiscardArmed(false);
+    }
+    mounted.current = true;
   }, [content, reloadCount]);
+
+  /**
+   * Mirror the buffer into the browser while it differs from the file.
+   *
+   * One effect for both halves, so there is nothing to remember to call:
+   * saving and discarding both end with `dirty` false, and clearing on that
+   * is how a draft stops existing. Debounced, because this runs on every
+   * keystroke and storage is synchronous — and flushed on `pagehide`, which
+   * is the last thing that runs before a phone evicts a backgrounded tab, so
+   * the tail of what was typed goes with it.
+   */
+  useEffect(() => {
+    if (!dirty || value === content) {
+      clearDraft(path);
+      return;
+    }
+    const flush = () => writeDraft(path, value);
+    const id = setTimeout(flush, DRAFT_DEBOUNCE_MS);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [dirty, value, content, path]);
 
   // Reported rather than read: the tab strip needs it to know whether its X
   // would throw work away, and it is derived state here, not there.

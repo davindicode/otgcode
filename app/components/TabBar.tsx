@@ -537,11 +537,17 @@ export default function TabBar({ pane }: { pane: PaneIndex }) {
    * implied otherwise. A viewer tab is usually free too — closing it returns
    * you to the explorer it came from and the file is still there — unless it
    * has edits that are not, which is the state its save button shows.
+   *
+   * Those edits used to be lost here, and this said so. They are kept in the
+   * browser now, so it says that instead: the close is still worth mentioning,
+   * since the file on disk is not what you were looking at, but it is no
+   * longer the kind of thing to put a red button on.
    */
   const closeCost = (tab: Tab): string | null => {
     if (tab.kind === "terminal") return "Its shell and anything running in it stop, and the scrollback goes with them.";
     if (tab.kind === "tmux") return null;
-    if (tab.kind === "viewer") return unsaved[tab.id] ? "This file has edits that are not saved. They are lost." : null;
+    if (tab.kind === "viewer")
+      return unsaved[tab.id] ? "This file has edits that are not saved. They come back when you open it again." : null;
     return "";
   };
 
@@ -612,8 +618,8 @@ export default function TabBar({ pane }: { pane: PaneIndex }) {
         <ConfirmDialog
           title={`Close ${closing.title}?`}
           body={closeCost(closing)}
-          confirmLabel={unsaved[closing.id] ? "Discard and close" : "Close tab"}
-          danger={closing.kind === "terminal" || !!unsaved[closing.id]}
+          confirmLabel="Close tab"
+          danger={closing.kind === "terminal"}
           onConfirm={() => {
             close(closing.id);
             setClosing(null);
