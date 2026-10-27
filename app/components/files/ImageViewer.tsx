@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import DownloadIcon from "~/components/DownloadIcon";
 import RefreshIcon from "~/components/RefreshIcon";
+import { readView, saveView } from "~/lib/viewState";
 import CannotDisplay from "./CannotDisplay";
 import CopyPathButton from "./CopyPathButton";
 
@@ -16,8 +17,17 @@ interface ImageViewerProps {
 /** The container's padding, which the image has to fit inside. */
 const PAD = 32;
 
+/** Quiet period before a pan is written down. */
+const PAN_SETTLE_MS = 400;
+
 export default function ImageViewer({ path, onReload, version, stale }: ImageViewerProps) {
-  const [zoom, setZoom] = useState(1);
+  /**
+   * Where this image was last being looked at, read once at mount. Zoom comes
+   * back immediately; the pan has to wait for the image to have a size to be
+   * panned within, which the effect below does once.
+   */
+  const [saved] = useState(() => readView(path));
+  const [zoom, setZoom] = useState(saved.zoom ?? 1);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [box, setBox] = useState<{ w: number; h: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,6 +68,44 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
   const zoomIn = () => setZoom((z) => Math.min(5, z + 0.25));
   const zoomOut = () => setZoom((z) => Math.max(0.1, z - 0.25));
   const zoomFit = () => setZoom(1);
+
+  useEffect(() => {
+    saveView(path, { zoom });
+  }, [path, zoom]);
+
+  /**
+   * Put the pane back where it was, once there is something to scroll.
+   *
+   * Pan is the container's own scroll offset rather than React state, and a
+   * scroll offset is clamped to the content — so setting it before the image
+   * has loaded and been laid out would have clamped it to zero. Waiting for
+   * both the natural size and the pane's own box is waiting for exactly that.
+   * Once only: after this the user is panning, and this would fight them.
+   */
+  const panRestored = useRef(false);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || panRestored.current || !naturalSize || !box) return;
+    panRestored.current = true;
+    if (saved.left) el.scrollLeft = saved.left;
+    if (saved.top) el.scrollTop = saved.top;
+  }, [naturalSize, box, saved.left, saved.top]);
+
+  /**
+   * Panning writes where it got to, once it settles. Scroll fires far too
+   * often to store on each one, and the offset after a zoom is the browser's
+   * doing rather than the user's — but it is still where they are looking, so
+   * it is still worth keeping.
+   */
+  const panTimer = useRef(0);
+  const handleScroll = () => {
+    const el = containerRef.current;
+    if (!el || !panRestored.current) return;
+    const { scrollLeft: left, scrollTop: top } = el;
+    clearTimeout(panTimer.current);
+    panTimer.current = window.setTimeout(() => saveView(path, { left, top }), PAN_SETTLE_MS);
+  };
+  useEffect(() => () => clearTimeout(panTimer.current), []);
 
   const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
@@ -200,6 +248,7 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
           onMouseDown={handleMouseDown}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
+          onScroll={handleScroll}
         >
           <div
             className="flex items-center justify-center p-4"

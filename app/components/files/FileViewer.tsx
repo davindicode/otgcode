@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { fileKind, getExt } from "~/lib/fileTypes";
+import { readView, saveView } from "~/lib/viewState";
 import CannotDisplay from "./CannotDisplay";
 import CopyPathButton from "./CopyPathButton";
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -11,6 +12,12 @@ import CodeEditor from "./CodeEditor";
 import ImageViewer from "./ImageViewer";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+/** How far playback has to move before the position is written again. */
+const TIME_STEP_S = 5;
+
+/** Nearer the end than this and a file is finished, not paused. */
+const END_MARGIN_S = 2;
 
 interface FileViewerProps {
   path: string;
@@ -42,8 +49,28 @@ function MediaViewer({
   // `version` changes on reload, which is what makes the browser fetch the
   // file again instead of serving the copy it already has.
   const src = `/api/files/download?path=${encodeURIComponent(path)}&inline=1&v=${version}`;
-  const [loop, setLoop] = useState(false);
+  const [saved] = useState(() => readView(path));
+  const [loop, setLoop] = useState(saved.loop ?? false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+
+  useEffect(() => {
+    saveView(path, { loop });
+  }, [path, loop]);
+
+  /**
+   * Where playback had got to, written down as it goes.
+   *
+   * `timeupdate` fires several times a second, so this only stores a position
+   * once it is a few seconds from the last one — enough to come back to the
+   * right place, not enough to be writing to storage continuously. Also
+   * written on pause, which is the one moment the exact position matters.
+   */
+  const stored = useRef(saved.time ?? 0);
+  const remember = (el: HTMLMediaElement, force = false) => {
+    if (!force && Math.abs(el.currentTime - stored.current) < TIME_STEP_S) return;
+    stored.current = el.currentTime;
+    saveView(path, { time: el.currentTime });
+  };
 
   const handleMediaError = (event: React.SyntheticEvent<HTMLMediaElement>) => {
     const code = event.currentTarget.error?.code;
@@ -62,7 +89,17 @@ function MediaViewer({
     loop,
     preload: "metadata" as const,
     onError: handleMediaError,
-    onLoadedMetadata: () => setMediaError(null),
+    // Seeking needs a duration to seek within, so it waits for the metadata.
+    // Not to the very end: coming back to a finished file should offer to
+    // play it, not sit on the last frame with nothing left.
+    onLoadedMetadata: (e: React.SyntheticEvent<HTMLMediaElement>) => {
+      setMediaError(null);
+      const el = e.currentTarget;
+      const at = saved.time ?? 0;
+      if (at > 0 && Number.isFinite(el.duration) && at < el.duration - END_MARGIN_S) el.currentTime = at;
+    },
+    onTimeUpdate: (e: React.SyntheticEvent<HTMLMediaElement>) => remember(e.currentTarget),
+    onPause: (e: React.SyntheticEvent<HTMLMediaElement>) => remember(e.currentTarget, true),
   };
 
   return (
@@ -187,7 +224,12 @@ function PdfViewer({
   stale: boolean;
 }) {
   const [numPages, setNumPages] = useState<number>(0);
-  const [scale, setScale] = useState(1.0);
+  const [savedPdf] = useState(() => readView(path));
+  const [scale, setScale] = useState(savedPdf.scale ?? 1.0);
+
+  useEffect(() => {
+    saveView(path, { scale });
+  }, [path, scale]);
   const [paneWidth, setPaneWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
