@@ -792,10 +792,18 @@ html.light .glow {
   inset: 0;
 }
 
+/*
+ * Lit on hover, on keyboard focus, and for the whole of a drag. The drag needs
+ * saying because `:hover` cannot cover it: the column is twelve pixels wide, so
+ * the pointer is outside it a moment after the drag starts, and the line went
+ * dark while it was the one thing moving.
+ */
 .pane-divider:hover::after,
 .pane-divider:focus-visible::after,
+.pane-divider[data-dragging]::after,
 .pane-divider:hover ~ .pane-seam::after,
-.pane-divider:focus-visible ~ .pane-seam::after {
+.pane-divider:focus-visible ~ .pane-seam::after,
+.pane-divider[data-dragging] ~ .pane-seam::after {
   background: linear-gradient(
     to right,
     transparent 0%,

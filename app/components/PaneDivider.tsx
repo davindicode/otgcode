@@ -20,10 +20,13 @@ export default function PaneDivider() {
   const ref = useRef<HTMLDivElement>(null);
 
   const onPointerDown = (e: React.PointerEvent) => {
-    const row = ref.current?.parentElement;
-    if (!row) return;
+    const el = ref.current;
+    const row = el?.parentElement;
+    if (!el || !row) return;
     // Otherwise the drag selects the text in both panes on the way across.
     e.preventDefault();
+    // Keeps it lit for the whole drag; the CSS says why hover cannot.
+    el.dataset.dragging = "true";
     const { left, width } = row.getBoundingClientRect();
     const min = MIN_PANE_PX / width;
 
@@ -32,6 +35,7 @@ export default function PaneDivider() {
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", end);
       document.removeEventListener("pointercancel", end);
+      delete el.dataset.dragging;
       refitVisible();
     };
     document.addEventListener("pointermove", onMove);
