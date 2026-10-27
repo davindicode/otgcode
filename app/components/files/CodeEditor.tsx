@@ -330,17 +330,9 @@ export default function CodeEditor({
     };
   }, [modeMenu]);
 
-  // Monaco binds its command once at mount, so it would otherwise save
-  // whatever `value` was at that moment. Keep the live one in a ref.
-  const saveRef = useRef<() => void>(() => {});
-
   const handleSave = () => {
     onSave(value);
     setDirty(false);
-  };
-
-  saveRef.current = () => {
-    if (dirty) handleSave();
   };
 
   /**
@@ -349,12 +341,24 @@ export default function CodeEditor({
    * mounted, so a document listener would fire in editors the user isn't
    * looking at. Keystrokes bubble from the focused editor, and an unfocused
    * pane can't receive them.
+   *
+   * And this is the only binding, deliberately. Monaco's own
+   * `editor.addCommand(CtrlCmd | KeyS, …)` used to sit beside it, which in a
+   * split broke saving outright: monaco's keybinding service is a single
+   * global singleton, a command registered with no `when` clause is an
+   * unconditional rule, and two open editors each registered that same rule.
+   * The resolver picks one, so Ctrl+S in either editor ran the winner's
+   * handler — which closed over the *other* editor's state, found it not
+   * dirty, and returned having done nothing. Monaco also stops propagation
+   * for anything it resolves, so this handler never got the chance to be
+   * right. Giving the command a per-editor `when` context would have fixed
+   * its aim; registering no global keybinding at all fixes the cause.
    */
   const handlePaneKeyDown = (e: React.KeyboardEvent) => {
     if (!isSaveShortcut(e)) return;
     e.preventDefault();
     e.stopPropagation();
-    saveRef.current();
+    if (dirty) handleSave();
   };
 
   return (
@@ -561,9 +565,8 @@ export default function CodeEditor({
               language={getLanguage(path)}
               value={value}
               onChange={handleChange}
-              onMount={(editor, monaco) => {
+              onMount={(editor) => {
                 monacoRef.current = editor as unknown as MonacoHandle;
-                editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveRef.current());
                 refreshHistory();
               }}
               theme={monacoTheme}
