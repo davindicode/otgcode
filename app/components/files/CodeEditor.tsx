@@ -1,10 +1,9 @@
-import { marked } from "marked";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DownloadIcon from "~/components/DownloadIcon";
 import RefreshIcon from "~/components/RefreshIcon";
 import { clearDraft, readDraft, writeDraft } from "~/lib/drafts";
 import { isSaveShortcut } from "~/lib/keys";
-import { rewriteLocalAssets, sanitizeHtml } from "~/lib/markdown";
+import { renderMarkdown, rewriteLocalAssets, sanitizeHtml } from "~/lib/markdown";
 import { readView, saveView } from "~/lib/viewState";
 import { showToast } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
@@ -76,9 +75,8 @@ function getLanguage(path: string): string {
 
 function MarkdownPreview({ content, fontSize, path }: { content: string; fontSize: number; path: string }) {
   const html = useMemo(() => {
-    marked.setOptions({ breaks: true, gfm: true });
     // Sanitised before the rewrite, which re-serialises what is left of it.
-    return rewriteLocalAssets(sanitizeHtml(marked.parse(content) as string), path);
+    return rewriteLocalAssets(renderMarkdown(content), path);
   }, [content, path]);
 
   return (
@@ -168,7 +166,7 @@ function NotebookPreview({ content, fontSize }: { content: string; fontSize: num
               <div
                 className="prose prose-invert prose-sm max-w-none p-3"
                 dangerouslySetInnerHTML={{
-                  __html: sanitizeHtml(marked.parse(joinSource(cell.source)) as string),
+                  __html: renderMarkdown(joinSource(cell.source)),
                 }}
               />
             ) : (

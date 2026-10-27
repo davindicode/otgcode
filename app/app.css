@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
 
 /* ---------------------------------------------------------------------------
    Theme tokens.
@@ -837,3 +838,18 @@ html.light .glow {
 }
 
 
+
+/* ---------------------------------------------------------------------------
+   Rendered maths.
+
+   A display equation has a fixed width — it is typeset, not reflowed — and a
+   paper's worth of them in a half-width pane on a phone is wider than the
+   pane. Scroll the equation rather than the page: a document that pans
+   sideways because one line of algebra is long is unreadable everywhere else.
+--------------------------------------------------------------------------- */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Room for the scrollbar, so it does not sit on the glyphs' descenders. */
+  padding: 2px 0 4px;
+}

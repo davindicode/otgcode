@@ -80,7 +80,7 @@ Install it to a home screen and it runs standalone like a native app; the layout
 - Failures say what actually went wrong — `"TODO.md" is a file, not a folder`, `No such folder "saves"`, `Permission denied` — rather than relaying an errno and a syscall name
 - **Built-in viewers & editors:**
   - **Code Editor** — Monaco with syntax highlighting and word wrap. Text opens in Plain and markdown in Preview; Edit is a deliberate switch. **Ctrl/Cmd+S saves** instead of opening the browser's save dialog, and undo/redo have buttons for phones
-  - **Markdown Preview** — GitHub-flavored with prose styling
+  - **Markdown Preview** — GitHub-flavored with prose styling, and **equations are typeset**: `$...$` inline and `$$...$$` display go through KaTeX, including the multi-line form a paper's worth of algebra actually arrives in. Prices and shell variables are left as they were written
   - **Jupyter Notebook** — cells with type badges, rendered markdown, code, and outputs
   - **HTML Preview** — live rendered in sandboxed iframe
   - **PDF Viewer** — pages render as they scroll into view, sized to the pane, with zoom and pinch-to-zoom
