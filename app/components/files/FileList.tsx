@@ -1,6 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { formatSize } from "~/lib/format";
+import { readView, saveView } from "~/lib/viewState";
 import type { FileEntry } from "~/stores/fileStore";
+
+/** Quiet period before a scroll position is written down. */
+const SCROLL_SETTLE_MS = 400;
 
 interface UploadFile {
   name: string;
@@ -12,6 +16,8 @@ interface UploadFile {
 
 interface FileListProps {
   entries: FileEntry[];
+  /** The directory being listed, which is what its scroll position is keyed by. */
+  cwd: string;
   onOpen: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
   onInfo: (entry: FileEntry) => void;
@@ -50,6 +56,7 @@ function isButtonMenuFor(menu: ContextMenuState | null, entry: FileEntry): boole
 
 export default function FileList({
   entries,
+  cwd,
   onOpen,
   onDelete,
   onInfo,
@@ -73,6 +80,32 @@ export default function FileList({
     visible: false,
   });
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Put the list back where it was, per directory rather than per tab.
+   *
+   * Keyed by the path because that is what you come back to: walking into a
+   * folder and out again lands where you left, and a page rebuilt under you
+   * does the same. Restoring waits for the rows, since a scroll offset is
+   * clamped to its content and there is none until they are rendered — and it
+   * runs again whenever the directory changes, which is the other half of the
+   * same behaviour.
+   */
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || entries.length === 0) return;
+    el.scrollTop = readView(cwd).scroll ?? 0;
+  }, [cwd, entries.length]);
+
+  const settle = useRef(0);
+  const rememberScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const scroll = el.scrollTop;
+    clearTimeout(settle.current);
+    settle.current = window.setTimeout(() => saveView(cwd, { scroll }), SCROLL_SETTLE_MS);
+  };
+  useEffect(() => () => clearTimeout(settle.current), []);
   const menuRef = useRef<HTMLDivElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -195,7 +228,7 @@ export default function FileList({
   }
 
   return (
-    <div ref={scrollRef} className="overflow-y-auto flex-1 relative">
+    <div ref={scrollRef} onScroll={rememberScroll} className="overflow-y-auto flex-1 relative">
       <div className={disabled ? "pointer-events-none opacity-50" : ""}>
         {entries.map((entry) => {
           const isSelected = selectMode && !!selectedNames?.has(entry.name);

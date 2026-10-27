@@ -670,6 +670,7 @@ function FileSessionView({ session }: { session: FileSession }) {
       ) : (
         <FileList
           entries={entries}
+          cwd={cwd}
           onOpen={handleOpen}
           onDelete={handleDelete}
           onInfo={handleInfo}

@@ -27,6 +27,19 @@ export interface ViewState {
   loop?: boolean;
   /** PDF: its own zoom, which is not the image one. */
   scale?: number;
+  /**
+   * How far down a list or a document had been scrolled, in pixels.
+   *
+   * Shared by the explorer, where the key is a directory, and the editor,
+   * where it is a file — so walking out of a folder and back in lands where
+   * you left, as does reopening a file. One field rather than one per
+   * viewer because they never key by the same path.
+   */
+  scroll?: number;
+  /** Editor: edit, plain or preview, since the default is not always right. */
+  mode?: string;
+  /** Editor: an HTML preview's zoom, which is its own control. */
+  htmlZoom?: number;
 }
 
 const views = localCache<ViewState>("otgcode:view:", {

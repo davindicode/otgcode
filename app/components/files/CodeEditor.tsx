@@ -5,6 +5,7 @@ import RefreshIcon from "~/components/RefreshIcon";
 import { clearDraft, readDraft, writeDraft } from "~/lib/drafts";
 import { isSaveShortcut } from "~/lib/keys";
 import { rewriteLocalAssets } from "~/lib/markdown";
+import { readView, saveView } from "~/lib/viewState";
 import { showToast } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
 import CopyPathButton from "./CopyPathButton";
@@ -206,6 +207,12 @@ const DRAFT_DEBOUNCE_MS = 500;
 const MODES = ["edit", "plain", "preview"] as const;
 type Mode = (typeof MODES)[number];
 
+/** Narrows what came back from storage, which is a string and may be anything. */
+const isMode = (value: string | undefined): value is Mode => MODES.includes(value as Mode);
+
+/** Quiet period before a scroll offset is written down. */
+const SCROLL_SETTLE_MS = 400;
+
 const MODE_LABELS: Record<Mode, string> = { edit: "Edit", plain: "Plain", preview: "Preview" };
 const MODE_HINTS: Record<Mode, string> = {
   edit: "Full code editor",
@@ -222,6 +229,9 @@ interface MonacoHandle {
   focus: () => void;
   getModel: () => { canUndo: () => boolean; canRedo: () => boolean } | null;
   addCommand: (keybinding: number, handler: () => void) => void;
+  getScrollTop: () => number;
+  setScrollTop: (top: number) => void;
+  onDidScrollChange: (listener: () => void) => void;
 }
 
 export default function CodeEditor({
@@ -248,10 +258,12 @@ export default function CodeEditor({
   const [draft] = useState(() => readDraft(path));
   const [value, setValue] = useState(draft ?? content);
   const [dirty, setDirty] = useState(draft !== null && draft !== content);
+  /** How this file was last being read: which mode, zoom and scroll offset. */
+  const [saved] = useState(() => readView(path));
   // Opening a file shows it; editing it is a choice you make. Markdown and
   // friends have a rendered form, everything else gets plain text — so what
   // you land in never depends on the extension beyond that.
-  const [mode, setMode] = useState<Mode>(canPreview ? "preview" : "plain");
+  const [mode, setMode] = useState<Mode>(isMode(saved.mode) ? saved.mode : canPreview ? "preview" : "plain");
   const [modeMenu, setModeMenu] = useState(false);
   const modeMenuRef = useRef<HTMLDivElement>(null);
   /** False until the first render's effects have run. */
@@ -266,7 +278,7 @@ export default function CodeEditor({
   const editorFontSize = useWorkspaceStore((s) => s.editorFontSize);
   const monacoTheme = useWorkspaceStore((s) => (s.theme === "light" ? "light" : "vs-dark"));
   const isHtml = ext === "html" || ext === "htm";
-  const [htmlZoom, setHtmlZoom] = useState(100);
+  const [htmlZoom, setHtmlZoom] = useState(saved.htmlZoom ?? 100);
 
   // `value` is only seeded from `content` at mount, so a reload has to be taken
   // up here. Keeps the chosen mode and zoom, which a remount would reset.
@@ -287,6 +299,35 @@ export default function CodeEditor({
     }
     mounted.current = true;
   }, [content, reloadCount]);
+
+  useEffect(() => {
+    saveView(path, { mode, htmlZoom });
+  }, [path, mode, htmlZoom]);
+
+  /**
+   * How far down the file had been read, kept across a reload.
+   *
+   * One offset for both text views, which is right because they are the same
+   * monospace text at the same size — switching between them should not jump,
+   * and it already did not. Preview is left out on purpose: it is a rendered
+   * document of its own height, so an offset from the source means nothing in
+   * it, and the clamp would land you somewhere arbitrary rather than nowhere.
+   */
+  const plainRef = useRef<HTMLTextAreaElement>(null);
+  const settle = useRef(0);
+  const rememberScroll = (top: number) => {
+    clearTimeout(settle.current);
+    settle.current = window.setTimeout(() => saveView(path, { scroll: top }), SCROLL_SETTLE_MS);
+  };
+  useEffect(() => () => clearTimeout(settle.current), []);
+
+  // Monaco does its own scrolling, so it is asked rather than observed; the
+  // textarea is a plain element and has the event. Both land in one place.
+  useEffect(() => {
+    if (mode !== "plain") return;
+    const el = plainRef.current;
+    if (el) el.scrollTop = saved.scroll ?? 0;
+  }, [mode, saved.scroll]);
 
   /**
    * Mirror the buffer into the browser while it differs from the file.
@@ -592,8 +633,10 @@ export default function CodeEditor({
           // Native textarea: mobile gets real selection handles + OS "Select All",
           // which Monaco's custom-rendered editor does not support on touch.
           <textarea
+            ref={plainRef}
             readOnly
             value={value}
+            onScroll={(e) => rememberScroll(e.currentTarget.scrollTop)}
             spellCheck={false}
             autoCapitalize="off"
             autoCorrect="off"
@@ -612,7 +655,10 @@ export default function CodeEditor({
               value={value}
               onChange={handleChange}
               onMount={(editor) => {
-                monacoRef.current = editor as unknown as MonacoHandle;
+                const handle = editor as unknown as MonacoHandle;
+                monacoRef.current = handle;
+                if (saved.scroll) handle.setScrollTop(saved.scroll);
+                handle.onDidScrollChange(() => rememberScroll(handle.getScrollTop()));
                 refreshHistory();
               }}
               theme={monacoTheme}
