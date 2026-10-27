@@ -20,7 +20,7 @@ import {
   SYMBOL_COMBO_KEYS,
 } from "./combos";
 import DropUpSelect from "./DropUpSelect";
-import { dragScroll } from "./dragScroll";
+import { dragScroll, wheelScroll } from "./dragScroll";
 
 interface QuickKeyGroup {
   label: string;
@@ -601,7 +601,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
           not — they are not things to choose between, so they keep their place
           however far the tabs are scrolled. */}
       <div className="flex items-center border-b border-line/50" style={{ minWidth: 0 }}>
-        <div onPointerDown={dragScroll} className="min-w-0 flex-1 overflow-x-auto scrollbar-none">
+        <div onPointerDown={dragScroll} onWheel={wheelScroll} className="min-w-0 flex-1 overflow-x-auto scrollbar-none">
           <div className="flex w-max items-center gap-1 px-2 py-1">
             {tabBtn(KB_TAB, "keyboard", "Type, and the keys a terminal needs", !sessionId)}
             {TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !sessionId))}
@@ -710,7 +710,11 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
               {/* Where you are, how to get out, and how to get somewhere —
                   none of which should depend on the group below. */}
-              <div onPointerDown={dragScroll} className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+              <div
+                onPointerDown={dragScroll}
+                onWheel={wheelScroll}
+                className="flex items-center gap-1 overflow-x-auto scrollbar-none"
+              >
                 <span className="shrink-0 text-[10px] text-ink-faint">
                   session <span className="font-medium text-blue-300">{tmuxSession}</span>
                   {tmuxWindow !== null && (
@@ -768,6 +772,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                 />
                 <div
                   onPointerDown={dragScroll}
+                  onWheel={wheelScroll}
                   className="flex min-w-0 items-center gap-1 overflow-x-auto scrollbar-none"
                 >
                   {(TMUX_GROUPS.find((g) => g.label === tmuxGroup) ?? TMUX_GROUPS[0]).keys.map((qk) => (
@@ -923,6 +928,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
               {/* 3. The keys. One line, scrolled sideways — never taller. */}
               <div
                 onPointerDown={dragScroll}
+                onWheel={wheelScroll}
                 className="mt-1.5 flex items-center gap-1 overflow-x-auto scrollbar-none border-t border-line/50 pt-1.5"
               >
                 {comboSet &&

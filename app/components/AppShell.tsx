@@ -61,6 +61,8 @@ function watchTabs(): () => void {
 const PANES: PaneIndex[] = [0, 1];
 /** Column 2 is the divider, so the right pane is the third track. */
 const COLUMN: Record<PaneIndex, number> = { 0: 1, 1: 3 };
+/** The divider's own column, wide enough to grab without reaching into a pane. */
+const GUTTER_PX = 12;
 
 export default function AppShell() {
   const socketConnected = useTerminalStore((s) => s.socketConnected);
@@ -203,7 +205,18 @@ export default function AppShell() {
         <div
           className="grid min-h-0 flex-1 overflow-hidden"
           style={{
-            gridTemplateColumns: split ? `${splitFraction * 100}% 0px ${(1 - splitFraction) * 100}%` : "100%",
+            // A real track for the divider, not a zero-width one it overhangs
+            // from. The grab area used to reach 7px into each pane, so in the
+            // left pane an editor's own scrollbar sat under it and took the
+            // press — the divider could not be grabbed at all with a file
+            // open. A column of its own means nothing from either pane is
+            // ever beneath it, and the clearance is symmetric by construction
+            // rather than by two insets that have to agree.
+            gridTemplateColumns: split
+              ? `calc(${splitFraction * 100}% - ${GUTTER_PX / 2}px) ${GUTTER_PX}px calc(${
+                  (1 - splitFraction) * 100
+                }% - ${GUTTER_PX / 2}px)`
+              : "100%",
             // Two rows, not three. A row for the composers would have been one
             // height shared by both columns, so opening the keyboard in one
             // pane shrank the other pane's terminal with it. Each tab's

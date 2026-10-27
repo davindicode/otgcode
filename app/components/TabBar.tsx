@@ -5,7 +5,7 @@ import { type PaneIndex, type Tab, useTabsStore } from "~/stores/tabsStore";
 import ConfirmDialog from "./ConfirmDialog";
 import RenamableTab from "./RenamableTab";
 import TmuxPicker from "./TmuxPicker";
-import { dragScroll } from "./terminal/dragScroll";
+import { dragScroll, wheelScroll } from "./terminal/dragScroll";
 
 type NewKind = "terminal" | "explorer" | "tmux";
 
@@ -236,9 +236,20 @@ const TOUCH_JITTER_PX = 2;
  * Two pixels would be enough to clamp the scroll offset of a strip that is
  * already at its end, which is the whole bug this caret replaced.
  */
-const DropCaret = () => (
-  <div aria-hidden="true" className="relative w-0 shrink-0 self-stretch">
-    <div className="absolute inset-y-1.5 -left-px w-0.5 rounded-full bg-blue-400" />
+/**
+ * The tab, drawn where it would land: same shape, same name, shaded.
+ *
+ * A bare line between two tabs said less than this did, and said nothing at
+ * all over a pane with no tabs in it — which is exactly where you most need
+ * telling that the drop will work.
+ */
+const TabGhost = ({ tab }: { tab: Tab }) => (
+  <div
+    aria-hidden="true"
+    className="pointer-events-none my-1 ml-1 flex shrink-0 items-center gap-1.5 rounded-control px-3 py-1.5 text-sm text-ink-dim opacity-60 ring-1 ring-inset ring-blue-400/70"
+  >
+    {tabIcon(tab)}
+    <span className="truncate max-w-[80px]">{tab.title}</span>
   </div>
 );
 
@@ -377,6 +388,16 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
       const ahead = indexOf(before);
       const afterLast = indexOf(others[others.length - 1]?.dataset.tabId);
       const index = ahead !== -1 ? ahead : afterLast !== -1 ? afterLast + 1 : rest.length;
+      // Inside its own pane the tab moves as you drag, which is what this
+      // looked like before and what reads best: the strip is its own preview.
+      // That was never the part that went wrong — a sweep of the hit test
+      // against every width combination is stable, because the tab being
+      // measured against is the one tab left out of the measurement.
+      //
+      // A move to the *other* pane is still only drawn, never done. Taking
+      // the tab out of this strip's DOM shortened the content it scrolls, and
+      // a browser clamps a scroll offset its content can no longer reach.
+      if (over === own) move(id, index);
       trace("place", {
         x,
         pane: over,
@@ -483,8 +504,14 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
   // what used to make the other pane lurch.
   const tabs = split ? allTabs.filter((t) => t.pane === pane) : allTabs;
   const activeId = split ? activeIds[pane] : activeIds[focusedPane];
-  /** Where a dragged tab would land, drawn in the strip it is over. */
-  const caret = drag?.pane === pane ? drag.before : undefined;
+  /**
+   * A tab from the other pane hovering over this one, drawn where it would
+   * land. Its own strip keeps it too, shaded, so neither strip changes width
+   * while the drag is going on — which is what used to clamp the other pane's
+   * scroll offset and shift every tab in it.
+   */
+  const guest = drag && drag.pane === pane ? allTabs.find((t) => t.id === drag.id && t.pane !== pane) : undefined;
+  const ghostAt = guest ? drag?.before : undefined;
   const setActive = useTabsStore((s) => s.setActive);
   const close = useTabsStore((s) => s.close);
   const rename = useTabsStore((s) => s.rename);
@@ -544,12 +571,13 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
         ref={stripRef}
         data-pane-strip={pane}
         onPointerDown={onPointerDown}
-        className="overflow-x-auto scrollbar-none flex-1 min-w-0"
+        onWheel={wheelScroll}
+        className="select-none overflow-x-auto scrollbar-none flex-1 min-w-0"
       >
         <div className="flex w-max items-center">
           {tabs.map((tab) => (
             <Fragment key={tab.id}>
-              {caret === tab.id && <DropCaret />}
+              {ghostAt === tab.id && guest && <TabGhost tab={guest} />}
               <RenamableTab
                 id={tab.id}
                 dragging={tab.id === drag?.id}
@@ -566,8 +594,9 @@ export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolea
               />
             </Fragment>
           ))}
-          {/* Past the last tab, so dropping at the end of the strip shows up too. */}
-          {caret === null && <DropCaret />}
+          {/* Past the last tab, so dropping at the end of a strip — or onto one
+              with nothing in it — shows up too. */}
+          {ghostAt === null && guest && <TabGhost tab={guest} />}
           <button
             ref={plusRef}
             type="button"

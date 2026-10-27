@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { dragScroll } from "./dragScroll";
+import { dragScroll, wheelScroll } from "./dragScroll";
 
 export interface Chip {
   label: string;
@@ -80,6 +80,7 @@ export default function CommandChips({
               : "flex flex-wrap items-center gap-1"
           }
           onPointerDown={row ? dragScroll : undefined}
+          onWheel={row ? wheelScroll : undefined}
         >
           {chips.map((chip) => (
             <button

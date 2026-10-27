@@ -742,7 +742,6 @@ html.light .glow {
 .pane-divider {
   grid-column: 2;
   position: relative;
-  width: 0;
   z-index: 20;
 }
 
@@ -767,7 +766,7 @@ html.light .glow {
 .pane-divider::after {
   content: "";
   position: absolute;
-  inset: 0 -3px;
+  inset: 0 3px;
   background: linear-gradient(
     to right,
     transparent 0%,
@@ -779,13 +778,15 @@ html.light .glow {
 }
 
 /*
- * What you grab: wider than what you see, and transparent. A line thin
- * enough to look right is too thin to hit with a trackpad.
+ * What you grab: the whole column, transparent, since a line thin enough to
+ * look right is too thin to hit with a trackpad. It used to reach past the
+ * column into both panes, which put it under whatever was at the edge of the
+ * pane — an editor's scrollbar, for one, which then took the press.
  */
 .pane-divider::before {
   content: "";
   position: absolute;
-  inset: 0 -7px;
+  inset: 0;
 }
 
 .pane-divider:hover::after,
