@@ -1,5 +1,4 @@
 import { Fragment, type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { scrollOf, trace } from "~/lib/dragTrace";
 import { type FileKind, fileKind } from "~/lib/fileTypes";
 import { type PaneIndex, type Tab, useTabsStore } from "~/stores/tabsStore";
 import ConfirmDialog from "./ConfirmDialog";
@@ -313,12 +312,6 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
     // them — pans instead. Touch scrolls the strip natively, so this is the
     // mouse's version of that; dragScroll bows out on its own when there is
     // nothing to scroll.
-    trace("down", {
-      id: id ?? "-",
-      active: activeId ?? "-",
-      type: e.pointerType,
-      gesture: id === activeId ? "reorder" : "pan",
-    });
     if (!id || id !== activeId) {
       dragScroll(e);
       return;
@@ -398,16 +391,6 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
       // the tab out of this strip's DOM shortened the content it scrolls, and
       // a browser clamps a scroll offset its content can no longer reach.
       if (over === own) move(id, index);
-      trace("place", {
-        x,
-        pane: over,
-        creeping: dir,
-        slot,
-        before: before ?? "end",
-        index,
-        tabs: others.map((el) => el.dataset.tabId).join(","),
-        ...scrollOf(landing),
-      });
       setDrag({ id, pane: over, before, index });
     };
 
@@ -463,7 +446,6 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
 
       // The one change the whole gesture makes.
       const drop = useTabsStore.getState().drag;
-      trace("drop", { pane: drop?.pane ?? "-", index: drop?.index ?? "-", before: drop?.before ?? "end" });
       setDrag(null);
       if (!drop) return;
       if (drop.pane === own) move(drop.id, drop.index);

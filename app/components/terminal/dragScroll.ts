@@ -1,5 +1,3 @@
-import { scrollOf, trace } from "~/lib/dragTrace";
-
 /** Past this much movement it is a drag, not a click on a button. */
 const DRAG_SLOP_PX = 4;
 
@@ -31,8 +29,6 @@ export function dragScroll(e: React.PointerEvent<HTMLElement>): void {
   // below is still needed.
   e.preventDefault();
 
-  trace("pan down", { row: el.dataset.paneStrip ?? el.className.slice(0, 24), ...scrollOf(el) });
-
   const startX = e.clientX;
   let lastX = startX;
 
@@ -46,11 +42,7 @@ export function dragScroll(e: React.PointerEvent<HTMLElement>): void {
     // run backwards — the pointer and the content had come apart, and only
     // the pointer knew. An incremental delta cannot bank anything, so the
     // content turns around in the same pixel the pointer does.
-    const want = el.scrollLeft - (ev.clientX - lastX);
-    el.scrollLeft = want;
-    // `want` against `sL` is the whole story if this ever goes wrong again:
-    // they differ exactly when the browser has clamped or rounded the offset.
-    trace("pan move", { x: ev.clientX, dx: ev.clientX - lastX, want, ...scrollOf(el) });
+    el.scrollLeft -= ev.clientX - lastX;
     lastX = ev.clientX;
   };
 
