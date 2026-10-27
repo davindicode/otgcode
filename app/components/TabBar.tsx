@@ -1,6 +1,7 @@
 import { Fragment, type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type FileKind, fileKind } from "~/lib/fileTypes";
 import { type PaneIndex, type Tab, useTabsStore } from "~/stores/tabsStore";
+import { useWorkspaceStore } from "~/stores/workspaceStore";
 import ConfirmDialog from "./ConfirmDialog";
 import RenamableTab from "./RenamableTab";
 import TmuxPicker from "./TmuxPicker";
@@ -470,22 +471,31 @@ function useTabReorder(stripRef: RefObject<HTMLDivElement | null>, activeId: str
  * needs no explaining. In a split, the strip of the pane without the cursor is
  * dimmed rather than hidden: it is still showing a tab.
  */
-export default function TabBar({ pane, split }: { pane: PaneIndex; split: boolean }) {
+export default function TabBar({ pane }: { pane: PaneIndex }) {
   const allTabs = useTabsStore((s) => s.tabs);
   const activeIds = useTabsStore((s) => s.activeIds);
-  const focusedPane = useTabsStore((s) => s.focusedPane);
   const focusPane = useTabsStore((s) => s.focusPane);
-  // In a split a strip shows its own pane's tabs. With one pane drawn, every
-  // tab is reachable from it, whichever pane it is assigned to — otherwise
-  // narrowing the window would hide tabs with no way back to them.
   const drag = useTabsStore((s) => s.drag);
-  // In a split a strip shows its own pane's tabs, and that is all it shows:
-  // the dragged tab stays here, shaded, while a caret in the other strip
-  // offers to take it. Redrawing it in the strip it was over changed how much
-  // content each strip had to scroll in the middle of the gesture, which is
-  // what used to make the other pane lurch.
-  const tabs = split ? allTabs.filter((t) => t.pane === pane) : allTabs;
-  const activeId = split ? activeIds[pane] : activeIds[focusedPane];
+  /**
+   * A strip shows its own pane's tabs whenever there are two panes to belong
+   * to — not only when both are on screen.
+   *
+   * It used to key off whether the split was *drawn*, so a phone, which draws
+   * one pane at a time, pooled every tab into whichever strip was up: switch
+   * to Right and the left pane's tabs were still sitting there. The reason
+   * given was that separating them would hide tabs with no way back, but
+   * Settings grows a Left/Right switcher in exactly this case and that is the
+   * way back. Pane assignment is the same on every screen now; only how many
+   * of them fit changes.
+   *
+   * And that is all a strip shows: the dragged tab stays here, shaded, while
+   * the other strip offers to take it. Redrawing it in the strip it was over
+   * changed how much content each strip had to scroll mid-gesture, which is
+   * what used to make the other pane lurch.
+   */
+  const twoPanes = useWorkspaceStore((s) => s.panes) === 2;
+  const tabs = twoPanes ? allTabs.filter((t) => t.pane === pane) : allTabs;
+  const activeId = activeIds[pane];
   /**
    * A tab from the other pane hovering over this one, drawn where it would
    * land. Its own strip keeps it too, shaded, so neither strip changes width

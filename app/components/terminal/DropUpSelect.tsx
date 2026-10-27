@@ -15,8 +15,12 @@ import { createPortal } from "react-dom";
  * hue held back, which is what pairs them without competing with the value.
  */
 const TINTS = {
-  sky: { name: "text-sky-400/60", value: "text-sky-300 hover:text-sky-200" },
-  emerald: { name: "text-emerald-400/60", value: "text-emerald-300 hover:text-emerald-200" },
+  sky: { name: "text-sky-400/60", value: "text-sky-300 hover:text-sky-200", ring: "ring-sky-400/30" },
+  emerald: {
+    name: "text-emerald-400/60",
+    value: "text-emerald-300 hover:text-emerald-200",
+    ring: "ring-emerald-400/30",
+  },
 } as const;
 
 export default function DropUpSelect<T extends string>({
@@ -62,7 +66,7 @@ export default function DropUpSelect<T extends string>({
   }, [open]);
 
   const current = options.find((o) => o.id === value) ?? options[0];
-  const tone = tint ? TINTS[tint] : { name: "text-ink-ghost", value: "text-ink-dim hover:text-ink" };
+  const tone = tint ? TINTS[tint] : { name: "text-ink-ghost", value: "text-ink-dim hover:text-ink", ring: "ring-line" };
 
   return (
     <>
@@ -76,9 +80,12 @@ export default function DropUpSelect<T extends string>({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`flex shrink-0 select-none items-center gap-0.5 text-[10px] font-medium ${
-          name ? "" : "pt-0.5"
-        } ${tone.value}`}
+        /* `relief` and a hairline in the selector's own hue, so the value reads
+           as the button it is rather than as a coloured word in a sentence —
+           the same raised control the command chips along this row use. The
+           box also squares the two variants up, which the old half-pixel
+           nudge on the caret-only one was there to fake. */
+        className={`relief flex shrink-0 select-none items-center gap-0.5 rounded-control px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${tone.ring} ${tone.value}`}
       >
         {/* Right while closed; turns to point up at the open menu, which is
             above it — this drawer sits at the bottom of the screen. */}

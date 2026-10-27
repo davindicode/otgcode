@@ -237,7 +237,7 @@ export default function AppShell() {
             // see is a + that loses them.
             split || pane === focusedPane ? (
               <div key={`strip-${pane}`} style={{ gridColumn: columnOf(pane), gridRow: 1 }} className="min-w-0">
-                <TabBar pane={pane} split={split} />
+                <TabBar pane={pane} />
               </div>
             ) : null,
           )}
