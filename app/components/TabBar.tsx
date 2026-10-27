@@ -538,16 +538,15 @@ export default function TabBar({ pane }: { pane: PaneIndex }) {
    * you to the explorer it came from and the file is still there — unless it
    * has edits that are not, which is the state its save button shows.
    *
-   * Those edits used to be lost here, and this said so. They are kept in the
-   * browser now, so it says that instead: the close is still worth mentioning,
-   * since the file on disk is not what you were looking at, but it is no
-   * longer the kind of thing to put a red button on.
+   * Those edits are mirrored in the browser, but only so they survive a page
+   * that was torn down without being asked — not this. Closing is a decision,
+   * and a file you shut quietly should not come back edited, so the draft goes
+   * with the tab and this still says what it costs.
    */
   const closeCost = (tab: Tab): string | null => {
     if (tab.kind === "terminal") return "Its shell and anything running in it stop, and the scrollback goes with them.";
     if (tab.kind === "tmux") return null;
-    if (tab.kind === "viewer")
-      return unsaved[tab.id] ? "This file has edits that are not saved. They come back when you open it again." : null;
+    if (tab.kind === "viewer") return unsaved[tab.id] ? "This file has edits that are not saved. They are lost." : null;
     return "";
   };
 
@@ -618,8 +617,8 @@ export default function TabBar({ pane }: { pane: PaneIndex }) {
         <ConfirmDialog
           title={`Close ${closing.title}?`}
           body={closeCost(closing)}
-          confirmLabel="Close tab"
-          danger={closing.kind === "terminal"}
+          confirmLabel={unsaved[closing.id] ? "Discard and close" : "Close tab"}
+          danger={closing.kind === "terminal" || !!unsaved[closing.id]}
           onConfirm={() => {
             close(closing.id);
             setClosing(null);

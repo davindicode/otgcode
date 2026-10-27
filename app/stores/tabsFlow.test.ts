@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readDraft, writeDraft } from "~/lib/drafts";
 import { focusedTabId, type PaneIndex, useTabsStore } from "~/stores/tabsStore";
 
 // Exercises the real store, so ordering and focus are checked together.
@@ -215,6 +216,31 @@ describe("dragging a tab between panes", () => {
     expect(state.tabs.map((t) => t.id)).toEqual([b, a, c]);
     expect(state.tabs.find((t) => t.id === a)?.pane).toBe(1);
     expect(state.activeIds).toEqual([b, a]);
+  });
+});
+
+describe("closing a file with unsaved edits", () => {
+  it("throws the browser's copy away too", () => {
+    reset();
+    const e1 = useTabsStore.getState().openExplorer();
+    const a = useTabsStore.getState().openViewer("/tmp/a.ts", e1);
+    writeDraft("/tmp/a.ts", "half a sentence");
+
+    // Closing is a decision. The draft exists for the page being torn down
+    // without being asked, not for a tab the user shut.
+    useTabsStore.getState().close(a);
+    expect(readDraft("/tmp/a.ts")).toBeNull();
+  });
+
+  it("leaves other files' drafts alone", () => {
+    reset();
+    const e1 = useTabsStore.getState().openExplorer();
+    const a = useTabsStore.getState().openViewer("/tmp/a.ts", e1);
+    useTabsStore.getState().openViewer("/tmp/b.ts", e1);
+    writeDraft("/tmp/b.ts", "still being typed");
+
+    useTabsStore.getState().close(a);
+    expect(readDraft("/tmp/b.ts")).toBe("still being typed");
   });
 });
 

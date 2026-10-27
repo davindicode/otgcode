@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { apiPost } from "~/lib/api";
+import { clearDraft } from "~/lib/drafts";
 import { errorMessage } from "~/lib/errors";
 import { basename } from "~/lib/paths";
 import type { WorkspaceTab } from "~/lib/workspace.shared";
@@ -369,6 +370,13 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (tab.kind === "explorer") useFileStore.getState().closeSession(id);
 
     get().setUnsaved(id, false);
+    // Closing a tab is a decision, so it throws the unsaved buffer away —
+    // every caller of this is the user: the X, the Cancel button on a file
+    // that is still opening, and a tmux session being killed. The buffer is
+    // kept in the browser for the case nobody chose, where the page is torn
+    // down and rebuilt under you; surviving a deliberate close as well would
+    // mean a file you shut quietly came back edited.
+    if (tab.kind === "viewer" && tab.path) clearDraft(tab.path);
 
     const remaining = tabs.filter((t) => t.id !== id);
     // Closing a file returns you to the explorer you opened it from; failing
