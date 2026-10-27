@@ -21,7 +21,34 @@ interface PtySession {
   process: pty.IPty;
   onData: (data: string) => void;
   onExit: (exitCode: number) => void;
+  /**
+   * Set while no socket owns this pty: what it has said since, and the timer
+   * that gives up waiting for someone to come back for it.
+   */
+  detached?: { buffer: string; timer: NodeJS.Timeout };
 }
+
+/**
+ * How long a pty outlives the socket that was reading it.
+ *
+ * A dropped connection used to take the shell with it, which on a phone meant
+ * a walk past a dead spot killed a running build. A socket.io reconnect takes
+ * a second or two, so this only has to cover the gap — and it deliberately
+ * does no more: a terminal that survived for hours would be a worse tmux,
+ * without the part where you can attach to it from somewhere else. Closing the
+ * tab still kills it immediately, because that was asked for.
+ */
+const GRACE_MS = 60_000;
+
+/**
+ * How much a detached pty may say before the oldest of it is dropped.
+ *
+ * Something still running writes to a terminal nobody is reading, and that
+ * output has to go somewhere until a reader returns. A bound is the difference
+ * between holding a minute of a build log and holding whatever `yes` produces
+ * in a minute. Trimmed from the front: the end is the part worth seeing.
+ */
+const BUFFER_CHARS = 256 * 1024;
 
 const sessions = new Map<string, PtySession>();
 
@@ -74,6 +101,11 @@ export function createPty(
 
   proc.onData((data) => {
     if (sessions.get(sessionId) !== session) return;
+    if (session.detached) {
+      const held = session.detached.buffer + data;
+      session.detached.buffer = held.length > BUFFER_CHARS ? held.slice(held.length - BUFFER_CHARS) : held;
+      return;
+    }
     session.onData(data);
   });
 
@@ -81,6 +113,13 @@ export function createPty(
     // A replacement PTY may already exist under the same client session ID.
     // Ignore this stale process's exit instead of deleting/closing its successor.
     if (sessions.get(sessionId) !== session) return;
+    // Exited while nobody was reading it: there is nothing to tell and nothing
+    // left to reattach to, so it goes now rather than at the end of its grace.
+    if (session.detached) {
+      clearTimeout(session.detached.timer);
+      sessions.delete(sessionId);
+      return;
+    }
     session.onExit(exitCode);
     sessions.delete(sessionId);
   });
@@ -106,9 +145,46 @@ export function resizePty(sessionId: string, ownerId: string, cols: number, rows
   }
 }
 
+/**
+ * Let go of a pty without killing it, for a socket that went away.
+ *
+ * False when there is nothing of ours to let go of — no such session, or one
+ * a reconnect has already taken over, which is the case the ownership check
+ * is here for: a late disconnect must not detach the pty that replaced it.
+ */
+export function detachPty(sessionId: string, ownerId: string): boolean {
+  const session = sessions.get(sessionId);
+  if (!session || session.ownerId !== ownerId || session.detached) return false;
+  session.detached = { buffer: "", timer: setTimeout(() => killPty(sessionId), GRACE_MS) };
+  return true;
+}
+
+/**
+ * Hand a detached pty to a new socket, with whatever it said while it waited.
+ *
+ * `null` means there was nothing to reattach and the caller should spawn —
+ * which is not the same as `""`, a reattach of something that stayed quiet.
+ */
+export function reattachPty(
+  sessionId: string,
+  ownerId: string,
+  handlers: { onData: (data: string) => void; onExit: (exitCode: number) => void },
+): string | null {
+  const session = sessions.get(sessionId);
+  if (!session?.detached) return null;
+  clearTimeout(session.detached.timer);
+  const pending = session.detached.buffer;
+  session.detached = undefined;
+  session.ownerId = ownerId;
+  session.onData = handlers.onData;
+  session.onExit = handlers.onExit;
+  return pending;
+}
+
 export function killPty(sessionId: string, ownerId?: string): void {
   const session = sessions.get(sessionId);
   if (session && (ownerId === undefined || session.ownerId === ownerId)) {
+    if (session.detached) clearTimeout(session.detached.timer);
     try {
       session.process.kill();
     } catch {

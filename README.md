@@ -53,6 +53,7 @@ Install it to a home screen and it runs standalone like a native app; the layout
 
 ### Terminal & tmux
 - Terminal tabs run your shell. **tmux tabs run tmux** (`tmux new -A`), so a dropped phone or a closed laptop re-attaches to the same session instead of landing in a fresh shell beside it
+- **A short drop does not cost you the shell.** A terminal's process keeps running for a minute after the connection goes, and a reconnect picks it up where it was, with whatever it printed in the meantime — so a walk past a dead spot no longer kills a build. A minute, and no more: anything longer is what tmux is for, and closing the tab still ends it there and then
 - Picking **tmux session** from `+` opens a picker: attach to a running session, start a new one, or kill one. Closing a tmux tab detaches; the session keeps running
 - **Renaming a tmux tab renames the session.** The tab title, tmux itself, and the name a reconnect attaches by are one value, so the picker and the strip can never disagree
 - **Composer tabs** under the terminal, changing with the tab they belong to:

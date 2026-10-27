@@ -213,7 +213,11 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const { sessions } = get();
       const updated: Record<string, (typeof sessions)[string]> = {};
       for (const [id, session] of Object.entries(sessions)) {
-        session.terminal?.write(RESET_MODES);
+        // The modes are not reset here any more. The pty survives a short drop
+        // now, so this screen may be mid-paint in something that is still
+        // running — and leaving the alternate screen under it would strand the
+        // repaint on the normal buffer. A pty that turns out to be new gets the
+        // reset when it says so, which is what the reset was ever for.
         updated[id] = { ...session, status: "disconnected" };
       }
       set({ sessions: updated });
@@ -243,13 +247,18 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       socket.disconnect();
     });
 
-    socket.on("terminal_ready", (data: { sessionId: string }) => {
+    socket.on("terminal_ready", (data: { sessionId: string; reattached?: boolean }) => {
       const { sessions } = get();
       const session = sessions[data.sessionId];
       if (!session) return;
 
-      const connectedMsg = "\x1b[1;32mConnected!\x1b[0m\r\n";
-      if (session.terminal) {
+      // Nothing is said to a reattached pty. It is the same shell, still
+      // running, and its own output is about to continue from wherever it had
+      // got to — a greeting written into that, or a mode reset under it, would
+      // corrupt whatever it is drawing. A fresh pty is a new shell, and both
+      // are exactly what a new shell wants.
+      const connectedMsg = data.reattached ? "" : `${RESET_MODES}\x1b[1;32mConnected!\x1b[0m\r\n`;
+      if (session.terminal && connectedMsg) {
         session.terminal.write(connectedMsg);
       }
       set({

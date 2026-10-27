@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import type { Server, Socket } from "socket.io";
-import { createPty, killPty, resizePty, writePty } from "./pty-manager.js";
+import { createPty, detachPty, killPty, reattachPty, resizePty, writePty } from "./pty-manager.js";
 
 interface CreateTerminal {
   sessionId: string;
@@ -65,6 +65,27 @@ export function registerSocketHandlers(io: Server): void {
       // bare shell outside it.
       const tmux = tmuxSession ? { shell: "tmux", args: tmuxArgs(tmuxSession, data.tmuxSessionId) } : {};
 
+      const onData = (output: string) => socket.emit("terminal_output", { sessionId, data: output });
+      const onExit = (exitCode: number) => {
+        socket.emit("terminal_closed", { sessionId, exitCode });
+        ownedSessions.delete(sessionId);
+      };
+
+      // A pty whose socket dropped is still running, for a minute. This is the
+      // same client asking for the same session, so it gets that pty back
+      // along with whatever it said in the meantime, rather than a new shell
+      // beside a build that is still going. An empty string is a reattach of
+      // something that stayed quiet, so the test is against null.
+      const pending = reattachPty(sessionId, socket.id, { onData, onExit });
+      if (pending !== null) {
+        console.log(`create_terminal: ${sessionId} reattached (${pending.length} chars held)`);
+        // Said before the held output, so the client knows not to reset the
+        // modes of a screen something is still drawing on.
+        socket.emit("terminal_ready", { sessionId, reattached: true });
+        if (pending) socket.emit("terminal_output", { sessionId, data: pending });
+        return;
+      }
+
       createPty(sessionId, socket.id, {
         ...tmux,
         cwd,
@@ -74,16 +95,11 @@ export function registerSocketHandlers(io: Server): void {
         // arrives to trigger a repaint.
         cols: dimension(data.cols),
         rows: dimension(data.rows),
-        onData: (output) => {
-          socket.emit("terminal_output", { sessionId, data: output });
-        },
-        onExit: (exitCode) => {
-          socket.emit("terminal_closed", { sessionId, exitCode });
-          ownedSessions.delete(sessionId);
-        },
+        onData,
+        onExit,
       });
 
-      socket.emit("terminal_ready", { sessionId });
+      socket.emit("terminal_ready", { sessionId, reattached: false });
     });
 
     socket.on("terminal_input", (data: { sessionId: string; data: string }) => {
@@ -112,10 +128,14 @@ export function registerSocketHandlers(io: Server): void {
     socket.on("disconnect", () => {
       console.log(`Client disconnected: ${socket.id}`);
       for (const sessionId of ownedSessions) {
-        // A reconnect may already have replaced this ID with a PTY owned by a
-        // new socket. Owner checking prevents stale disconnect cleanup from
-        // killing that replacement.
-        killPty(sessionId, socket.id);
+        // Let go of it rather than kill it: a dropped connection is usually
+        // about to come back, and taking the shell with it meant a walk past a
+        // dead spot killed whatever was running. If nothing comes back for it,
+        // the grace period in the manager does the killing.
+        //
+        // Still by owner: a reconnect may already have taken this id over with
+        // a new socket, and a late disconnect must not detach that.
+        detachPty(sessionId, socket.id);
       }
       ownedSessions.clear();
     });
