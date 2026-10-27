@@ -69,7 +69,7 @@
     "typescript": "^5.9.3",
     "vite": "^7.3.7",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "pnpm": {
     "onlyBuiltDependencies_comment": "node-pty ships prebuilt binaries for macOS and Windows only, so on Linux it compiles pty.node at install time. pnpm >= 10 skips a dependency's build scripts unless it is listed here, and install still exits 0 — the failure only surfaces later as 'Failed to load native module: pty.node'. node-gyp is a devDependency because pnpm, unlike npm, does not supply one: node-pty's install script calls bare `node-gyp`, which otherwise resolves to whatever the machine happens to have (nothing on many, or a years-old distro build that produces a pty.node that segfaults).",

@@ -752,8 +752,19 @@ html.light .glow {
 
 .pane-divider {
   grid-row: 2;
-  cursor: col-resize;
   touch-action: none;
+  /*
+   * Inert in itself; only the handle below takes a press.
+   *
+   * The column is wider than the line, and the slack sits on the left — right
+   * where the left pane's own scrollbar ends. That slack is an air gap, there
+   * so the scrollbar can be reached without the pointer crossing anything
+   * that resizes, and a div hit-tests its whole box whatever its pseudo-
+   * elements do. So the box steps back and the handle opts itself in. The
+   * press still arrives here, since a pseudo-element's hit targets the
+   * element it belongs to, and `:hover` and the tooltip follow it too.
+   */
+  pointer-events: none;
 }
 
 /*
@@ -766,10 +777,10 @@ html.light .glow {
 .pane-divider::after {
   content: "";
   position: absolute;
-  /* Flush with the right pane, with the grab area's slack to its left: the
-     column is clearance the left pane gave up, so the line belongs at the far
-     end of it rather than floating in the middle. */
-  inset: 0 0 0 6px;
+  /* Flush with the right pane, with the air gap to its left: the column is
+     clearance the left pane gave up, so the line belongs at the far end of it
+     rather than floating in the middle. */
+  inset: 0 0 0 3px;
   background: linear-gradient(
     to right,
     transparent 0%,
@@ -781,15 +792,23 @@ html.light .glow {
 }
 
 /*
- * What you grab: the whole column, transparent, since a line thin enough to
- * look right is too thin to hit with a trackpad. It used to reach past the
- * column into both panes, which put it under whatever was at the edge of the
- * pane — an editor's scrollbar, for one, which then took the press.
+ * What you grab, transparent, since a line thin enough to look right is too
+ * thin to hit with a trackpad.
+ *
+ * The line's own width plus a little into the right pane, and nothing to the
+ * left of the line. It used to be the whole column, air gap included, so
+ * going for the left pane's scrollbar meant crossing a resize handle to get
+ * there. Before that it reached into *both* panes, which put it under
+ * whatever sat at the edge of either — an editor's scrollbar, which then took
+ * the press. The right pane is the safe side to borrow from: nothing of its
+ * own is against this edge.
  */
 .pane-divider::before {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: 0 -3px 0 3px;
+  pointer-events: auto;
+  cursor: col-resize;
 }
 
 /*

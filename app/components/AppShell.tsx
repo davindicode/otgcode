@@ -66,7 +66,7 @@ const COLUMN: Record<PaneIndex, number> = { 0: 1, 1: 3 };
  * Taken out of the left pane alone: that is the side where something — an
  * editor's scrollbar — actually sits against the edge.
  */
-const GUTTER_PX = 12;
+const GUTTER_PX = 8;
 
 export default function AppShell() {
   const socketConnected = useTerminalStore((s) => s.socketConnected);
