@@ -218,7 +218,6 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   }, [activeGroup]);
   const sendInput = useTerminalStore((s) => s.sendInput);
   const resetModes = useTerminalStore((s) => s.resetModes);
-  const stopInputReporting = useTerminalStore((s) => s.stopInputReporting);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
   /**
@@ -408,21 +407,25 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   /**
    * Put the terminal back to a usable state after a program left it wrong.
    *
-   * Two halves, because neither fixes the other: the modes, which is what
-   * stops a dead program's mouse reporting, and a repaint, which is what
-   * clears what it left on screen.
+   * What that means depends on what the tab is.
    *
-   * The halves differ by what the tab is. A plain terminal gets the full mode
-   * reset — leaving the alternate screen is how you get out of a dead TUI's
-   * buffer — then Ctrl+L, which every shell and editor reads as "redraw" and
-   * none reads as a command. A tmux tab must stay on the alternate screen,
-   * since tmux is legitimately drawing there, so it gets the reporting modes
-   * cleared and then tmux is asked to repaint, which it does authoritatively.
+   * A plain terminal gets the full mode reset — leaving the alternate screen is
+   * how you get out of a dead TUI's buffer — then Ctrl+L, which every shell and
+   * editor reads as "redraw" and none reads as a command.
+   *
+   * A tmux tab is only ever asked to repaint, which tmux does authoritatively.
+   * It used to have its reporting modes cleared here first, and that quietly
+   * broke the thing it was pressed to fix: tmux sends a mode only when what it
+   * believes the terminal is in differs from what the pane wants, so switching
+   * reporting off underneath it meant tmux never switched it back on. A repaint
+   * brought the screen back and took the mouse with it — no scrolling, no
+   * clicking into the line being typed — until the session was re-attached.
+   * tmux owns the modes in its own panes; this asks it for a redraw and leaves
+   * them alone.
    */
   const resetTerminal = async () => {
     if (!sessionId) return;
     if (tmuxSession) {
-      stopInputReporting(sessionId);
       try {
         await apiPost("/api/tmux/sessions", { op: "refresh", name: tmuxSession });
       } catch (err: unknown) {
@@ -620,11 +623,9 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
             onClick={resetTerminal}
             disabled={!sessionId}
             title={
-              tmuxSession
-                ? "Reset: stop mouse reporting and ask tmux to repaint"
-                : "Reset: clear leftover terminal modes and redraw"
+              tmuxSession ? "Repaint: ask tmux to redraw this pane" : "Reset: clear leftover terminal modes and redraw"
             }
-            aria-label="Reset the terminal"
+            aria-label={tmuxSession ? "Repaint the pane" : "Reset the terminal"}
             className="p-1.5 text-ink-dim transition-colors hover:text-ink disabled:pointer-events-none disabled:text-ink-ghost"
           >
             <RefreshIcon className="h-4 w-4" />

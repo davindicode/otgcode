@@ -1,6 +1,7 @@
 import type { FitAddon } from "@xterm/addon-fit";
 import type { Terminal } from "@xterm/xterm";
 import { create } from "zustand";
+import { apiPost } from "~/lib/api";
 import { DEFAULT_FONT_SIZE } from "~/lib/constants";
 import { getSocket } from "~/lib/socket";
 import { useAuthStore } from "./authStore";
@@ -45,8 +46,6 @@ interface TerminalState {
   closeSession: (sessionId: string) => void;
   /** Ask for a new pty for a session whose own has gone. */
   restartSession: (sessionId: string) => void;
-  /** Stop the terminal reporting pointer movement, after a program left it on. */
-  stopInputReporting: (sessionId: string) => void;
   /**
    * Put the terminal back to a known state: out of the alternate screen, no
    * scroll region, cursor showing, nothing reporting. For a shell left behind
@@ -160,10 +159,16 @@ function fitAndPush(sessionId: string, get: () => TerminalState): void {
  * A program that enables mouse reporting and exits without disabling it leaves
  * the terminal reporting every pointer move to a shell that cannot read them,
  * which is what `35;79;43M` scrolling past is: an SGR mouse report printing as
- * text. Turning these off is safe even while a program is running — it stops
- * receiving mouse events, which on a touchscreen is usually an improvement.
+ * text.
+ *
+ * Part of a fresh pty's reset and nothing else. It used to be reachable on its
+ * own, for a tmux tab, and that was a one-way door: tmux sends a mode only when
+ * what it believes the terminal is in differs from what the pane wants, so
+ * turning reporting off here — behind tmux's back — meant tmux never sent it
+ * again. A live TUI in that pane lost the mouse until the next attach, which is
+ * not a trade a repaint should make.
  */
-export const INPUT_REPORTING_OFF = [
+const INPUT_REPORTING_OFF = [
   "\x1b[?1000l", // X11 mouse: button press and release
   "\x1b[?1002l", // cell motion tracking (drag)
   "\x1b[?1003l", // all motion tracking — the one that spams
@@ -258,6 +263,23 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       // corrupt whatever it is drawing. A fresh pty is a new shell, and both
       // are exactly what a new shell wants.
       const connectedMsg = data.reattached ? "" : `${RESET_MODES}\x1b[1;32mConnected!\x1b[0m\r\n`;
+      // A reattach hands back a pty whose tmux client never went anywhere, so
+      // tmux has nothing it thinks needs redrawing — but this terminal may be
+      // a brand new one that has never been drawn into. That is what the
+      // password screen leaves behind: it reloads the page, so the screen is
+      // gone from here while the pty is still waiting out its grace on the
+      // server, and the tab came back dark until something happened to make
+      // tmux repaint. Ask it to, rather than hoping the pane changed size.
+      // Harmless when the terminal did survive: tmux draws what is already
+      // there. A plain shell has no equivalent and needs none — an empty
+      // screen with a live shell behind it is what reconnecting to one looks
+      // like anywhere else.
+      if (data.reattached && session.tmuxSession) {
+        apiPost("/api/tmux/sessions", { op: "refresh", name: session.tmuxSession }).catch(() => {
+          // Best effort. A failed repaint leaves the old behaviour, and the
+          // reset button in the composer is the same request by hand.
+        });
+      }
       if (session.terminal && connectedMsg) {
         session.terminal.write(connectedMsg);
       }
@@ -379,13 +401,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   resetModes: (sessionId) => {
     get().sessions[sessionId]?.terminal?.write(RESET_MODES);
-  },
-
-  stopInputReporting: (sessionId) => {
-    const session = get().sessions[sessionId];
-    // Written into the terminal rather than sent to the pty: it is the
-    // terminal's own mode, and the shell has nothing to do with turning it off.
-    session?.terminal?.write(INPUT_REPORTING_OFF);
   },
 
   restartSession: (sessionId) => {

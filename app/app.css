@@ -853,3 +853,23 @@ html.light .glow {
   /* Room for the scrollbar, so it does not sit on the glyphs' descenders. */
   padding: 2px 0 4px;
 }
+
+/* ---------------------------------------------------------------------------
+   Monaco's button tooltips.
+
+   The find widget sits at the top of the editor and its tooltips are asked for
+   ABOVE their button. Monaco lays hovers out inside the editor's own container
+   — the standalone layout service hands out the active editor's DOM node — so
+   above a button three pixels from that container's top there is nowhere to
+   put one, and contextview's fallback, in its own words, is to "lay it over
+   the anchor". The tooltip lands on the close button, and the hover swallows
+   mousedown to keep text selectable, so hovering the X flickered the tooltip
+   and clicking it did nothing: Escape was the only way out of find. Every
+   control up there — match case, regex, next, previous, close — had it.
+
+   A tooltip has nothing to click, so it does not need the pointer. `.locked`
+   is the keyboard-invoked hover, which does.
+--------------------------------------------------------------------------- */
+.workbench-hover-container:not(.locked) {
+  pointer-events: none;
+}
