@@ -14,9 +14,6 @@ vi.mock("~/lib/socket", () => ({
   hasSocket: () => true,
 }));
 
-const apiPost = vi.fn(() => Promise.resolve({}));
-vi.mock("~/lib/api", () => ({ apiPost }));
-
 const { useTerminalStore } = await import("~/stores/terminalStore");
 
 const write = vi.fn();
@@ -42,41 +39,28 @@ function seed(tmuxSession?: string) {
 }
 
 beforeEach(() => {
-  apiPost.mockClear();
   write.mockClear();
   emit.mockClear();
   useTerminalStore.getState().initSocket();
 });
 
 describe("a pty handed back after a drop", () => {
-  it("asks tmux to repaint, because tmux does not know this screen is new", () => {
-    // The password screen reloads the page: the pty is still waiting out its
-    // grace on the server, but the terminal looking at it has never been drawn
-    // into, and tmux sees no reason to redraw a client that never left.
-    seed("work");
-
-    handlers.terminal_ready({ sessionId: "t1", reattached: true });
-
-    expect(apiPost).toHaveBeenCalledWith("/api/tmux/sessions", { op: "refresh", name: "work" });
-    // Nothing written over whatever it is drawing.
-    expect(write).not.toHaveBeenCalled();
-  });
-
-  it("says nothing to a plain shell, which has no repaint to ask for", () => {
+  it("is left to carry on, with nothing written over it", () => {
+    // The same shell, still running, mid-draw in whatever it was drawing. A
+    // greeting or a mode reset lands inside that.
     seed(undefined);
 
     handlers.terminal_ready({ sessionId: "t1", reattached: true });
 
-    expect(apiPost).not.toHaveBeenCalled();
     expect(write).not.toHaveBeenCalled();
+    expect(useTerminalStore.getState().sessions.t1.status).toBe("connected");
   });
 
-  it("greets a fresh pty and resets its modes instead", () => {
-    seed("work");
+  it("greets a fresh pty and resets its modes", () => {
+    seed(undefined);
 
     handlers.terminal_ready({ sessionId: "t1", reattached: false });
 
-    expect(apiPost).not.toHaveBeenCalled();
     const written = write.mock.calls[0][0] as string;
     expect(written).toContain("Connected!");
     // Out of the alternate screen: this is a new shell, not the old one.

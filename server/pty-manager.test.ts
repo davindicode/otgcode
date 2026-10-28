@@ -37,7 +37,7 @@ vi.mock("node-pty", () => ({
   }),
 }));
 
-import { createPty, detachPty, getSessionIds, killPty, reattachPty, resizePty, writePty } from "./pty-manager";
+import { createPty, getSessionIds, killPty, reattachPty, releasePty, resizePty, writePty } from "./pty-manager";
 
 afterEach(() => {
   for (const sessionId of getSessionIds()) killPty(sessionId);
@@ -94,7 +94,7 @@ describe("surviving a dropped socket", () => {
     createPty("terminal-1", "old-socket", { onData: gone, onExit: vi.fn() });
     const proc = spawned[0];
 
-    expect(detachPty("terminal-1", "old-socket")).toBe(true);
+    expect(releasePty("terminal-1", "old-socket")).toBe(true);
     proc.emitData("build finished\n");
     // Nobody is reading it, so nothing is delivered — and nothing is lost.
     expect(gone).not.toHaveBeenCalled();
@@ -120,7 +120,7 @@ describe("surviving a dropped socket", () => {
     vi.useFakeTimers();
     createPty("terminal-1", "old-socket", { onData: vi.fn(), onExit: vi.fn() });
     const proc = spawned[0];
-    detachPty("terminal-1", "old-socket");
+    releasePty("terminal-1", "old-socket");
 
     vi.advanceTimersByTime(GRACE_MS - 1);
     expect(proc.kill).not.toHaveBeenCalled();
@@ -135,7 +135,7 @@ describe("surviving a dropped socket", () => {
   it("tells a reattach apart from nothing to reattach to", () => {
     vi.useFakeTimers();
     createPty("terminal-1", "old-socket", { onData: vi.fn(), onExit: vi.fn() });
-    detachPty("terminal-1", "old-socket");
+    releasePty("terminal-1", "old-socket");
 
     // A pty that stayed quiet reattaches with an empty string, which is not
     // the same answer as "there is nothing here" — one spawns, one does not.
@@ -146,11 +146,11 @@ describe("surviving a dropped socket", () => {
   it("will not let a late disconnect detach the pty that replaced it", () => {
     vi.useFakeTimers();
     createPty("terminal-1", "old-socket", { onData: vi.fn(), onExit: vi.fn() });
-    detachPty("terminal-1", "old-socket");
+    releasePty("terminal-1", "old-socket");
     reattachPty("terminal-1", "new-socket", { onData: vi.fn(), onExit: vi.fn() });
 
     // The old socket's cleanup arrives after the reconnect has taken over.
-    expect(detachPty("terminal-1", "old-socket")).toBe(false);
+    expect(releasePty("terminal-1", "old-socket")).toBe(false);
     const onData = vi.fn();
     reattachPty("terminal-1", "newer-socket", { onData, onExit: vi.fn() });
     spawned[0].emitData("x");
@@ -163,7 +163,7 @@ describe("surviving a dropped socket", () => {
     vi.useFakeTimers();
     createPty("terminal-1", "old-socket", { onData: vi.fn(), onExit: vi.fn() });
     const proc = spawned[0];
-    detachPty("terminal-1", "old-socket");
+    releasePty("terminal-1", "old-socket");
 
     proc.emitData("a".repeat(200 * 1024));
     proc.emitData("b".repeat(200 * 1024));
@@ -179,7 +179,7 @@ describe("surviving a dropped socket", () => {
     const onExit = vi.fn();
     createPty("terminal-1", "old-socket", { onData: vi.fn(), onExit });
     const proc = spawned[0];
-    detachPty("terminal-1", "old-socket");
+    releasePty("terminal-1", "old-socket");
 
     proc.emitExit(0);
 
@@ -197,5 +197,34 @@ describe("surviving a dropped socket", () => {
 
     expect(proc.kill).toHaveBeenCalledOnce();
     expect(getSessionIds()).toEqual([]);
+  });
+});
+
+describe("a pty that manages its own persistence", () => {
+  it("is killed with its socket, because holding it buys nothing", () => {
+    vi.useFakeTimers();
+    createPty("tmux-1", "old-socket", { persistent: true, onData: vi.fn(), onExit: vi.fn() });
+    const proc = spawned[0];
+
+    // Not held: a tmux client nobody is reading leaves tmux thinking the
+    // client never left, so it repaints nothing and re-sends no modes — and
+    // it keeps sizing the window to a pane that is gone.
+    expect(releasePty("tmux-1", "old-socket")).toBe(false);
+    expect(proc.kill).toHaveBeenCalledOnce();
+    expect(getSessionIds()).toEqual([]);
+
+    // So the next connection is told to spawn, which attaches to tmux afresh.
+    expect(reattachPty("tmux-1", "new-socket", { onData: vi.fn(), onExit: vi.fn() })).toBeNull();
+    // And nothing is left ticking.
+    vi.advanceTimersByTime(120_000);
+    expect(proc.kill).toHaveBeenCalledOnce();
+  });
+
+  it("leaves an ordinary shell its grace period", () => {
+    vi.useFakeTimers();
+    createPty("terminal-1", "old-socket", { onData: vi.fn(), onExit: vi.fn() });
+
+    expect(releasePty("terminal-1", "old-socket")).toBe(true);
+    expect(spawned[0].kill).not.toHaveBeenCalled();
   });
 });

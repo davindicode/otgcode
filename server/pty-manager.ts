@@ -22,6 +22,12 @@ interface PtySession {
   onData: (data: string) => void;
   onExit: (exitCode: number) => void;
   /**
+   * The process behind this pty keeps the user's work itself, so there is
+   * nothing here for a grace period to protect. True for a tmux tab: tmux is
+   * a server with its own lifetime and this pty is only a client of it.
+   */
+  persistent: boolean;
+  /**
    * Set while no socket owns this pty: what it has said since, and the timer
    * that gives up waiting for someone to come back for it.
    */
@@ -29,7 +35,7 @@ interface PtySession {
 }
 
 /**
- * How long a pty outlives the socket that was reading it.
+ * How long an ephemeral pty outlives the socket that was reading it.
  *
  * A dropped connection used to take the shell with it, which on a phone meant
  * a walk past a dead spot killed a running build. A socket.io reconnect takes
@@ -37,6 +43,9 @@ interface PtySession {
  * does no more: a terminal that survived for hours would be a worse tmux,
  * without the part where you can attach to it from somewhere else. Closing the
  * tab still kills it immediately, because that was asked for.
+ *
+ * It is for the ptys that *are* the work. A `persistent` one is not: see
+ * `releasePty`.
  */
 const GRACE_MS = 60_000;
 
@@ -62,6 +71,8 @@ export function createPty(
     cwd?: string;
     cols?: number;
     rows?: number;
+    /** See `PtySession.persistent`. Off by default: a shell is the work. */
+    persistent?: boolean;
     onData: (data: string) => void;
     onExit: (exitCode: number) => void;
   },
@@ -97,6 +108,7 @@ export function createPty(
     process: proc,
     onData: options.onData,
     onExit: options.onExit,
+    persistent: options.persistent ?? false,
   };
 
   proc.onData((data) => {
@@ -146,15 +158,35 @@ export function resizePty(sessionId: string, ownerId: string, cols: number, rows
 }
 
 /**
- * Let go of a pty without killing it, for a socket that went away.
+ * Give up a pty whose socket went away: hold it for the grace period, or kill
+ * it where holding it buys nothing. True when it is being held.
  *
- * False when there is nothing of ours to let go of — no such session, or one
- * a reconnect has already taken over, which is the case the ownership check
- * is here for: a late disconnect must not detach the pty that replaced it.
+ * A `persistent` pty is killed, and that is not a compromise — it is the whole
+ * reason tmux tabs exist. Holding one means a tmux client that nobody is
+ * reading stays attached, and three things then go wrong at the next
+ * connection. tmux has no reason to repaint, because from where it sits the
+ * client never left, so a reloaded page gets a blank screen with only the
+ * parts a program happens to redraw on its own — a spinner turning in the
+ * dark. The modes go the same way: tmux sends mouse reporting only when what
+ * it believes the terminal is in differs from what the pane wants, so a brand
+ * new terminal never gets it and the TUI in there loses scrolling and clicking
+ * until the next attach. And until the old client's grace runs out there are
+ * two clients attached, so tmux sizes the window to the smaller of them.
+ * Killing it costs nothing: tmux is still holding the session, and the next
+ * connection attaches afresh — a full repaint, the modes re-sent, the size its
+ * own.
+ *
+ * False also when there is nothing of ours to give up — no such session, or
+ * one a reconnect has already taken over, which is what the ownership check is
+ * for: a late disconnect must not touch the pty that replaced it.
  */
-export function detachPty(sessionId: string, ownerId: string): boolean {
+export function releasePty(sessionId: string, ownerId: string): boolean {
   const session = sessions.get(sessionId);
   if (!session || session.ownerId !== ownerId || session.detached) return false;
+  if (session.persistent) {
+    killPty(sessionId, ownerId);
+    return false;
+  }
   session.detached = { buffer: "", timer: setTimeout(() => killPty(sessionId), GRACE_MS) };
   return true;
 }

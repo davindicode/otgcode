@@ -1,7 +1,6 @@
 import type { FitAddon } from "@xterm/addon-fit";
 import type { Terminal } from "@xterm/xterm";
 import { create } from "zustand";
-import { apiPost } from "~/lib/api";
 import { DEFAULT_FONT_SIZE } from "~/lib/constants";
 import { getSocket } from "~/lib/socket";
 import { useAuthStore } from "./authStore";
@@ -263,23 +262,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       // corrupt whatever it is drawing. A fresh pty is a new shell, and both
       // are exactly what a new shell wants.
       const connectedMsg = data.reattached ? "" : `${RESET_MODES}\x1b[1;32mConnected!\x1b[0m\r\n`;
-      // A reattach hands back a pty whose tmux client never went anywhere, so
-      // tmux has nothing it thinks needs redrawing — but this terminal may be
-      // a brand new one that has never been drawn into. That is what the
-      // password screen leaves behind: it reloads the page, so the screen is
-      // gone from here while the pty is still waiting out its grace on the
-      // server, and the tab came back dark until something happened to make
-      // tmux repaint. Ask it to, rather than hoping the pane changed size.
-      // Harmless when the terminal did survive: tmux draws what is already
-      // there. A plain shell has no equivalent and needs none — an empty
-      // screen with a live shell behind it is what reconnecting to one looks
-      // like anywhere else.
-      if (data.reattached && session.tmuxSession) {
-        apiPost("/api/tmux/sessions", { op: "refresh", name: session.tmuxSession }).catch(() => {
-          // Best effort. A failed repaint leaves the old behaviour, and the
-          // reset button in the composer is the same request by hand.
-        });
-      }
       if (session.terminal && connectedMsg) {
         session.terminal.write(connectedMsg);
       }

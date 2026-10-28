@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import type { Server, Socket } from "socket.io";
-import { createPty, detachPty, killPty, reattachPty, resizePty, writePty } from "./pty-manager.js";
+import { createPty, killPty, reattachPty, releasePty, resizePty, writePty } from "./pty-manager.js";
 
 interface CreateTerminal {
   sessionId: string;
@@ -89,6 +89,10 @@ export function registerSocketHandlers(io: Server): void {
       createPty(sessionId, socket.id, {
         ...tmux,
         cwd,
+        // tmux holds the session itself, so this pty is a client and not the
+        // work. Keeping it alive past its socket would leave a second client
+        // attached and tmux with nothing it thinks needs redrawing.
+        persistent: !!tmuxSession,
         // Spawning at the pane's real size matters most for tmux: it paints a
         // whole screen the moment it attaches, so a default 80x24 spawn draws
         // 24 rows into a taller pane and leaves the rest blank until a resize
@@ -128,14 +132,15 @@ export function registerSocketHandlers(io: Server): void {
     socket.on("disconnect", () => {
       console.log(`Client disconnected: ${socket.id}`);
       for (const sessionId of ownedSessions) {
-        // Let go of it rather than kill it: a dropped connection is usually
-        // about to come back, and taking the shell with it meant a walk past a
-        // dead spot killed whatever was running. If nothing comes back for it,
-        // the grace period in the manager does the killing.
+        // A dropped connection is usually about to come back, and taking the
+        // shell with it meant a walk past a dead spot killed whatever was
+        // running — so an ephemeral pty is held for a grace period rather than
+        // killed. A tmux one is killed, because tmux is already the thing that
+        // survives; the manager decides which this is.
         //
         // Still by owner: a reconnect may already have taken this id over with
-        // a new socket, and a late disconnect must not detach that.
-        detachPty(sessionId, socket.id);
+        // a new socket, and a late disconnect must not touch that.
+        releasePty(sessionId, socket.id);
       }
       ownedSessions.clear();
     });
