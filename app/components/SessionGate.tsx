@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { hasSocket } from "~/lib/socket";
+import { useAuthStore } from "~/stores/authStore";
 import { usePresenceStore } from "~/stores/presenceStore";
 import { useTerminalStore } from "~/stores/terminalStore";
 
@@ -20,18 +22,25 @@ function ago(since: number): string {
  * it at once used to mean each one silently killing the other's terminals.
  * Two devices on the same terminal is what a tmux tab is for.
  *
- * The only button asks the server again. A "take over" button meant anyone who
- * reached the tunnel URL could pull a live terminal out from under whoever was
- * using it — on a phone, by mistapping. Nothing here reconnects on a timer
- * either: the handshake that put this screen up was the check, and only the
- * other device can give the session up, so a poll would be a question asked
- * over and over on the off-chance. One tap is cheaper and says more.
+ * This stands in for the lock screen too, when the server says the session is
+ * held before a password has been asked for: logging in could only land here,
+ * and the tabs that used to show through the scrim were a workspace this
+ * device was never going to get.
+ *
+ * The only button asks the server again — the status endpoint before there is
+ * a socket, the handshake once there is one. A "take over" button meant anyone
+ * who reached the tunnel URL could pull a live terminal out from under whoever
+ * was using it — on a phone, by mistapping. Nothing here reconnects on a timer
+ * either: whatever put this screen up was the check, and only the other device
+ * can give the session up, so a poll would be a question asked over and over
+ * on the off-chance. One tap is cheaper and says more.
  */
 export default function SessionGate() {
   const status = usePresenceStore((s) => s.status);
   const since = usePresenceStore((s) => s.since);
   const lastCheck = usePresenceStore((s) => s.lastCheck);
   const retryNow = useTerminalStore((s) => s.retryNow);
+  const refreshAuth = useAuthStore((s) => s.refresh);
 
   /**
    * The `lastCheck` the current tap was made against, wrapped so that checking
@@ -93,7 +102,11 @@ export default function SessionGate() {
             type="button"
             onClick={() => {
               setPending({ from: lastCheck });
-              retryNow();
+              // Before the password there is no socket to retry, and making
+              // one would be refused for the other reason (no session cookie)
+              // and answer the wrong question.
+              if (hasSocket()) retryNow();
+              else refreshAuth();
             }}
             disabled={checking}
             className="relief-accent shrink-0 rounded-control px-3 py-1.5 text-[12px] text-white disabled:opacity-60"

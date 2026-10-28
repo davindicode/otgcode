@@ -1,5 +1,6 @@
+import type { Server as SocketIOServer } from "socket.io";
 import { describe, expect, it } from "vitest";
-import { activeSession, claimSession, releaseSession } from "./presence";
+import { activeSession, claimSession, gatePresence, releaseSession } from "./presence";
 
 /** The lock is module state, so each case starts from an empty one. */
 function reset() {
@@ -56,5 +57,27 @@ describe("claimSession", () => {
     expect(activeSession()).toBeNull();
     // And then anyone may take it.
     expect(claimSession("laptop", "s2")).toEqual({ ok: true, displaced: null });
+  });
+});
+
+describe("a holder whose socket is no longer on the server", () => {
+  /** Enough of a Socket.IO server to answer the liveness check. */
+  function connected(has: (id: string) => boolean) {
+    gatePresence({ use: () => {}, sockets: { sockets: { has } } } as unknown as SocketIOServer);
+  }
+
+  it("is dropped rather than left holding the app shut", () => {
+    reset();
+    connected((id) => id !== "s1");
+    claimSession("phone", "s1");
+
+    // The disconnect handler never ran — a crash, a missed event — and the
+    // lock is the only way in, so the stale holder cannot be taken at its
+    // word. This is also what `/api/auth/status` leans on: a gate shown to
+    // the next device has to be about a device that is actually there.
+    expect(activeSession()).toBeNull();
+    expect(claimSession("laptop", "s2")).toEqual({ ok: true, displaced: null });
+
+    connected(() => true);
   });
 });

@@ -26,6 +26,8 @@ export type ClaimResult = { ok: true; displaced: string | null } | { ok: false; 
 const DISPLACE_GRACE_MS = 50;
 
 let holder: Holder | null = null;
+/** Set by `gatePresence`: the only way to tell a live holder from a stale one. */
+let server: SocketIOServer | null = null;
 
 /**
  * Admits a connection, displaces the current one, or refuses.
@@ -39,13 +41,14 @@ export function claimSession(
   opts: { takeover?: boolean; now?: number } = {},
 ): ClaimResult {
   const now = opts.now ?? Date.now();
+  const held = activeSession();
 
-  if (holder && holder.socketId !== socketId) {
+  if (held && held.socketId !== socketId) {
     // The same browser coming back — a refresh, a tunnel blip, a phone waking
     // up — is not a second device and must not have to ask for its own lock.
-    const sameDevice = deviceId !== "" && holder.deviceId === deviceId;
-    if (!sameDevice && !opts.takeover) return { ok: false, holder };
-    const displaced = holder.socketId;
+    const sameDevice = deviceId !== "" && held.deviceId === deviceId;
+    if (!sameDevice && !opts.takeover) return { ok: false, holder: held };
+    const displaced = held.socketId;
     holder = { deviceId, socketId, since: now };
     return { ok: true, displaced };
   }
@@ -59,7 +62,18 @@ export function releaseSession(socketId: string): void {
   if (holder?.socketId === socketId) holder = null;
 }
 
+/**
+ * The device holding the session, a stale holder dropped first.
+ *
+ * A holder is released when its socket disconnects, which Socket.IO is
+ * reliable about — but this lock is the only way into the app, so it does not
+ * get to depend on that: a holder whose socket is no longer on the server is
+ * gone, and nobody should have to wait for it or take it over. The handshake
+ * asks, and so does `/api/auth/status`, which is why the check lives here
+ * rather than in either of them.
+ */
 export function activeSession(): Holder | null {
+  if (holder && server && !server.sockets.sockets.has(holder.socketId)) releaseSession(holder.socketId);
   return holder;
 }
 
@@ -68,6 +82,7 @@ export function activeSession(): Holder | null {
  * a client that hasn't logged in.
  */
 export function gatePresence(io: SocketIOServer): void {
+  server = io;
   io.use((socket, next) => {
     const auth = socket.handshake.auth ?? {};
     const raw = typeof auth.deviceId === "string" ? auth.deviceId : "";

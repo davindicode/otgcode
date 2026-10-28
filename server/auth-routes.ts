@@ -20,6 +20,7 @@ import {
   validatePassword,
   verifyPassword,
 } from "./auth.js";
+import { activeSession } from "./presence.js";
 
 const throttle = createLoginThrottle();
 
@@ -81,6 +82,20 @@ export function mountAuthRoutes(app: Express): void {
   router.use(express.json({ limit: "16kb" }));
 
   router.get("/status", (req, res) => {
+    // Who holds the single app session, answered before the password rather
+    // than after it. Another device means this one cannot have the app
+    // whatever it types, so a login form here is a dead end with a password
+    // typed into it. The same device is not "another" — a reload must not gate
+    // itself out — which is `claimSession`'s own rule, mirrored here so the
+    // two cannot disagree about who is let in.
+    //
+    // This does tell an unauthenticated caller that the host is in use. The
+    // endpoint already names the OS user and the machine, and the lock is
+    // still enforced at the socket handshake either way: what moves is where
+    // the refusal is shown, not what enforces it.
+    const held = activeSession();
+    const device = typeof req.query.deviceId === "string" ? req.query.deviceId : "";
+
     res.json({
       configured: isConfigured(),
       enabled: isPasswordEnabled(),
@@ -88,6 +103,7 @@ export function mountAuthRoutes(app: Express): void {
       user: localUsername(),
       host: hostname(),
       since: sessionStartedAt(req.headers.cookie),
+      busySince: held && !(device !== "" && held.deviceId === device) ? held.since : null,
     });
   });
 

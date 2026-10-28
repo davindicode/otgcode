@@ -1,5 +1,7 @@
 import { create } from "zustand";
+import { deviceId } from "~/lib/deviceId";
 import { hasSocket } from "~/lib/socket";
+import { usePresenceStore } from "./presenceStore";
 
 interface AuthState {
   /** False until the first /api/auth/status response lands. */
@@ -59,7 +61,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   refresh: async () => {
     try {
-      const res = await fetch("/api/auth/status");
+      // The device id goes along so the server can tell this browser coming
+      // back from a second device holding the session — the same distinction
+      // the socket handshake makes, asked here because the answer decides
+      // whether there is any point showing a password form at all.
+      const res = await fetch(`/api/auth/status?deviceId=${encodeURIComponent(deviceId())}`);
       const data = (await res.json()) as {
         configured: boolean;
         enabled: boolean;
@@ -67,6 +73,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user?: string;
         host?: string;
         since?: number | null;
+        busySince?: number | null;
       };
       set({
         loaded: true,
@@ -77,6 +84,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         host: data.host || "",
         since: typeof data.since === "number" ? data.since : null,
       });
+
+      // Another device holding the session outranks everything else on this
+      // screen, so the gate goes up from here rather than waiting for a socket
+      // refusal — which only arrives after a password has been typed and the
+      // workspace restored behind it. `displaced` is left alone: only the
+      // socket that lost the session can resolve that one.
+      const presence = usePresenceStore.getState();
+      if (typeof data.busySince === "number") presence.setBusy(data.busySince);
+      else if (presence.status === "busy") presence.clear();
     } catch {
       // Treat an unreachable status endpoint as "not gated" rather than
       // stranding the user on a lock screen they can't get past.

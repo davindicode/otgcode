@@ -135,9 +135,11 @@ export default function AppShell() {
   }, [refreshAuth]);
 
   // The workspace endpoint is behind the auth gate, so only reach for it once
-  // we know the app is unlocked.
+  // we know the app is unlocked — and not while another device holds the
+  // session, where restoring its tabs only draws a workspace behind a gate
+  // that is never going to lift for this device.
   useEffect(() => {
-    if (!authLoaded || locked || workspaceReady) return;
+    if (!authLoaded || locked || workspaceReady || sessionStatus === "busy") return;
     let cancelled = false;
     hydrateWorkspace().then(() => {
       if (cancelled) return;
@@ -147,7 +149,7 @@ export default function AppShell() {
     return () => {
       cancelled = true;
     };
-  }, [authLoaded, locked, workspaceReady, hydrateWorkspace]);
+  }, [authLoaded, locked, workspaceReady, sessionStatus, hydrateWorkspace]);
 
   useEffect(() => {
     if (!workspaceReady) return;
@@ -159,6 +161,20 @@ export default function AppShell() {
   useEffect(() => {
     if (authLoaded && !locked && workspaceReady) initSocket();
   }, [authLoaded, locked, workspaceReady, initSocket]);
+
+  // Another device has it: that is the whole answer, and it comes before the
+  // password rather than after it. The old order asked for a password, restored
+  // the workspace, then let the socket handshake refuse — so the reward for
+  // logging in was this same screen with someone else's tabs showing through
+  // it. Only before the app is up: once it is, the gate goes over the top (see
+  // below) so the terminals keep their DOM.
+  if (sessionStatus === "busy" && !workspaceReady) {
+    return (
+      <div className="h-screen bg-app">
+        <SessionGate />
+      </div>
+    );
+  }
 
   if (!authLoaded || (!locked && !workspaceReady)) {
     return (
