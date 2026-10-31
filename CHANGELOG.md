@@ -223,7 +223,9 @@ workspace that is saved on the host rather than in the browser.
   under it — an editor's scrollbar used to take the press — and it stays lit
   for the whole drag.
 - **The lock screen's session note is a tooltip** beside the tick rather than a
-  line of footer, and only the tick and its words toggle it.
+  line of footer, and only the tick and its words toggle it. The
+  already-open screen is down to one line too — what to do about it, with no
+  paragraph underneath explaining the app to someone already using it.
 
 ### Fixed
 

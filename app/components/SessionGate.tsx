@@ -22,9 +22,9 @@ function ago(since: number): string {
  * it at once used to mean each one silently killing the other's terminals.
  * Two devices on the same terminal is what a tmux tab is for.
  *
- * The actionable line comes first and the reason is the footnote, not the other
- * way round: whoever is reading this already knows what the app is, and what
- * they want is the sentence that ends the screen.
+ * One line, and it is the one that ends the screen. Whoever is reading this
+ * already knows what the app is, so an explanation of it underneath was a
+ * second paragraph saying nothing the title and the instruction had not.
  *
  * This stands in for the lock screen too, when the server says the session is
  * held before a password has been asked for: logging in could only land here,
@@ -125,10 +125,6 @@ export default function SessionGate() {
             )
           )}
         </div>
-
-        <p className="text-[11px] leading-relaxed text-ink-ghost">
-          One session at a time: the open tabs and their terminals are a single workspace on the host.
-        </p>
       </div>
     </div>
   );
