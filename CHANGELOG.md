@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-10-18
+## [0.2.0] - 2026-10-31
 
 A rebuilt interface: one tabbed pane in place of the split panels, tmux as a
 tab kind, an access password on by default, light and dark themes, and a
@@ -64,10 +64,10 @@ workspace that is saved on the host rather than in the browser.
   side, with a divider to drag — a file in the left pane and a terminal in the
   right. Each pane keeps its own tab strip, its own `+` and its own active tab,
   and a tab moves between them by being dragged onto the other strip. Below
-  900px, or on a screen taller than it is wide, one pane is drawn and the
-  other's tabs stay reachable from the same strip; the arrangement is kept, so
-  turning a tablet landscape restores both columns with everything where it
-  was.
+  900px, or on a screen taller than it is wide, one pane is drawn at a time and
+  Settings grows a Left / Right switch for which one. Each pane still keeps its
+  own tabs there, so turning a tablet landscape restores both columns with
+  everything where it was.
 - **One keyboard in the composer**, with five modes: `main` plus a keyboard per
   CLI — claude, codex, opencode — and git. `main` carries the key set (nav,
   numbers, letters, function, symbols) and a sticky modifier (Shift, Ctrl,
@@ -123,6 +123,26 @@ workspace that is saved on the host rather than in the browser.
 - Media previews explain a browser, codec or network failure instead of failing
   blank, and offer the download.
 - GIF replay, an audio/video loop toggle, and a Cancel while a large file loads.
+- **A short drop no longer costs you the shell.** A plain terminal's process
+  keeps running for a minute after the connection goes, and a reconnect picks
+  it up where it was with whatever it printed in the meantime — so a walk past
+  a dead spot does not kill a build. A minute and no more: longer is what tmux
+  is for, and closing the tab still ends it there and then. A tmux tab needs
+  none of this and gets none, since tmux is already the thing that survives.
+- **Equations are typeset in markdown preview** — `$...$` inline and `$$...$$`
+  display through KaTeX, including the multi-line form a paper's worth of
+  algebra actually arrives in. Prices and shell variables are left as written.
+- **Work in progress survives a page torn down under you.** A phone evicts a
+  backgrounded tab and reloads it silently, and the workspace used to come
+  back with every editor showing what was on disk — which looks like nothing
+  was lost, and is exactly when something was. An editor's unsaved buffer, a
+  half-written commit message, an explorer's directory and how a file was
+  being looked at are kept in the browser, bounded and expiring. Closing a tab
+  is a decision, so it throws its buffer away.
+- **The session gate comes before the password.** Another device holding the
+  session is answered by the status endpoint now, so a second device is told
+  who has it rather than asked for a password that could only land on the same
+  screen with the first device's tabs showing through it.
 
 ### Changed
 
@@ -196,6 +216,14 @@ workspace that is saved on the host rather than in the browser.
   walkthrough and a troubleshooting section.
 - `start.sh` prints a failing step's real log and exit code instead of hiding
   it behind tidy output.
+- **The tab strip and the pane divider each do one thing.** Dragging the
+  selected tab reorders it and dragging any other slides the strip, with no
+  stray selection where a drag ends and nothing for Safari's own scrolling to
+  fight. The divider is a grid track of its own, so neither pane puts anything
+  under it — an editor's scrollbar used to take the press — and it stays lit
+  for the whole drag.
+- **The lock screen's session note is a tooltip** beside the tick rather than a
+  line of footer, and only the tick and its words toggle it.
 
 ### Fixed
 
@@ -274,6 +302,35 @@ workspace that is saved on the host rather than in the browser.
   replacement shell starts, and multi-byte controls are sent as one operation
   so trailing keys cannot cross a reconnect. Stale callbacks can no longer
   write to, resize or kill a newly reconnected terminal.
+- **Markdown and notebook previews are sanitised.** `marked` passes raw HTML
+  through by design, and a notebook's outputs are HTML, so a `<script>` or an
+  `onerror` in a file ran in the app's own origin — the origin holding the
+  session that drives the terminals. A README from a repo you cloned is enough,
+  and "preview this file" should not be a sentence that can reach a shell.
+  Everything bound for the DOM goes through DOMPurify.
+- **An inline file no longer runs in the app's own origin either.** `inline=1`
+  renders a file off the host under this origin and markdown preview links
+  straight at it, so a local `.html` was the same hole one step out. Those
+  responses carry `Content-Security-Policy: sandbox` and `nosniff`, which
+  leaves the images, video and audio a preview actually loads untouched.
+- **An unreadable `~/.otgcode/config.json` turned the access password off.** A
+  file truncated by a full disk or a power cut mid-write fell back to no
+  password and still looked configured from the inside, with one line on stderr
+  as the only sign. It refuses to start instead.
+- **A reconnect could leave a tmux tab dark and its mouse dead.** The pty was
+  held through a grace period meant for an ephemeral shell, so tmux kept a
+  client nobody was reading: no repaint, no mouse reporting re-sent, and the
+  window sized to a pane that no longer existed. A tmux client is dropped and
+  re-attached cleanly now.
+- **The editor's find bar could not be closed with the mouse.** Monaco's own
+  tooltip opens above its button, which on a short widget means over it, and
+  swallows the press — so Escape was the only way out of Ctrl+F, on every
+  control in the bar.
+- **Ctrl/Cmd+S saved the wrong editor in a split**, or nothing at all.
+- **A browser could pin the app to one build** by answering the document from
+  its own cache after an update.
+- Socket.IO no longer announces itself to every origin; the client is served by
+  the same server, so a cross-origin socket was never a real one.
 - The Settings panel's Appearance section existed as dead code and was never
   rendered, so there was no way to switch theme from the UI.
 - The terminal no longer shows dark bands after a theme switch.

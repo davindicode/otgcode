@@ -22,6 +22,10 @@ function ago(since: number): string {
  * it at once used to mean each one silently killing the other's terminals.
  * Two devices on the same terminal is what a tmux tab is for.
  *
+ * The actionable line comes first and the reason is the footnote, not the other
+ * way round: whoever is reading this already knows what the app is, and what
+ * they want is the sentence that ends the screen.
+ *
  * This stands in for the lock screen too, when the server says the session is
  * held before a password has been asked for: logging in could only land here,
  * and the tabs that used to show through the scrim were a workspace this
@@ -92,8 +96,8 @@ export default function SessionGate() {
 
         <p className="text-[12px] leading-relaxed text-ink-dim">
           {displaced
-            ? "Your session here ended when another device connected. Only one device uses OTG Code at a time, so your tabs and terminals stay consistent."
-            : "OTG Code runs one session at a time — the open tabs and their terminals are a single workspace on the host, shared by every device that connects."}
+            ? "Another device connected and took the session. Only one has it at a time."
+            : "Sign out on the other device, close its tab, or let its session expire."}
           {!displaced && since && <span className="text-ink-faint"> Connected {ago(since)}.</span>}
         </p>
 
@@ -123,7 +127,7 @@ export default function SessionGate() {
         </div>
 
         <p className="text-[11px] leading-relaxed text-ink-ghost">
-          Sign out on the other device, close its tab, or let its session expire.
+          One session at a time: the open tabs and their terminals are a single workspace on the host.
         </p>
       </div>
     </div>

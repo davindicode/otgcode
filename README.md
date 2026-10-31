@@ -49,7 +49,7 @@ Each tab's controls sit in the bottom bar and change with the tab. Localhost pre
 
 Install it to a home screen and it runs standalone like a native app; the layout, open tabs and your preferences are saved on the host, so a refresh or a reconnect from another device puts you back where you were.
 
-**One device at a time.** The open tabs and their terminals are a single workspace on the host, so a second device is told who holds the session and waits for it rather than taking it — nothing reachable from the tunnel URL can pull a live terminal away from whoever is using it. Signing out, closing the tab or letting the session expire frees it. tmux sessions keep running either way, which is what to use for two devices on one terminal.
+**One device at a time.** The open tabs and their terminals are a single workspace on the host, so a second device is told who holds the session and waits for it rather than taking it — nothing reachable from the tunnel URL can pull a live terminal away from whoever is using it. It is told before the password, too, so there is no logging in to reach that screen. Signing out, closing the tab or letting the session expire frees it. tmux sessions keep running either way, which is what to use for two devices on one terminal.
 
 ### Terminal & tmux
 - Terminal tabs run your shell. **tmux tabs run tmux** (`tmux new -A`), so a dropped phone or a closed laptop re-attaches to the same session instead of landing in a fresh shell beside it
@@ -94,6 +94,8 @@ Install it to a home screen and it runs standalone like a native app; the layout
 - Enforced on the server for every request, the localhost proxy (HTTP + WebSocket) and the Socket.IO handshake — not just the UI
 - Salted **scrypt** hash stored in `~/.otgcode/config.json` (mode 600); sessions are signed HttpOnly cookies, and changing or removing the password signs every device out
 - Failed logins back off exponentially rather than locking out, so a stranger with the URL can't deny you access to your own machine
+- **A config file it cannot read stops the server** rather than falling back to no password — the one file that decides whether the password is required fails closed
+- **Previewing a file cannot run it.** Rendered markdown and a notebook's own HTML outputs go through DOMPurify, and a file served inline carries `Content-Security-Policy: sandbox` — so a `.html` or a `<script>` in a repo you cloned cannot reach the session that drives the terminals
 - **Your account popup** in the header shows the user the shell runs as, how long the session has been open, and signs you out
 - **Stay signed in until I close the browser** on the login screen. Nothing is written to disk either way, so closing the browser always ends the session; unticked, it also expires after 30 minutes so coming back later asks again
 
@@ -313,6 +315,12 @@ React Router v7, Express, Socket.IO, node-pty, xterm.js, Monaco Editor, Zustand,
 - **The code editor loads from a CDN.** Monaco is fetched from jsDelivr at
   runtime rather than bundled, so the editor needs internet access even though
   everything else works offline.
+- **Work in progress does not follow you between devices.** Your tabs and
+  layout are on the host, but an unsaved buffer, a half-written commit message
+  and a viewer's zoom are kept in the browser that typed them — so a file
+  edited and not saved on a phone opens from disk on a laptop, with no sign a
+  draft exists elsewhere. Save before switching. The browser's share also ends
+  with the tunnel, since a Quick Tunnel's hostname is new on every start.
 
 ## License
 

@@ -3,6 +3,59 @@ import { useAuthStore } from "~/stores/authStore";
 import PasswordField from "./PasswordField";
 
 /**
+ * A note worth reading once, kept out of the way until it is asked for.
+ *
+ * Inline rather than a shared component: there is one of these, and a tooltip
+ * primitive with a single caller is a file to maintain for nothing. Opens on
+ * click rather than on hover because the screen it sits on is used from a
+ * phone, where there is no hover and a `title` attribute never appears.
+ */
+function InfoNote({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <span ref={ref} className="relative inline-flex">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label="What this means"
+        className="flex h-4 w-4 items-center justify-center rounded-full border border-current text-[9px] font-semibold text-ink-ghost hover:text-ink-faint"
+      >
+        i
+      </button>
+      {open && (
+        // Above the icon: this sits low in a short panel, and a note below it
+        // would open off the bottom of a phone's viewport.
+        <span
+          role="tooltip"
+          className="glass absolute bottom-full right-0 z-10 mb-1.5 w-52 rounded-control p-2 text-[10px] leading-relaxed text-ink-dim"
+        >
+          {children}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
  * Full-screen lock shown before anything else when an access password is set.
  * The server enforces the same check on every request and socket, so this is
  * the front door rather than the lock itself.
@@ -78,16 +131,23 @@ export default function PasswordGate() {
           </p>
         )}
 
-        <label className="mt-3 flex cursor-pointer items-center gap-2 text-[11px] text-ink-faint">
-          <input
-            type="checkbox"
-            checked={stay}
-            onChange={(e) => setStay(e.target.checked)}
-            disabled={busy}
-            className="accent-blue-500"
-          />
-          Stay signed in until I close the browser
-        </label>
+        {/* The label wraps the box and its words and stops there, so the rest
+            of the row is not a toggle. It shares the row with a button now,
+            and a full-width label made the gap beside that button one more
+            place a tap flipped the tick by accident. */}
+        <div className="mt-3 flex items-center gap-2 text-[11px] text-ink-faint">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={stay}
+              onChange={(e) => setStay(e.target.checked)}
+              disabled={busy}
+              className="accent-blue-500"
+            />
+            Stay signed in until I close the browser
+          </label>
+          <InfoNote>Left unticked, the session expires after 30 minutes idle.</InfoNote>
+        </div>
 
         <button
           type="submit"
@@ -97,10 +157,6 @@ export default function PasswordGate() {
           {busy && <span className="spinner spinner-sm" aria-hidden="true" />}
           {busy ? "Unlocking..." : "Unlock"}
         </button>
-
-        <p className="mt-3 text-center text-[10px] leading-relaxed text-ink-ghost">
-          Left unticked, the session expires after 30 minutes idle.
-        </p>
 
         <p className="mt-3 text-center text-[10px] leading-relaxed text-ink-ghost">
           Forgot it? Remove <code className="text-ink-faint">passwordEnabled</code> from{" "}
