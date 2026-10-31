@@ -55,6 +55,22 @@ export async function loader({ request }: Route.LoaderArgs) {
       "Accept-Ranges": "bytes",
       "Content-Type": mimeType,
       "Content-Disposition": contentDisposition(name, inline),
+      // This route serves a file off the host under the app's own origin, and
+      // `inline=1` asks the browser to render it there. For an .html or .svg
+      // that means its script runs next to the session that drives the
+      // terminals — and markdown preview links straight here, so a README in
+      // a repo you cloned, or anything an agent wrote, could turn "preview
+      // this file" into a shell. That is the threat `renderMarkdown` installs
+      // DOMPurify for, and serving the file itself walked around it.
+      //
+      // `sandbox` with no tokens: scripts off, forms off, opaque origin, so
+      // the document cannot reach back into the app. It applies to documents
+      // only, so an <img>, <video> or <audio> loaded from here is unaffected
+      // — which is every use the preview actually makes of `inline=1`.
+      // `nosniff` closes the same hole from the other side, where the type is
+      // generic enough for a browser to guess HTML on the content.
+      "Content-Security-Policy": "sandbox",
+      "X-Content-Type-Options": "nosniff",
     };
 
     if (rangeHeader && !range) {

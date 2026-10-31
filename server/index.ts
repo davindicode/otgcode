@@ -21,10 +21,12 @@ async function main() {
   const httpServer = createServer(app);
 
   // Socket.IO
-  const io = new SocketIOServer(httpServer, {
-    path: "/socket.io",
-    cors: { origin: "*" },
-  });
+  // No CORS. The client is always served by this same server, so every real
+  // socket is same-origin; `origin: "*"` only ever helped a page on another
+  // origin talk to it. That was one declaration away from being a hole:
+  // nothing but the cookie's SameSite=Lax stops a third-party page opening a
+  // socket here, and this is the layer that should not depend on it.
+  const io = new SocketIOServer(httpServer, { path: "/socket.io" });
   // Reject unauthenticated sockets before any handler can create a PTY.
   gateSocketIO(io);
   // One device at a time; a second is told, and can take over.

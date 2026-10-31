@@ -18,11 +18,9 @@ async function main() {
   // Suppress max listener warnings from proxy
   httpServer.setMaxListeners(50);
 
-  // Socket.IO — uses /socket.io path
-  const io = new SocketIOServer(httpServer, {
-    path: "/socket.io",
-    cors: { origin: "*" },
-  });
+  // Socket.IO — uses /socket.io path, and no CORS: the client is served by
+  // this same server, so every real socket is same-origin (see index.ts).
+  const io = new SocketIOServer(httpServer, { path: "/socket.io" });
   gateSocketIO(io);
   // One device at a time; a second is told, and can take over.
   gatePresence(io);
