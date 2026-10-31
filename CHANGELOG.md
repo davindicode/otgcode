@@ -216,6 +216,13 @@ workspace that is saved on the host rather than in the browser.
   walkthrough and a troubleshooting section.
 - `start.sh` prints a failing step's real log and exit code instead of hiding
   it behind tidy output.
+- **A tab crossing panes looks like a tab being moved.** The drag drew its own
+  brighter blue ring, on the tab in the strip it left and on the ghost showing
+  where it would land, so taking a tab to the other pane read as a different
+  kind of operation from reordering one in place. Both are the selected tab's
+  own pill, shaded — the difference between the two cases is that crossing
+  panes keeps the original in place as well, which is the duplicate, not a
+  colour.
 - **The tab strip and the pane divider each do one thing.** Dragging the
   selected tab reorders it and dragging any other slides the strip, with no
   stray selection where a drag ends and nothing for Safari's own scrolling to

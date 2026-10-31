@@ -19,6 +19,18 @@ interface RenamableTabProps {
   title?: string;
 }
 
+/**
+ * The selected tab's surface, which is also every tab a drag draws.
+ *
+ * Only the selected tab can be dragged, so a tab in motion is always this one
+ * — and the cross-pane ghost is a picture of it. Shared so the two cannot
+ * drift: a drag used to swap this ring for a brighter blue of its own, which
+ * made moving a tab to the other pane look like a different kind of operation
+ * from moving it within one. It is the same operation, so the only difference
+ * now is the shading both of them already had.
+ */
+export const TAB_PILL = "relief text-ink ring-1 ring-inset ring-blue-500/45";
+
 export default function RenamableTab({
   id,
   dragging = false,
@@ -69,10 +81,8 @@ export default function RenamableTab({
         // Only the selected tab is drawn as a pill. Outlining the others was
         // tried and read as busier, not clearer — the strip is short enough
         // that the filled one is unambiguous on its own.
-        isActive
-          ? "relief text-ink ring-1 ring-inset ring-blue-500/45"
-          : "text-ink-dim transition-colors hover:bg-surface/60 hover:text-ink"
-      } ${dragging ? "opacity-60 ring-1 ring-inset ring-blue-400/70" : ""}`}
+        isActive ? TAB_PILL : "text-ink-dim transition-colors hover:bg-surface/60 hover:text-ink"
+      } ${dragging ? "opacity-60" : ""}`}
     >
       {icon}
       {editing && renamable ? (

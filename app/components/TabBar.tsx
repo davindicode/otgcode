@@ -3,7 +3,7 @@ import { type FileKind, fileKind } from "~/lib/fileTypes";
 import { type PaneIndex, type Tab, useTabsStore } from "~/stores/tabsStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
 import ConfirmDialog from "./ConfirmDialog";
-import RenamableTab from "./RenamableTab";
+import RenamableTab, { TAB_PILL } from "./RenamableTab";
 import TmuxPicker from "./TmuxPicker";
 import { dragScroll, wheelScroll } from "./terminal/dragScroll";
 
@@ -242,11 +242,17 @@ const TOUCH_JITTER_PX = 2;
  * A bare line between two tabs said less than this did, and said nothing at
  * all over a pane with no tabs in it — which is exactly where you most need
  * telling that the drop will work.
+ *
+ * `TAB_PILL` and the shading, which is exactly what the source strip shows of
+ * the same tab, and exactly what a reorder inside one pane shows of a tab on
+ * its way. Crossing panes is the one case that keeps the original in place as
+ * well, so there are two shaded tabs instead of one — the difference is the
+ * duplicate, not a different colour around it.
  */
 const TabGhost = ({ tab }: { tab: Tab }) => (
   <div
     aria-hidden="true"
-    className="pointer-events-none my-1 ml-1 flex shrink-0 items-center gap-1.5 rounded-control px-3 py-1.5 text-sm text-ink-dim opacity-60 ring-1 ring-inset ring-blue-400/70"
+    className={`pointer-events-none my-1 ml-1 flex shrink-0 items-center gap-1.5 rounded-control px-3 py-1.5 text-sm opacity-60 ${TAB_PILL}`}
   >
     {tabIcon(tab)}
     <span className="truncate max-w-[80px]">{tab.title}</span>
