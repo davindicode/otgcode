@@ -24,8 +24,3 @@ Thumbs.db
 # Logs
 *.log
 /tmp/
-
-# Screen recordings for the README demo. The sources are tens of megabytes;
-# only the GIF they are cut down into belongs in the repo.
-/public/videos/*.mov
-/public/videos/*.mp4
