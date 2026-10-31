@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearDraft, readDraft, writeDraft } from "~/lib/drafts";
+import { clearDraft, readCommitDraft, readDraft, writeCommitDraft, writeDraft } from "~/lib/drafts";
 import { localCache } from "~/lib/localCache";
 import { readView, saveView } from "~/lib/viewState";
 
@@ -131,5 +131,34 @@ describe("view state", () => {
 
   it("is empty for a file nobody has looked at", () => {
     expect(readView("/tmp/unseen.png")).toEqual({});
+  });
+});
+
+describe("commit message drafts", () => {
+  it("comes back per tab after the page is rebuilt under you", () => {
+    writeCommitDraft("tab-1", "fix the thing");
+    writeCommitDraft("tab-2", "other repo");
+
+    expect(readCommitDraft("tab-1")).toBe("fix the thing");
+    expect(readCommitDraft("tab-2")).toBe("other repo");
+    expect(readCommitDraft("tab-never-used")).toBeNull();
+  });
+
+  it("stores nothing for an emptied field", () => {
+    writeCommitDraft("tab-1", "typed then deleted");
+    // What the composer does on send, and on the last backspace. An entry
+    // holding "" would take a slot in the cap and read back as a draft.
+    writeCommitDraft("tab-1", "");
+
+    expect(readCommitDraft("tab-1")).toBeNull();
+    expect(localStorage.getItem("otgcode:commit:tab-1")).toBeNull();
+  });
+
+  it("does not collide with an editor draft of the same name", () => {
+    writeDraft("shared-key", "a buffer");
+    writeCommitDraft("shared-key", "a message");
+
+    expect(readDraft("shared-key")).toBe("a buffer");
+    expect(readCommitDraft("shared-key")).toBe("a message");
   });
 });

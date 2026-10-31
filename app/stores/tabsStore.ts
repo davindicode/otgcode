@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { apiPost } from "~/lib/api";
-import { clearDraft } from "~/lib/drafts";
+import { clearDraft, writeCommitDraft } from "~/lib/drafts";
 import { errorMessage } from "~/lib/errors";
 import { basename } from "~/lib/paths";
 import type { WorkspaceTab } from "~/lib/workspace.shared";
@@ -370,6 +370,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     // down and rebuilt under you; surviving a deliberate close as well would
     // mean a file you shut quietly came back edited.
     if (tab.kind === "viewer" && tab.path) clearDraft(tab.path);
+    // Same rule for a composer's commit message: the tab going is a decision.
+    // A tab id is never reused, so this is hygiene rather than correctness —
+    // it frees the entry now instead of leaving it to age out of the cap.
+    writeCommitDraft(id, "");
 
     const remaining = tabs.filter((t) => t.id !== id);
     // Closing a file returns you to the explorer you opened it from; failing

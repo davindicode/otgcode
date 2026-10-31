@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import RefreshIcon from "~/components/RefreshIcon";
 import { apiPost } from "~/lib/api";
+import { readCommitDraft, writeCommitDraft } from "~/lib/drafts";
 import { errorMessage } from "~/lib/errors";
 import { shellQuote } from "~/lib/shell";
 import { isTabVisible, useTabsStore } from "~/stores/tabsStore";
@@ -203,7 +204,9 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   /** Which window this tab's tmux client is on, as tmux reports it. */
   const [tmuxWindow, setTmuxWindow] = useState<string | null>(null);
   const [windowTarget, setWindowTarget] = useState("");
-  const [gitCommitMsg, setGitCommitMsg] = useState("");
+  // Seeded from the browser: see `writeCommitDraft`. The rest of this
+  // component's state is deliberately not.
+  const [gitCommitMsg, setGitCommitMsg] = useState(() => readCommitDraft(sessionId) ?? "");
   const [gitConfigName, setGitConfigName] = useState("");
   const [gitConfigEmail, setGitConfigEmail] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -242,11 +245,17 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     textareaRef.current?.focus();
   };
 
+  /** The one composer field that outlives the page, so every edit goes through here. */
+  const editCommitMsg = (message: string) => {
+    setGitCommitMsg(message);
+    writeCommitDraft(sessionId, message);
+  };
+
   const commitGit = () => {
     const message = gitCommitMsg.trim();
     if (!sessionId || !message) return;
     sendInput(sessionId, `git commit -m ${shellQuote(message)}\n`);
-    setGitCommitMsg("");
+    editCommitMsg("");
   };
 
   const setGitIdentity = () => {
@@ -886,7 +895,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                       <>
                         <input
                           value={gitCommitMsg}
-                          onChange={(e) => setGitCommitMsg(e.target.value)}
+                          onChange={(e) => editCommitMsg(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && commitGit()}
                           placeholder="commit message..."
                           className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
