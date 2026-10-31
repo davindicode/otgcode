@@ -65,7 +65,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitest/coverage-v8": "^4.1.12",
-    "jsdom": "^29.1.1",
+    "jsdom": "^30.1.3",
     "node-gyp": "^13.1.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
@@ -75,17 +75,11 @@
     "vitest": "^4.1.12"
   },
   "pnpm": {
-    "onlyBuiltDependencies_comment": "node-pty ships prebuilt binaries for macOS and Windows only, so on Linux it compiles pty.node at install time. pnpm >= 10 skips a dependency's build scripts unless it is listed here, and install still exits 0 — the failure only surfaces later as 'Failed to load native module: pty.node'. node-gyp is a devDependency because pnpm, unlike npm, does not supply one: node-pty's install script calls bare `node-gyp`, which otherwise resolves to whatever the machine happens to have (nothing on many, or a years-old distro build that produces a pty.node that segfaults).",
+    "onlyBuiltDependencies_comment": "node-pty ships prebuilt binaries for macOS and Windows only, so on Linux it compiles pty.node at install time. pnpm >= 10 skips a dependency's build scripts unless it is listed here, and install still exits 0 \u2014 the failure only surfaces later as 'Failed to load native module: pty.node'. node-gyp is a devDependency because pnpm, unlike npm, does not supply one: node-pty's install script calls bare `node-gyp`, which otherwise resolves to whatever the machine happens to have (nothing on many, or a years-old distro build that produces a pty.node that segfaults).",
     "onlyBuiltDependencies": [
       "node-pty"
     ],
-    "auditConfig_comment": "GHSA-vfj7-8cjw-p6xm (braces, stack exhaustion on deeply nested brace patterns) has no fix: 3.0.3 is the latest release, and micromatch 4 still depends on it — including under http-proxy-middleware 4, so there is nothing to upgrade to. It is also unreachable here: neither createProxyMiddleware call in server/proxy.ts passes a pathFilter, so micromatch never compiles a pattern, and no user input reaches one. Re-check when braces publishes a fix.",
-    "auditConfig": {
-      "ignoreGhsas": [
-        "GHSA-vfj7-8cjw-p6xm"
-      ]
-    },
-    "comment": "Version-scoped overrides bump only the vulnerable major of transitive deps to a patched release, leaving other resolved majors (e.g. path-to-regexp@0.1.x, used by other tooling) untouched.",
+    "comment": "Version-scoped overrides bump only the vulnerable major of transitive deps to a patched release, leaving other resolved majors (e.g. path-to-regexp@0.1.x, used by other tooling) untouched. minimatch@10 is replaced by 11 rather than a patched 10: the amplification fix (GHSA-g3hv-75wg-m249) landed in 11.0.1 and 10.x has no patched release, while its only consumer here is readdir-glob under archiver, which asks for ^10.2.2 and uses the Minimatch class that 11 still exports. The patterns are ours \u2014 server/zip.ts names paths, it does not take a glob from the client \u2014 so this closes an advisory rather than a reachable hole.",
     "overrides": {
       "dompurify@3": "^3.4.11",
       "ws@8": "^8.21.0",
@@ -93,10 +87,11 @@
       "path-to-regexp@8": "^8.4.0",
       "picomatch@2": "^2.3.2",
       "picomatch@4": "^4.0.4",
-      "follow-redirects@1": "^1.16.0",
+      "follow-redirects@1": "^1.16.2",
       "postcss@8": "^8.5.23",
       "@babel/core@7": "^7.29.6",
-      "undici@7": "^7.29.1"
+      "undici@8": "^8.12.2",
+      "minimatch@10": "^11.0.1"
     }
   }
 }
