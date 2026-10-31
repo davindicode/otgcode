@@ -338,10 +338,17 @@ body {
  * gap-1 sits between rows. Fixed px rather than rem because the chip text is
  * a fixed px size, so a rem cap would drift away from the rows it measures.
  * No scrollbar, like the rest of the composer.
+ *
+ * The padding is the bottom row's shadow room, for the reason `.scroll-row`
+ * has it, and the cap carries it so three rows still means three rows: this
+ * box is `border-box` like everything else, so padding taken out of the cap
+ * would show the third row with its last few pixels cut away.
  */
 .chip-rows {
   --chip-row: 21px; /* 11px x 1.5, + 2px padding top and bottom */
-  max-height: calc(3 * var(--chip-row) + 2 * 4px); /* three rows, two gutters */
+  --chip-lift: 4px; /* see .scroll-row */
+  max-height: calc(3 * var(--chip-row) + 2 * 4px + var(--chip-lift)); /* three rows, two gutters */
+  padding-bottom: var(--chip-lift);
   overflow-y: auto;
   -ms-overflow-style: none;
   scrollbar-width: none;

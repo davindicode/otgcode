@@ -242,6 +242,14 @@ workspace that is saved on the host rather than in the browser.
   where the row ended. Plainest in light mode, where that shadow also carries a
   hairline ring. The rows now keep the shadow's 4px inside the scroller, which
   is where the tab strips have always kept theirs.
+- **The chip rows had the same bottom edge shaved**, for the same reason as the
+  key rows. The cap that keeps them to three rows carries the shadow's room, so
+  three rows still means three rows.
+- **Actions on selected, in the explorer's bar, opened a menu nobody could
+  see.** It was an absolute menu inside a bar that scrolls sideways, so the bar
+  clipped it — and it opened downward from the bottom of the pane, off the
+  screen. It goes through a portal and opens upward now, like the composer's
+  selectors.
 - **`./start.sh` on Linux crashed with `Failed to load native module:
   pty.node`.** node-pty ships binaries for macOS and Windows only and compiles
   elsewhere, but pnpm 10 skips a dependency's build scripts unless it is

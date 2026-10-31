@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import RefreshIcon from "~/components/RefreshIcon";
 import { apiPost } from "~/lib/api";
 import { copyText } from "~/lib/clipboard";
@@ -70,6 +71,7 @@ function FileSessionView({ session }: { session: FileSession }) {
   const { cwd, entries, showHidden, loading } = session;
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const groupMenuRef = useRef<HTMLButtonElement>(null);
 
   // Upload state: queue of files with per-file progress
   interface UploadFile {
@@ -997,8 +999,9 @@ function FileSessionView({ session }: { session: FileSession }) {
                   >
                     {selected.size === entries.length && entries.length > 0 ? "None" : "All"}
                   </button>
-                  <div className="relative">
+                  <div>
                     <button
+                      ref={groupMenuRef}
                       onClick={() => setGroupMenu((v) => !v)}
                       disabled={selected.size === 0}
                       aria-haspopup="menu"
@@ -1020,20 +1023,37 @@ function FileSessionView({ session }: { session: FileSession }) {
                           onClick={() => setGroupMenu(false)}
                           aria-label="Close menu"
                         />
-                        <div className="absolute right-0 top-full mt-1 z-50 glass rounded-panel py-1 min-w-[160px]">
-                          <button
-                            onClick={handleGroupDownload}
-                            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
+                        {/* Upward, and through a portal, for the two reasons
+                            `DropUpSelect` has: this bar is the bottom of the
+                            pane, so a menu below the button is off the screen,
+                            and the bar scrolls sideways — which clips the other
+                            axis too, so an absolute menu inside it was cut away
+                            whichever way it opened. */}
+                        {createPortal(
+                          <div
+                            role="menu"
+                            className="glass fixed z-[9999] min-w-[160px] rounded-panel py-1"
+                            style={(() => {
+                              const r = groupMenuRef.current?.getBoundingClientRect();
+                              if (!r) return {};
+                              return { right: window.innerWidth - r.right, bottom: window.innerHeight - r.top + 4 };
+                            })()}
                           >
-                            Download
-                          </button>
-                          <button
-                            onClick={handleGroupDelete}
-                            className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-hover transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
+                            <button
+                              onClick={handleGroupDownload}
+                              className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
+                            >
+                              Download
+                            </button>
+                            <button
+                              onClick={handleGroupDelete}
+                              className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-hover transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </div>,
+                          document.body,
+                        )}
                       </>
                     )}
                   </div>
