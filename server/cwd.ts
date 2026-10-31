@@ -1,7 +1,7 @@
 import { execFileSync, execSync } from "node:child_process";
-import { readFileSync, readlinkSync } from "node:fs";
+import { readlinkSync } from "node:fs";
 import type { Express } from "express";
-import { getPtyPid } from "./pty-manager.js";
+import { getPtyPid, getPtyTty } from "./pty-manager.js";
 
 /**
  * Which directory a terminal tab is sitting in.
@@ -13,6 +13,13 @@ import { getPtyPid } from "./pty-manager.js";
  * returned null and this endpoint always answered with the default directory,
  * on tmux tabs and plain terminal tabs alike. Keeping it beside the module
  * whose state it reads is the fix.
+ *
+ * Nothing here guesses. A directory this cannot establish comes back as null,
+ * because the caller is a picker whose buttons are directories: one wrong
+ * answer and every button in it sends the terminal somewhere else. It used to
+ * answer with the default directory, which on a host where the probe never
+ * worked meant the picker quietly claimed the login directory every time it
+ * was reopened.
  */
 
 function getDirectChildren(pid: number): number[] {
@@ -27,27 +34,41 @@ function getDirectChildren(pid: number): number[] {
   }
 }
 
-function readComm(pid: number): string {
-  try {
-    return readFileSync(`/proc/${pid}/comm`, "utf-8").trim();
-  } catch {
-    return "";
-  }
-}
-
-function readTty(pid: number): string | null {
-  try {
-    return readlinkSync(`/proc/${pid}/fd/0`);
-  } catch {
-    return null;
-  }
-}
-
 function findDeepestDescendant(pid: number, depth = 0): number {
   if (depth > 16) return pid;
   const children = getDirectChildren(pid);
   if (children.length === 0) return pid;
   return findDeepestDescendant(children[children.length - 1], depth + 1);
+}
+
+/**
+ * A running process's working directory, or null.
+ *
+ * Linux keeps it in /proc. macOS has no /proc at all, which is what made this
+ * endpoint useless there: every read threw and the default directory was handed
+ * back as though it were an answer. `lsof` is that platform's own way to ask
+ * and ships with the OS; its field output is one line per field, so the cwd is
+ * the line beginning `n`.
+ */
+function processCwd(pid: number): string | null {
+  if (process.platform === "linux") {
+    try {
+      return readlinkSync(`/proc/${pid}/cwd`) || null;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const out = execFileSync("lsof", ["-a", "-d", "cwd", "-p", String(pid), "-Fn"], {
+      encoding: "utf-8",
+      timeout: 2000,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const line = out.split("\n").find((l) => l.startsWith("n/"));
+    return line ? line.slice(1) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Every client on the tmux server, with what each is looking at. */
@@ -79,7 +100,8 @@ function listTmuxClients(): { tty: string; session: string; id: string; window: 
 }
 
 interface TerminalPlace {
-  cwd: string;
+  /** Null when it could not be established. Never a guess — see the note above. */
+  cwd: string | null;
   /** Present only for a tab attached to tmux. */
   tmuxSession: string | null;
   /** tmux's own id for that session, which a rename does not change. */
@@ -88,63 +110,45 @@ interface TerminalPlace {
   tmuxWindow: string | null;
 }
 
-function detectCwd(sessionId: string | undefined): TerminalPlace {
-  if (sessionId) {
-    const ptyPid = getPtyPid(sessionId);
-    if (ptyPid) {
-      // Ask tmux which pane this tab's own client is looking at.
-      //
-      // Matching on the client tty rather than asking tmux for "the" active
-      // pane: without a client, tmux answers for whichever pane is globally
-      // focused, which is wrong as soon as two tabs each have a client. And
-      // `display-message -c` turned out not to be enough either — the server
-      // may itself be running inside tmux, and the inherited $TMUX then scoped
-      // the answer to *that* session instead of the client's. So the env var
-      // goes, and the client is found by listing them all.
-      //
-      // The pty process itself is checked first: a tmux tab runs tmux as its
-      // pty rather than a shell that then attaches, so looking only at the
-      // pty's children found nothing and every tmux tab reported the default
-      // directory. A client started by hand inside a terminal tab is still a
-      // child, hence both.
-      for (const candidate of [ptyPid, ...getDirectChildren(ptyPid)]) {
-        const name = readComm(candidate);
-        if (name !== "tmux" && !name.startsWith("tmux:")) continue;
-        const tty = readTty(candidate);
-        if (!tty?.startsWith("/dev/")) continue;
-        const match = listTmuxClients().find((client) => client.tty === tty);
-        if (match) {
-          return {
-            cwd: match.cwd,
-            tmuxSession: match.session || null,
-            tmuxSessionId: match.id || null,
-            tmuxWindow: match.window || null,
-          };
-        }
-      }
+const NOWHERE: TerminalPlace = { cwd: null, tmuxSession: null, tmuxSessionId: null, tmuxWindow: null };
 
-      // No tmux client: walk to the deepest descendant of the PTY and read its cwd.
-      try {
-        const cwd = readlinkSync(`/proc/${findDeepestDescendant(ptyPid)}/cwd`);
-        if (cwd) return { cwd, tmuxSession: null, tmuxSessionId: null, tmuxWindow: null };
-      } catch {}
-      try {
-        const cwd = readlinkSync(`/proc/${ptyPid}/cwd`);
-        if (cwd) return { cwd, tmuxSession: null, tmuxSessionId: null, tmuxWindow: null };
-      } catch {}
+function detectCwd(sessionId: string | undefined): TerminalPlace {
+  if (!sessionId) return NOWHERE;
+
+  // The tab's own tmux client, found by the device its pty is attached to.
+  //
+  // Matching on the tty rather than asking tmux for "the" active pane:
+  // without a client, tmux answers for whichever pane is globally focused,
+  // which is wrong as soon as two tabs each have a client. And
+  // `display-message -c` turned out not to be enough either — the server may
+  // itself be running inside tmux, and the inherited $TMUX then scoped the
+  // answer to *that* session instead of the client's.
+  //
+  // The tty comes from the pty we opened, not from the process tree. Walking
+  // the tree for something named `tmux` and reading its stdin link needed
+  // /proc twice over, so on macOS it found nothing, every tmux tab fell
+  // through, and the fallback below could not read a cwd there either.
+  const tty = getPtyTty(sessionId);
+  if (tty) {
+    const client = listTmuxClients().find((c) => c.tty === tty);
+    if (client) {
+      return {
+        cwd: client.cwd,
+        tmuxSession: client.session || null,
+        tmuxSessionId: client.id || null,
+        tmuxWindow: client.window || null,
+      };
     }
   }
 
-  // No pty, or nothing readable from it: the configured default is the best
-  // answer available. The caller only asks for terminal tabs, so there is no
-  // tmux fallback here — a tmux pane's directory is answered above, from that
-  // client specifically, rather than from whichever pane tmux has focused.
-  return {
-    cwd: process.env.DEFAULT_CWD || process.env.HOME || "/",
-    tmuxSession: null,
-    tmuxSessionId: null,
-    tmuxWindow: null,
-  };
+  // No tmux client on this pty: it is running a shell, so the directory is
+  // whatever the innermost thing under it is in. The deepest descendant first,
+  // because a shell running `vim` or a coding CLI is not the process that
+  // moved; the pty itself as the fallback, for a pty with no children yet.
+  const ptyPid = getPtyPid(sessionId);
+  if (!ptyPid) return NOWHERE;
+  const cwd = processCwd(findDeepestDescendant(ptyPid)) ?? processCwd(ptyPid);
+  return { ...NOWHERE, cwd };
 }
 
 export function mountCwdRoute(app: Express): void {

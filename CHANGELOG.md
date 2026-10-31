@@ -282,7 +282,17 @@ workspace that is saved on the host rather than in the browser.
   fine, ignored every keystroke and never redrew. Each session now carries the
   connection its terminal was created in.
 - **The directory picker reported the wrong directory** on both tab kinds,
-  answering with the home directory for a shell sitting somewhere else.
+  answering with the home directory for a shell sitting somewhere else. It
+  rested entirely on /proc, which macOS does not have, so there it could never
+  read a directory at all and handed back the default every time — most
+  visibly on reopening the drawer, which reset the picker to the login
+  directory while the terminal had not moved. A tab's tmux client is found by
+  the device its own pty is attached to rather than by hunting the process tree
+  for something named `tmux`, and a plain shell's directory comes from /proc or
+  from `lsof` depending on the platform. A directory it cannot establish is
+  reported as one it cannot establish: the picker says so and offers no
+  buttons, because every button in it sends a `cd` and a wrong one moves the
+  terminal somewhere nobody chose.
 - **A reconnected tmux tab painted only the top of the pane.** The terminal was
   created at 80x24 and resized afterwards; a shell hides that by reflowing at
   its next prompt, but tmux paints a whole screen the moment it attaches. It is

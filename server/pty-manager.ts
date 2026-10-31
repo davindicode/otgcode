@@ -233,6 +233,21 @@ export function getPtyPid(sessionId: string): number | null {
 }
 
 /**
+ * The slave device this pty is attached to — `/dev/pts/3`, `/dev/ttys004`.
+ *
+ * tmux names each of its clients by exactly this, so it is how a tab's own
+ * client is picked out of `list-clients` without guessing from process names
+ * or reading anything out of /proc. node-pty keeps it on `ptsName`, which its
+ * typings do not declare but `UnixTerminal` has had since 0.x.
+ */
+export function getPtyTty(sessionId: string): string | null {
+  const session = sessions.get(sessionId);
+  if (!session) return null;
+  const tty = (session.process as { ptsName?: unknown }).ptsName;
+  return typeof tty === "string" && tty.startsWith("/dev/") ? tty : null;
+}
+
+/**
  * Every live session id. Nothing in the app needs this — the one caller is the
  * test, which uses it to observe that create and kill did what they claim and
  * to clean up between cases. Kept for that: the ownership rules it checks are

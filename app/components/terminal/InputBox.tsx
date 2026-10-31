@@ -196,6 +196,8 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const [tmuxGroup, setTmuxGroup] = useState(TMUX_GROUPS[0].label);
   const [cdDirs, setCdDirs] = useState<string[]>([]);
   const [cdLoading, setCdLoading] = useState(false);
+  /** Why the picker has nothing to show, when that is the answer. */
+  const [cdError, setCdError] = useState<string | null>(null);
   const [comboMode, setComboMode] = useState<ComboMode>("none");
   const [kbMode, setKbMode] = useState<KbMode>("main");
   /** Which set of keys `main` is showing. Only it has sets. */
@@ -471,27 +473,39 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     }
   };
 
-  // cd directory picker — always scoped to the currently-active terminal session
+  /**
+   * The directory picker, always scoped to this tab's own terminal.
+   *
+   * `dir` given means the user picked it, so it is listed as asked. Without
+   * one the terminal is asked where it is — and if it cannot say, that is the
+   * answer and the picker shows it. There is no falling back to the default
+   * directory: every button here sends a `cd`, so a picker listing somewhere
+   * the terminal is not would move it somewhere nobody chose.
+   */
   const fetchDirs = useCallback(
     async (dir?: string) => {
       if (!sessionId) return;
       setCdLoading(true);
       try {
-        // If no dir specified, detect this terminal's actual CWD first
         let targetDir = dir;
         if (!targetDir) {
-          try {
-            const cwdData = await (await fetch(`/api/terminal/cwd?sessionId=${sessionId}`)).json();
-            if (cwdData.cwd) targetDir = cwdData.cwd;
-          } catch {}
+          const place = await (await fetch(`/api/terminal/cwd?sessionId=${sessionId}`)).json();
+          targetDir = typeof place.cwd === "string" ? place.cwd : "";
+          if (!targetDir) {
+            setCdDirs([]);
+            setCdError("Could not read the working directory of this terminal.");
+            setCdLoading(false);
+            return;
+          }
         }
-        const query = targetDir ? `?dir=${encodeURIComponent(targetDir)}&showHidden=false` : "?showHidden=false";
-        const res = await fetch(`/api/files/list${query}`);
+        const res = await fetch(`/api/files/list?dir=${encodeURIComponent(targetDir)}&showHidden=false`);
         const data = await res.json();
         if (data.error) {
-          showToast(data.error);
+          setCdDirs([]);
+          setCdError(data.error);
         } else if (useTerminalStore.getState().sessions[sessionId]) {
           // Drop the result if the tab was closed while we were fetching.
+          setCdError(null);
           setCdCwd(sessionId, data.dir);
           setCdDirs(
             (data.entries || [])
@@ -501,7 +515,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
         }
       } catch {
         setCdDirs([]);
-        showToast("Could not reach the server");
+        setCdError("Could not reach the server.");
       }
       setCdLoading(false);
     },
@@ -531,7 +545,9 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const handleCdHome = () => {
     if (!sessionId) return;
     sendInput(sessionId, "cd ~\n");
-    fetchDirs(); // No dir param = defaults to HOME
+    // `~` is the shell's to expand, so the listing follows from asking the
+    // terminal again rather than from a path guessed on this side.
+    fetchDirs();
   };
 
   // Editors
@@ -668,50 +684,61 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
           {/* cd directory picker */}
           {drawerGroup === CD_TAB && (
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="shrink-0 text-[11px] text-ink-faint">current</span>
-                <span
-                  className="text-[10px] text-ink-ghost overflow-hidden text-ellipsis whitespace-nowrap flex-1"
-                  title={cdCwd}
-                >
-                  {cdCwd}
-                </span>
-              </div>
-              {/* Only on the first fetch. The re-check on coming back to the
-                  tab usually lands on the same directory, and replacing the
-                  chips with "Loading..." each time made returning flicker. */}
-              {cdLoading && cdDirs.length === 0 ? (
-                <span className="text-[11px] text-ink-faint">Loading...</span>
+              {/* Nothing but the reason, when there is no directory to stand
+                  on. Every chip below sends a `cd`, so showing a path the
+                  terminal is not in offers buttons that move it somewhere
+                  nobody picked — which is what the default directory did. */}
+              {cdError ? (
+                <span className="text-[11px] text-red-400">{cdError}</span>
               ) : (
-                <div className="chip-rows flex flex-wrap gap-1">
-                  <button
-                    onClick={() => handleCdTo("..")}
-                    disabled={!sessionId}
-                    className={`${keyBtn} text-yellow-400 hover:text-yellow-300`}
-                    title="Go up one directory"
-                  >
-                    ..
-                  </button>
-                  <button
-                    onClick={handleCdHome}
-                    disabled={!sessionId}
-                    className={`${keyBtn} text-blue-400 hover:text-blue-300`}
-                    title="Go to home directory"
-                  >
-                    ~
-                  </button>
-                  {cdDirs.map((dir) => (
-                    <button
-                      key={dir}
-                      onClick={() => handleCdTo(dir)}
-                      disabled={!sessionId}
-                      className="px-2 py-0.5 text-[11px] relief text-purple-300 hover:text-purple-100 rounded-control whitespace-nowrap select-none touch-manipulation"
-                      title={`cd ${dir}`}
+                <>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="shrink-0 text-[11px] text-ink-faint">current</span>
+                    <span
+                      className="text-[10px] text-ink-ghost overflow-hidden text-ellipsis whitespace-nowrap flex-1"
+                      title={cdCwd}
                     >
-                      {dir}
-                    </button>
-                  ))}
-                </div>
+                      {cdCwd}
+                    </span>
+                  </div>
+                  {/* Only on the first fetch. The re-check on coming back to
+                      the tab usually lands on the same directory, and
+                      replacing the chips with "Loading..." each time made
+                      returning flicker. */}
+                  {cdLoading && cdDirs.length === 0 ? (
+                    <span className="text-[11px] text-ink-faint">Loading...</span>
+                  ) : (
+                    <div className="chip-rows flex flex-wrap gap-1">
+                      <button
+                        onClick={() => handleCdTo("..")}
+                        disabled={!sessionId}
+                        className={`${keyBtn} text-yellow-400 hover:text-yellow-300`}
+                        title="Go up one directory"
+                      >
+                        ..
+                      </button>
+                      <button
+                        onClick={handleCdHome}
+                        disabled={!sessionId}
+                        className={`${keyBtn} text-blue-400 hover:text-blue-300`}
+                        title="Go to home directory"
+                      >
+                        ~
+                      </button>
+                      {cdDirs.map((dir) => (
+                        <button
+                          key={dir}
+                          onClick={() => handleCdTo(dir)}
+                          disabled={!sessionId}
+                          className="px-2 py-0.5 text-[11px] relief text-purple-300 hover:text-purple-100 rounded-control whitespace-nowrap select-none touch-manipulation"
+                          title={`cd ${dir}`}
+                        >
+                          {dir}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
