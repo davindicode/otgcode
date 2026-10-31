@@ -236,6 +236,12 @@ workspace that is saved on the host rather than in the browser.
 
 ### Fixed
 
+- **Composer keys were shaved along the bottom edge in light mode.** A row of
+  keys scrolls sideways, and a box that scrolls on one axis clips the other —
+  a control's drop shadow is not scrollable overflow, so the browser cut it off
+  where the row ended. Plainest in light mode, where that shadow also carries a
+  hairline ring. The rows now keep the shadow's 4px inside the scroller, which
+  is where the tab strips have always kept theirs.
 - **`./start.sh` on Linux crashed with `Failed to load native module:
   pty.node`.** node-pty ships binaries for macOS and Windows only and compiles
   elsewhere, but pnpm 10 skips a dependency's build scripts unless it is

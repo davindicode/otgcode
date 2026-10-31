@@ -74,11 +74,7 @@ export default function CommandChips({
 
       <div className={row ? "flex items-center gap-1" : "chip-rows flex flex-wrap items-center gap-1"}>
         <div
-          className={
-            row
-              ? "flex min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-none"
-              : "flex flex-wrap items-center gap-1"
-          }
+          className={row ? "scroll-row flex min-w-0 flex-1 items-center gap-1" : "flex flex-wrap items-center gap-1"}
           onPointerDown={row ? dragScroll : undefined}
           onWheel={row ? wheelScroll : undefined}
         >

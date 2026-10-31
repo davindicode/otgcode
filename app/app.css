@@ -306,6 +306,28 @@ body {
 }
 
 /*
+ * A row of controls scrolled sideways.
+ *
+ * `overflow-x: auto` makes the browser clip the other axis as well — a box
+ * with one scrolling axis has no `visible` on the other — and a control's
+ * drop shadow is not scrollable overflow, so it is simply cut off where the
+ * row's content ends. The shadow reaches about 3px below a button, and in
+ * light mode it carries a 1px ring, which is why the bottom edge of a key
+ * looked shaved there and nowhere else. The padding is inside the scroller,
+ * so it is the shadow's room rather than a gap in the layout — the tab strips
+ * get the same effect from the `my-1` on each tab.
+ */
+.scroll-row {
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scroll-row::-webkit-scrollbar {
+  display: none;
+}
+
+/*
  * A wrapping grid of chips, capped at three rows and scrolled beyond that.
  *
  * These lists are open-ended — the folders in a directory, the commands and

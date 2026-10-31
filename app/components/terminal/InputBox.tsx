@@ -747,11 +747,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
             <div className="border-b border-line/50 bg-panel px-2 py-1.5">
               {/* Where you are, how to get out, and how to get somewhere —
                   none of which should depend on the group below. */}
-              <div
-                onPointerDown={dragScroll}
-                onWheel={wheelScroll}
-                className="flex items-center gap-1 overflow-x-auto scrollbar-none"
-              >
+              <div onPointerDown={dragScroll} onWheel={wheelScroll} className="scroll-row flex items-center gap-1">
                 <span className="shrink-0 text-[10px] text-ink-faint">
                   session <span className="font-medium text-blue-300">{tmuxSession}</span>
                   {tmuxWindow !== null && (
@@ -810,7 +806,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                 <div
                   onPointerDown={dragScroll}
                   onWheel={wheelScroll}
-                  className="flex min-w-0 items-center gap-1 overflow-x-auto scrollbar-none"
+                  className="scroll-row flex min-w-0 items-center gap-1"
                 >
                   {(TMUX_GROUPS.find((g) => g.label === tmuxGroup) ?? TMUX_GROUPS[0]).keys.map((qk) => (
                     <button
@@ -836,7 +832,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
             so opening the keyboard never changes how much terminal you can see.
           */}
           {drawerGroup === KB_TAB && (
-            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
+            <div className="border-b border-line/50 bg-panel px-2 pt-1.5 pb-0.5">
               {/* 1. The input itself. */}
               <div className="flex gap-2 pb-1.5">
                 <textarea
@@ -966,7 +962,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
               <div
                 onPointerDown={dragScroll}
                 onWheel={wheelScroll}
-                className="mt-1.5 flex items-center gap-1 overflow-x-auto scrollbar-none border-t border-line/50 pt-1.5"
+                className="scroll-row mt-1.5 flex items-center gap-1 border-t border-line/50 pt-1.5"
               >
                 {comboSet &&
                   comboKeys().map((key) => (
