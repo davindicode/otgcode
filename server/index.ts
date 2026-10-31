@@ -119,6 +119,12 @@ async function main() {
     else next(err);
   });
 
+  // Read before the port opens. A config file that exists but cannot be parsed
+  // is a hard failure now (see `loadConfig`), and the difference between
+  // reading it here and reading it in the banner below is the difference
+  // between refusing to start and dying with the socket already accepting.
+  const passwordOn = isPasswordEnabled();
+
   await new Promise<void>((ready) => {
     httpServer.listen(PORT, () => {
       console.log(`\n  ${dim(`OTG Code running on http://localhost:${PORT}`)}`);
@@ -128,7 +134,7 @@ async function main() {
         console.log(dim(`  On this network:    ${address}`));
       }
       console.log(
-        isPasswordEnabled()
+        passwordOn
           ? "  Access password: on\n"
           : `  ${dim("Access password: off (enable it in Settings for an extra layer)")}\n`,
       );

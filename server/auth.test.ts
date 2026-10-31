@@ -1,5 +1,8 @@
 import { createHmac } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import {
   createLoginThrottle,
   hashPassword,
@@ -231,5 +234,28 @@ describe("readToken", () => {
     expect(readToken("nonsense", secret)).toBeNull();
     expect(readToken(token, "other".repeat(16), 1_000_001)).toBeNull();
     expect(readToken(token, secret, 1_060_001)).toBeNull();
+  });
+});
+
+// Last in the file on purpose: it swaps the module out for a fresh copy, so
+// anything after it would be testing a different instance than it imported.
+describe("a config file that exists but will not parse", () => {
+  it("refuses to answer rather than falling back to no password", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "otg-auth-"));
+    // Truncated mid-write: valid prefix, no closing brace.
+    writeFileSync(join(dir, "config.json"), '{"passwordEnabled":true,"passwordHash":"scrypt:aa:bb"');
+
+    // CONFIG_DIR is read once, at import, so the module has to be reloaded.
+    vi.resetModules();
+    process.env.OTG_CONFIG_DIR = dir;
+    const auth = await import("./auth");
+
+    expect(() => auth.loadConfig()).toThrow(/Could not read/);
+    // The one that matters: the old fallback made this true for a caller with
+    // no cookie at all, with a log line as the only sign.
+    expect(() => auth.isRequestAuthenticated(undefined)).toThrow();
+
+    delete process.env.OTG_CONFIG_DIR;
+    rmSync(dir, { recursive: true, force: true });
   });
 });

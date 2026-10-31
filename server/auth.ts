@@ -60,8 +60,22 @@ export function loadConfig(): AuthConfig {
       return cached;
     }
   } catch (err) {
-    console.error(`  Could not read ${CONFIG_FILE}, falling back to no password: ${(err as Error).message}`);
+    // Fail closed, loudly. This used to fall back to no password, which meant
+    // a config file that existed but would not parse — truncated by a full
+    // disk, a power cut mid-write, a half-finished sync — silently turned the
+    // access password off and left the tunnel URL as the only thing in front
+    // of a shell. Nor did it look like anything was wrong: the file exists, so
+    // `isConfigured` stayed true and the app never asked for a password to be
+    // set either. There is no safe reading of "the password may or may not be
+    // required", and this is the one file that decides.
+    throw new Error(
+      `Could not read ${CONFIG_FILE}: ${(err as Error).message}\n` +
+        "  Refusing to start: this file decides whether an access password is required.\n" +
+        "  Repair it, or delete it to start over (which asks about the password again).",
+    );
   }
+  // No file at all is the genuine first run, and `isConfigured` being false is
+  // what puts the password question on screen.
   cached = defaultConfig();
   return cached;
 }
