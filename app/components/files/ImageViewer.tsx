@@ -59,11 +59,15 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
   const fit = !naturalSize || !box ? 1 : Math.min(1, (box.w - PAD) / naturalSize.w, (box.h - PAD) / naturalSize.h);
   const scale = fit * zoom;
 
-  // GIFs animate via the <img> itself; bumping a cache-busting param reloads the
-  // image, which restarts the animation (a play-once gif can't otherwise replay).
+  // GIFs animate via the <img> itself, and an animation starts when its
+  // element does — so the replay remounts the <img> rather than changing its
+  // URL. It used to add a cache-busting parameter, which fetched the file
+  // again: a few megabytes of GIF arriving while it played, which a browser
+  // shows by looping over the frames it has until the rest turns up. Same
+  // URL, same bytes, and the request behind it is a revalidation.
   const isGif = path.split(".").pop()?.toLowerCase() === "gif";
   const [replayKey, setReplayKey] = useState(0);
-  const src = `/api/files/download?path=${encodeURIComponent(path)}&inline=1&v=${version}${replayKey ? `&_r=${replayKey}` : ""}`;
+  const src = `/api/files/download?path=${encodeURIComponent(path)}&inline=1&v=${version}`;
 
   const zoomIn = () => setZoom((z) => Math.min(5, z + 0.25));
   const zoomOut = () => setZoom((z) => Math.max(0.1, z - 0.25));
@@ -279,6 +283,7 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
             }}
           >
             <img
+              key={replayKey}
               src={src}
               alt={path}
               className="max-w-none"

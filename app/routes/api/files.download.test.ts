@@ -44,4 +44,31 @@ describe("serving a file under the app's own origin", () => {
 
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it("answers 304 when the copy they have is still current", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "otg-dl-"));
+    const file = join(dir, "demo.gif");
+    writeFileSync(file, "GIF89a and then some bytes");
+
+    const url = `http://localhost/api/files/download?path=${encodeURIComponent(file)}&inline=1`;
+    const first = (await loader({ request: new Request(url) } as never)) as Response;
+    const modified = first.headers.get("Last-Modified") as string;
+    expect(modified).toBeTruthy();
+
+    // What the browser sends back on the next view — the replay button's
+    // request, which must not pull the whole file down again.
+    const again = (await loader({
+      request: new Request(url, { headers: { "If-Modified-Since": modified } }),
+    } as never)) as Response;
+    expect(again.status).toBe(304);
+    expect(again.body).toBeNull();
+
+    // A range request asks about part of the file, not whether it changed.
+    const ranged = (await loader({
+      request: new Request(url, { headers: { "If-Modified-Since": modified, Range: "bytes=0-3" } }),
+    } as never)) as Response;
+    expect(ranged.status).toBe(206);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
 });

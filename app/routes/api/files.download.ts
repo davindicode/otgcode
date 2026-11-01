@@ -71,7 +71,29 @@ export async function loader({ request }: Route.LoaderArgs) {
       // generic enough for a browser to guess HTML on the content.
       "Content-Security-Policy": "sandbox",
       "X-Content-Type-Options": "nosniff",
+      // Store it, but ask before reusing it. Every preview URL carries the
+      // file's version, so the bytes behind one never change — except for the
+      // images inside a rendered markdown file, which are addressed by path
+      // alone. `no-cache` keeps both honest: a revalidation is a few hundred
+      // bytes, and what it saves is the file itself.
+      //
+      // Without this nothing was cached at all, so reopening an image fetched
+      // it again — and a GIF played as it downloaded, looping over the part
+      // that had arrived before the rest caught up.
+      "Cache-Control": "private, no-cache",
+      "Last-Modified": fileStats.mtime.toUTCString(),
     };
+
+    // Unchanged since they last saw it. Skipped for a range request, which is
+    // asking about a part of the file rather than the whole of it.
+    const since = request.headers.get("if-modified-since");
+    if (!rangeHeader && since) {
+      // HTTP dates are whole seconds; an mtime is not.
+      const asked = Date.parse(since);
+      if (!Number.isNaN(asked) && Math.floor(fileStats.mtimeMs / 1000) * 1000 <= asked) {
+        return new Response(null, { status: 304, headers: commonHeaders });
+      }
+    }
 
     if (rangeHeader && !range) {
       return new Response(null, {

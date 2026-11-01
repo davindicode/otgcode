@@ -249,6 +249,12 @@ workspace that is saved on the host rather than in the browser.
   where the row ended. Plainest in light mode, where that shadow also carries a
   hairline ring. The rows now keep the shadow's 4px inside the scroller, which
   is where the tab strips have always kept theirs.
+- **Replaying a GIF fetched it again, and it looped while it arrived.** The
+  replay changed the image's URL to defeat the cache, so a few megabytes came
+  down a second time — and a browser plays a GIF as it loads, looping over the
+  frames it has until the rest turns up. It remounts the image instead, and
+  the file route now carries `Last-Modified` and answers `304`, so reopening
+  anything is a revalidation rather than a download.
 - **A large GIF opened at the wrong size and then jumped.** The viewer waited
   for `onLoad` to learn the image's dimensions, which for an animated GIF is
   the last frame — seconds after the first one is already on screen, during
