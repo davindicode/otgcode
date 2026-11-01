@@ -107,6 +107,27 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
   };
   useEffect(() => () => clearTimeout(panTimer.current), []);
 
+  /**
+   * The image's size, in the two stages the browser gives it to us.
+   *
+   * `onLoad` is the last byte, not the first picture. An animated GIF paints
+   * its first frame as soon as that frame has arrived and keeps loading the
+   * rest, so for a few megabytes there is a second or two where it is on
+   * screen and `naturalSize` is still null — and with no size of our own the
+   * image rendered at 1:1, filling the pane with a corner of itself until the
+   * load finally landed and it snapped down to fit. A still image hides this
+   * because it has nothing to show before the end.
+   *
+   * So until then it is capped to the pane instead, which is what fitting it
+   * comes to anyway: the first paint is already the right size, and `onLoad`
+   * only hands over to the zoomable version of the same number.
+   */
+  const sizing = naturalSize
+    ? { width: naturalSize.w * scale, height: naturalSize.h * scale }
+    : box
+      ? { maxWidth: box.w - PAD, maxHeight: box.h - PAD }
+      : undefined;
+
   const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
     setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
@@ -264,14 +285,7 @@ export default function ImageViewer({ path, onReload, version, stale }: ImageVie
               draggable={false}
               onLoad={handleImageLoad}
               onError={reportFailure}
-              style={
-                naturalSize
-                  ? {
-                      width: naturalSize.w * scale,
-                      height: naturalSize.h * scale,
-                    }
-                  : undefined
-              }
+              style={sizing}
             />
           </div>
         </div>

@@ -242,6 +242,11 @@ workspace that is saved on the host rather than in the browser.
   where the row ended. Plainest in light mode, where that shadow also carries a
   hairline ring. The rows now keep the shadow's 4px inside the scroller, which
   is where the tab strips have always kept theirs.
+- **A large GIF opened at the wrong size and then jumped.** The viewer waited
+  for `onLoad` to learn the image's dimensions, which for an animated GIF is
+  the last frame — seconds after the first one is already on screen, during
+  which it rendered at 1:1 and filled the pane with a corner of itself. It is
+  capped to the pane until then, so the first paint is already fitted.
 - **The chip rows had the same bottom edge shaved**, for the same reason as the
   key rows. The cap that keeps them to three rows carries the shadow's room, so
   three rows still means three rows.
