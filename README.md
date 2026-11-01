@@ -22,36 +22,32 @@ Every release is described in [CHANGELOG.md](CHANGELOG.md).
 
 ## Features
 
-<!-- Product demo previews (GIFs) -> use table for consistent GitHub layout -->
-<table align="center">
-  <tr>
-    <td align="center" style="padding:8px">
-    <a href="public/videos/demo_explorer.gif" title="Open Explorer GIF"><img src="public/videos/demo_explorer.gif" alt="File explorer" width="220" style="max-width:220px;height:auto;"></a>
-      <div style="font-size:13px;color:#555;margin-top:8px;">File explorer</div>
-    </td>
-    <td align="center" style="padding:8px">
-      <a href="public/videos/demo_terminal.gif" title="Open Terminal GIF"><img src="public/videos/demo_terminal.gif" alt="Terminal interface" width="220" style="max-width:220px;height:auto;"></a>
-      <div style="font-size:13px;color:#555;margin-top:8px;">Terminal interface</div>
-    </td>
-    <td align="center" style="padding:8px">
-      <a href="public/videos/demo_localhost.gif" title="Open Localhost GIF"><img src="public/videos/demo_localhost.gif" alt="Localhost preview" width="220" style="max-width:220px;height:auto;"></a>
-      <div style="font-size:13px;color:#555;margin-top:8px;">Localhost preview</div>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <a href="public/videos/demo.gif" title="OTG Code on a desktop browser and on a phone"><img src="public/videos/demo.gif" alt="The same workspace on a desktop browser and on a phone: file explorer and markdown preview beside a terminal and tmux on the left, the phone running a coding CLI over the on-screen key rows on the right" width="900"></a>
+</p>
 
+**The same workspace on both screens.** The tabs, their terminals, the split
+and every preference live on the host rather than in the browser, so a phone
+and a laptop are one session: open either and you are where you left off.
+Only what your thumb is doing — the composer you had open, a half-typed
+command — stays on the device doing it.
 
 Tabs in one strip, VS Code style. Tabs come in four kinds — **Terminal**, **tmux session**, **Explorer**, and the **viewer/editor** tabs that open when you pick a file in an explorer. A tmux tab *is* its session: it runs tmux rather than a shell, so a reconnect re-attaches instead of dropping you into a shell outside it. `+` asks which kind to create; file tabs are spawned by the explorer, so an explorer always stays a file browser, and a file opens next to the explorer it came from. **Drag the selected tab to reorder it**; dragging any other tab slides the whole strip, for when there are more tabs than fit. On a phone the selected tab needs a hold first, so a swipe still scrolls.
 
 On a wide screen you can **split the view in two**, from Settings → Appearance: a file on the left and a terminal on the right, with a divider to drag (double-click it to even the panes up). Each pane has its own tab strip, its own `+` and its own active tab, and a tab moves across by being dragged onto the other strip. On a phone — or any screen under 900px or taller than it is wide — one pane is drawn at a time and Settings grows a **Left / Right** switch for which one. Each pane still keeps its own tabs there, so the split you set on a laptop is the same workspace when you pick the phone up.
 
-Each tab's controls sit in the bottom bar and change with the tab. Localhost previews, system info, settings and your account live in popups under the header icons. Every tab stays mounted in the DOM with CSS visibility toggling, preserving terminal state and WebSocket connections across switches. A fresh start opens on an empty board rather than a shell you did not ask for. Everything routes through a single Cloudflare Quick Tunnel.
-
-Install it to a home screen and it runs standalone like a native app; the layout, open tabs and your preferences are saved on the host, so a refresh or a reconnect from another device puts you back where you were.
+Each tab's controls sit in the bottom bar and change with the tab; localhost previews, system info, settings and your account live in popups under the header icons. Switching tabs never costs you a terminal — one stays live while you are in another. A fresh start opens on an empty board rather than a shell you did not ask for, and everything routes through a single Cloudflare Quick Tunnel. Installed to a home screen it runs standalone, like an app.
 
 **One device at a time.** The open tabs and their terminals are a single workspace on the host, so a second device is told who holds the session and waits for it rather than taking it — nothing reachable from the tunnel URL can pull a live terminal away from whoever is using it. It is told before the password, too, so there is no logging in to reach that screen. Signing out, closing the tab or letting the session expire frees it. tmux sessions keep running either way, which is what to use for two devices on one terminal.
 
-### Terminal & tmux
+### Terminal, tmux and the on-screen keyboard
+
+A phone has no modifier keys, no arrows, no second mouse button and no Esc —
+which is most of what a coding CLI is driven by. So the terminal brings its
+own: a composer underneath it with the keys, the commands and the CLI
+shortcuts that a shell actually needs, in rows sized for a thumb. It is the
+same composer on a desktop, so neither screen is the cut-down one.
+
 - Terminal tabs run your shell. **tmux tabs run tmux** (`tmux new -A`), so a dropped phone or a closed laptop re-attaches to the same session instead of landing in a fresh shell beside it
 - **A short drop does not cost you the shell.** A plain terminal's process keeps running for a minute after the connection goes, and a reconnect picks it up where it was, with whatever it printed in the meantime — so a walk past a dead spot no longer kills a build. A minute, and no more: anything longer is what tmux is for, and closing the tab still ends it there and then. A tmux tab needs none of this and gets none: tmux is already the thing that survives, so its client is dropped and re-attached cleanly
 - Picking **tmux session** from `+` opens a picker: attach to a running session, start a new one, or kill one. Closing a tmux tab detaches; the session keeps running
@@ -66,14 +62,13 @@ Install it to a home screen and it runs standalone like a native app; the layout
   - **tmux session** — in-session controls, only on a tmux tab, so tmux keys can never be typed into a plain shell: windows (new, next, prev, last, rename, kill, list, and any index by number), panes (split, select, cycle, zoom, kill, layout) and copy mode
 - **Closing a tab asks first** only where it costs something — a terminal takes its processes and scrollback with it, a file with unsaved edits says so. A tmux tab closes without asking: the session keeps running on the host
 - **Every tab keeps its own composer state** — switching tabs leaves your half-typed command, open group and chosen CLI where they were, rather than carrying them to another session
-- System info popup with OS, kernel, CPU, memory, GPU, and connection latency to the host
-- Tool version detection (tmux, claude, codex, opencode)
+- **System info** under the header — OS, kernel, CPU, memory, GPU, latency to the host, and which of tmux, claude, codex and opencode are installed
 
 ### File Explorer
 - Explorer tabs (renamable), breadcrumb and editable path navigation
 - Create, rename, delete files and folders; multi-select for bulk download or delete; file info dialog; hidden files toggle
-- **Move mode** — pick an entry, browse to where it belongs, drop it there. Refuses to overwrite, to move a folder into itself, or to move something onto where it already is, and copies instead of renaming across filesystems
-- Context menu (right-click / long-press), selectable/scrollable file paths
+- **Move by dragging** — hold a row until it lifts, drag it onto a folder in the same listing and let go; dragging near the top or bottom creeps the list, so a destination off the screen is still reachable. For a folder that is not in front of you, **Move** from the row's menu turns the explorer itself into the destination picker. Either way the move refuses to overwrite, to put a folder inside itself, or to land somewhere it already is, and copies instead of renaming across filesystems
+- Row menu on right-click, or by holding a row and letting go; file paths stay selectable and scrollable
 - Drag-and-drop file upload with progress tracking and per-file cancel
 - Chunked upload for large files (>80 MB) to bypass Cloudflare's 100 MB request limit
 - **Reload a file in place** from its own bar, for every type. The editor also carries the version it read, so a save that would land on a file something else has changed since is refused rather than quietly winning
