@@ -143,6 +143,12 @@ workspace that is saved on the host rather than in the browser.
   session is answered by the status endpoint now, so a second device is told
   who has it rather than asked for a password that could only land on the same
   screen with the first device's tabs showing through it.
+- **Drag a row onto a folder to move it there.** Hold a file or folder in the
+  explorer until it lifts, then drag it onto any folder in the listing and let
+  go. A mouse skips the hold and drags straight away. The destination-picking
+  mode is still there for a folder that is not in front of you; this is for
+  the one that is. Holding and letting go without moving opens the row's menu,
+  as the long press always did.
 
 ### Changed
 

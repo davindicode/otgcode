@@ -360,6 +360,20 @@ function FileSessionView({ session }: { session: FileSession }) {
     });
   };
 
+  // The same move without the mode: dropping a row on a folder you can
+  // already see says where it is going, so there is nothing to pick.
+  const moveInto = async (entry: FileEntry, destName: string) => {
+    await withBusy(async () => {
+      try {
+        await apiPost("/api/files/move", { sourcePath: fullPath(entry.name), destDir: fullPath(destName) });
+        await refresh();
+        showToast(`Moved "${entry.name}" into "${destName}"`, "info");
+      } catch (err: unknown) {
+        showToast(errorMessage(err, "Move failed"));
+      }
+    });
+  };
+
   const cancelUpload = (index: number) => {
     const xhr = uploadXhrs.current.get(index);
     if (xhr) {
@@ -680,6 +694,7 @@ function FileSessionView({ session }: { session: FileSession }) {
           onDownload={handleDownload}
           onCopyPath={handleCopyPath}
           onMove={handleMove}
+          onMoveInto={moveInto}
           moveMode={!!moveSource}
           movingName={moveSource && moveSource.originCwd === cwd ? moveSource.name : null}
           selectMode={selectMode}

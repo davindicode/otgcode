@@ -6,6 +6,13 @@ import type { FileEntry } from "~/stores/fileStore";
 /** Quiet period before a scroll position is written down. */
 const SCROLL_SETTLE_MS = 400;
 
+/** A mouse this far from where it went down is dragging, not clicking. */
+const DRAG_SLOP_PX = 6;
+/** How long a finger has to rest on a row before it picks it up. */
+const TOUCH_HOLD_MS = 500;
+/** Under this a finger is resting, not moving. */
+const TOUCH_JITTER_PX = 3;
+
 interface UploadFile {
   name: string;
   size: number;
@@ -25,6 +32,8 @@ interface FileListProps {
   onDownload: (entry: FileEntry) => void;
   onCopyPath: (entry: FileEntry) => void;
   onMove: (entry: FileEntry) => void;
+  /** Drop of a dragged row onto a folder in the same listing. */
+  onMoveInto?: (entry: FileEntry, destName: string) => void;
   /** Picking a destination for `movingName`: rows lose their menus. */
   moveMode?: boolean;
   /** Name of the entry being moved, highlighted while it is in view. */
@@ -64,6 +73,7 @@ export default function FileList({
   onDownload,
   onCopyPath,
   onMove,
+  onMoveInto,
   moveMode = false,
   movingName = null,
   selectMode = false,
@@ -107,7 +117,6 @@ export default function FileList({
   };
   useEffect(() => () => clearTimeout(settle.current), []);
   const menuRef = useRef<HTMLDivElement>(null);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Open the menu anchored to a point (right-click / long-press), stored in the
   // scroll container's content coordinates so it stays attached on scroll.
@@ -202,18 +211,104 @@ export default function FileList({
     openMenuAtPoint(e.clientX, e.clientY, entry);
   };
 
-  const handleTouchStart = (e: React.TouchEvent, entry: FileEntry) => {
-    const touch = e.touches[0];
-    longPressTimer.current = setTimeout(() => {
-      openMenuAtPoint(touch.clientX, touch.clientY, entry);
-    }, 500);
-  };
+  /**
+   * One gesture for a row: hold it, then either let go for the menu or drag
+   * it onto a folder to move it there.
+   *
+   * A finger has no second button and no hover, so the hold is what
+   * distinguishes acting *on* a row from opening it — and once a row is held,
+   * the two things worth doing with it are the menu and the move. The menu
+   * now comes on release rather than at the end of the hold, because the
+   * alternative is a menu opening under a finger that is about to drag.
+   *
+   * A mouse skips the wait: pressing and moving is already unambiguous, and
+   * the right button has always opened the menu.
+   *
+   * Dragging and scrolling the list are the same gesture to the browser, so a
+   * finger that moves before the hold is through has given the drag up: a
+   * scroll is already under way by then, and `touch-action` is read when the
+   * gesture begins, so nothing here can call it off. Once the drag has
+   * started it is the other way round, and `touchmove` is cancelled by hand.
+   */
+  const [drag, setDrag] = useState<{ name: string; over: string | null } | null>(null);
 
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
+  const startDrag = (e: React.PointerEvent, entry: FileEntry) => {
+    if (e.button !== 0 || moveMode || selectMode || disabled || !onMoveInto) return;
+    // The 3-dot button and the checkbox own their own gestures.
+    if ((e.target as Element).closest("button[data-file-menu-trigger], button[title]")) return;
+
+    const { pointerId, clientX: startX, clientY: startY } = e;
+    const holdFirst = e.pointerType !== "mouse";
+    let held = !holdFirst;
+    let dragging = false;
+    let over: string | null = null;
+    let at = { x: startX, y: startY };
+    let hold: ReturnType<typeof setTimeout> | null = null;
+
+    const lift = () => {
+      hold = null;
+      held = true;
+      setDrag({ name: entry.name, over: null });
+    };
+
+    /** Which folder the pointer is over, if any. A folder is not its own home. */
+    const place = (x: number, y: number) => {
+      at = { x, y };
+      const row = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-entry-dir]");
+      const name = row?.dataset.entryDir ?? null;
+      over = name === entry.name ? null : name;
+      setDrag({ name: entry.name, over });
+    };
+
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      const moved = Math.hypot(ev.clientX - startX, ev.clientY - startY);
+      if (!dragging) {
+        if (!held) {
+          if (moved > TOUCH_JITTER_PX) end();
+          return;
+        }
+        if (!holdFirst && moved <= DRAG_SLOP_PX) return;
+        dragging = true;
+      }
+      place(ev.clientX, ev.clientY);
+    };
+
+    const onTouchMove = (ev: TouchEvent) => {
+      if (dragging) ev.preventDefault();
+    };
+
+    function end() {
+      if (hold) clearTimeout(hold);
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", end);
+      document.removeEventListener("pointercancel", end);
+      document.removeEventListener("touchmove", onTouchMove);
+      setDrag(null);
+
+      if (dragging) {
+        // A pointerup on a row is followed by a click on it, and a row's click
+        // opens it. Dropping a file on a folder would otherwise move it and
+        // then walk into the folder it came from.
+        const swallow = (ev: Event) => {
+          ev.stopPropagation();
+          ev.preventDefault();
+        };
+        document.addEventListener("click", swallow, { capture: true, once: true });
+        setTimeout(() => document.removeEventListener("click", swallow, { capture: true }), 100);
+        if (over) onMoveInto?.(entry, over);
+        return;
+      }
+      // Held still and let go: that is the long press, and it opens the menu
+      // where the finger was.
+      if (held && holdFirst) openMenuAtPoint(at.x, at.y, entry);
     }
+
+    if (holdFirst) hold = setTimeout(lift, TOUCH_HOLD_MS);
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", end);
+    document.addEventListener("pointercancel", end);
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
   };
 
   const menuAction = (action: (entry: FileEntry) => void) => {
@@ -234,23 +329,32 @@ export default function FileList({
           const isSelected = selectMode && !!selectedNames?.has(entry.name);
           const menuOpen = isButtonMenuFor(menu, entry);
           const isMoving = moveMode && entry.name === movingName;
+          // The row a drag is over, and the row it picked up. The target wears
+          // the same highlight the destination-picking mode gives a row, since
+          // it means the same thing; the picked-up row fades like a tab being
+          // dragged between panes.
+          const isTarget = entry.isDirectory && drag?.over === entry.name;
+          const isLifted = drag?.name === entry.name;
           // In move mode only folders are worth clicking — they are the
           // destinations; opening a file would drop you out of the flow.
           const rowDisabled = moveMode && !entry.isDirectory;
           return (
             <div
               key={entry.name}
+              data-entry-dir={entry.isDirectory ? entry.name : undefined}
+              onPointerDown={(e) => startDrag(e, entry)}
               className={`w-full flex items-center border-b border-line-soft ${
-                isMoving ? "bg-blue-600/25 ring-1 ring-inset ring-blue-500/60" : isSelected ? "bg-blue-600/15" : ""
-              }`}
+                isMoving || isTarget
+                  ? "bg-blue-600/25 ring-1 ring-inset ring-blue-500/60"
+                  : isSelected
+                    ? "bg-blue-600/15"
+                    : ""
+              } ${isLifted ? "opacity-60" : ""}`}
             >
               {/* Clickable file/folder area */}
               <button
                 onClick={() => (selectMode ? onToggleSelect?.(entry) : onOpen(entry))}
                 onContextMenu={moveMode ? undefined : (e) => handleContextMenu(e, entry)}
-                onTouchStart={moveMode ? undefined : (e) => handleTouchStart(e, entry)}
-                onTouchEnd={handleTouchEnd}
-                onTouchMove={handleTouchEnd}
                 disabled={rowDisabled}
                 className={`flex-1 flex items-center gap-3 px-3 py-2 transition-colors text-left min-w-0 ${
                   rowDisabled ? "opacity-45 cursor-default" : "hover:bg-raised active:bg-raised"
