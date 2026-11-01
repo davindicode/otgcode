@@ -148,7 +148,8 @@ workspace that is saved on the host rather than in the browser.
   go. A mouse skips the hold and drags straight away. The destination-picking
   mode is still there for a folder that is not in front of you; this is for
   the one that is. Holding and letting go without moving opens the row's menu,
-  as the long press always did.
+  as the long press always did. Near the top or bottom of a long listing the
+  rows creep past, so a destination off the screen is still reachable.
 
 ### Changed
 

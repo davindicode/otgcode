@@ -12,6 +12,10 @@ const DRAG_SLOP_PX = 6;
 const TOUCH_HOLD_MS = 500;
 /** Under this a finger is resting, not moving. */
 const TOUCH_JITTER_PX = 3;
+/** How near an edge a drag has to be before the list starts creeping. */
+const EDGE_PX = 40;
+/** How far it creeps per frame while held there. */
+const EDGE_SPEED_PX = 8;
 
 interface UploadFile {
   name: string;
@@ -244,6 +248,7 @@ export default function FileList({
     let over: string | null = null;
     let at = { x: startX, y: startY };
     let hold: ReturnType<typeof setTimeout> | null = null;
+    let creep = 0;
 
     const lift = () => {
       hold = null;
@@ -251,9 +256,29 @@ export default function FileList({
       setDrag({ name: entry.name, over: null });
     };
 
-    /** Which folder the pointer is over, if any. A folder is not its own home. */
+    /**
+     * Which folder the pointer is over, if any. A folder is not its own home.
+     *
+     * Takes a position rather than an event because the creep below calls it
+     * again while the pointer sits still: the folder you want can be off the
+     * bottom of a long listing, and the pointer cannot reach what it has to
+     * scroll to. Measured after the scroll, so the hit test reads the rows
+     * where they ended up.
+     */
     const place = (x: number, y: number) => {
       at = { x, y };
+      const list = scrollRef.current;
+      if (list && list.scrollHeight > list.clientHeight) {
+        const box = list.getBoundingClientRect();
+        const dir = y < box.top + EDGE_PX ? -1 : y > box.bottom - EDGE_PX ? 1 : 0;
+        if (dir !== 0) {
+          list.scrollTop += dir * EDGE_SPEED_PX;
+          creep ||= requestAnimationFrame(() => {
+            creep = 0;
+            if (dragging) place(at.x, at.y);
+          });
+        }
+      }
       const row = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-entry-dir]");
       const name = row?.dataset.entryDir ?? null;
       over = name === entry.name ? null : name;
@@ -280,6 +305,7 @@ export default function FileList({
 
     function end() {
       if (hold) clearTimeout(hold);
+      if (creep) cancelAnimationFrame(creep);
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", end);
       document.removeEventListener("pointercancel", end);
