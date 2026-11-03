@@ -243,6 +243,23 @@ workspace that is saved on the host rather than in the browser.
 
 ### Fixed
 
+- **Text sent from the composer reached the terminal as keystrokes.** Send
+  wrote the message down the same channel as a keypress, so to the program on
+  the other end it was someone typing four hundred characters in a
+  millisecond — and every one of them a key it might have a binding for.
+  opencode binds a bare `!` to its shell mode and the check that gates it does
+  not re-run inside a burst, so a question with a `!` in it flipped the prompt
+  partway through and the whole thing went to bash, which answered `syntax
+  error near unexpected token '('`. Text is now sent as a paste, wrapped in
+  the bracketed paste markers when the program has asked for them, which is
+  what tells a TUI it is holding text and not keys. Everything that composes a
+  command line goes the same way — the git drawer's commit message, the
+  directory drawer's `cd`, your own saved commands — because a path or a
+  commit message is as free to hold a `!` as a sentence is, and quoting it for
+  the shell never said anything about the program in between. The Enter is a
+  separate keystroke, so the newline that used to ride along inside a message
+  is gone with it. Quick keys and the slash-command chips still go as keys:
+  reaching the program's own bindings is what they are for.
 - **Composer keys were shaved along the bottom edge in light mode.** A row of
   keys scrolls sideways, and a box that scrolls on one axis clips the other —
   a control's drop shadow is not scrollable overflow, so the browser cut it off

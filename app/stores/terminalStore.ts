@@ -42,6 +42,35 @@ interface TerminalState {
   createSession: (sessionId: string, name?: string, cwd?: string, tmuxSession?: string, tmuxSessionId?: string) => void;
   registerTerminal: (sessionId: string, terminal: Terminal, fitAddon: FitAddon) => void;
   sendInput: (sessionId: string, data: string) => void;
+  /**
+   * Send text the user wrote, rather than keys they pressed.
+   *
+   * The composer used to send straight down `sendInput`, which is the stream a
+   * keystroke goes down: to the program on the other end that is someone
+   * typing four hundred characters in one millisecond, and every one of them
+   * is a key it may have a binding for. opencode binds a bare `!` to its shell
+   * mode while the cursor is at the start of a row, and the check that gates it
+   * does not re-run inside a burst — so a question with a `!` in it flipped the
+   * prompt to shell mode partway through and the whole thing went to bash,
+   * which answered "syntax error near unexpected token `('".
+   *
+   * A terminal does not have this problem: a paste arrives wrapped in the
+   * bracketed paste markers, which say "text, not keys", and every TUI worth
+   * the name honours them. xterm.js writes those markers — and only when the
+   * program has actually asked for them, which is the reason this goes through
+   * the terminal instead of building the sequence here.
+   */
+  pasteInput: (sessionId: string, text: string) => void;
+  /**
+   * Run a command line: `pasteInput` for the line, then Enter on its own.
+   *
+   * Every composed command goes through here — the git drawer's `git commit`,
+   * the directory drawer's `cd`, a command chip — because a command line is
+   * text too, and a path or a commit message is as free to hold a `!` as a
+   * sentence is. `shellQuote` makes it safe for the shell on the other side;
+   * it does nothing about the program in between taking it for a keystroke.
+   */
+  runInput: (sessionId: string, command: string) => void;
   closeSession: (sessionId: string) => void;
   /** Ask for a new pty for a session whose own has gone. */
   restartSession: (sessionId: string) => void;
@@ -416,6 +445,23 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     if (socket.connected && session?.status === "connected") {
       socket.emit("terminal_input", { sessionId, data });
     }
+  },
+
+  pasteInput: (sessionId, text) => {
+    const terminal = get().sessions[sessionId]?.terminal;
+    // Nothing has read the program's modes yet, so there is nothing to decide
+    // the markers from. Sending it as keys is the old behaviour, not a fix.
+    if (!terminal) {
+      get().sendInput(sessionId, text);
+      return;
+    }
+    // Comes back through `onData`, so it still goes out as `sendInput`.
+    terminal.paste(text);
+  },
+
+  runInput: (sessionId, command) => {
+    get().pasteInput(sessionId, command);
+    get().sendInput(sessionId, "\r");
   },
 
   closeSession: (sessionId) => {

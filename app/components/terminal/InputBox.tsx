@@ -222,6 +222,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     return () => clearTimeout(timer);
   }, [activeGroup]);
   const sendInput = useTerminalStore((s) => s.sendInput);
+  const runInput = useTerminalStore((s) => s.runInput);
   const resetModes = useTerminalStore((s) => s.resetModes);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
@@ -241,8 +242,9 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
 
   // --- Handlers ---
   const handleSend = () => {
-    if (!sessionId || !text) return;
-    sendInput(sessionId, `${text}\n`);
+    const body = text.trimEnd();
+    if (!sessionId || !body) return;
+    runInput(sessionId, body);
     setText("");
     textareaRef.current?.focus();
   };
@@ -256,26 +258,26 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const commitGit = () => {
     const message = gitCommitMsg.trim();
     if (!sessionId || !message) return;
-    sendInput(sessionId, `git commit -m ${shellQuote(message)}\n`);
+    runInput(sessionId, `git commit -m ${shellQuote(message)}`);
     editCommitMsg("");
   };
 
   const setGitIdentity = () => {
     if (!sessionId) return;
-    if (gitConfigName.trim())
-      sendInput(sessionId, `git config --global user.name ${shellQuote(gitConfigName.trim())}\n`);
+    if (gitConfigName.trim()) runInput(sessionId, `git config --global user.name ${shellQuote(gitConfigName.trim())}`);
     if (gitConfigEmail.trim())
-      sendInput(sessionId, `git config --global user.email ${shellQuote(gitConfigEmail.trim())}\n`);
+      runInput(sessionId, `git config --global user.email ${shellQuote(gitConfigEmail.trim())}`);
   };
 
+  /**
+   * A key, and only ever a key: these are short vetted sequences that are
+   * supposed to reach the program's own bindings. Text the user wrote goes
+   * through `runInput` instead, which is the difference that stops a
+   * sentence from being read as a burst of keystrokes.
+   */
   const handleQuickKey = useCallback(
     (key: string) => {
-      if (!sessionId) return;
-      if (key.length === 2 && key.charCodeAt(0) < 0x20 && key.charCodeAt(1) >= 0x20) {
-        sendInput(sessionId, key);
-      } else {
-        sendInput(sessionId, key);
-      }
+      if (sessionId) sendInput(sessionId, key);
     },
     [sessionId, sendInput],
   );
@@ -465,6 +467,19 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     }
   };
 
+  /**
+   * A chip. The trailing newline in a chip's command is what says "and run
+   * it": that one is a command line, and goes as text with its own Enter.
+   * A chip without one is a key sequence, and is meant to be taken for
+   * keystrokes — a slash command opens its CLI's palette by being typed, and
+   * would not if it arrived as a paste.
+   */
+  const runChip = (command: string) => {
+    if (!sessionId) return;
+    if (command.endsWith("\n")) runInput(sessionId, command.slice(0, -1));
+    else sendInput(sessionId, command);
+  };
+
   const toggleGroup = (id: string) => {
     if (activeGroup === id) {
       setActiveGroup(null);
@@ -538,13 +553,13 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const handleCdTo = (dir: string) => {
     if (!sessionId) return;
     const absPath = dir === ".." ? cdCwd.replace(/\/[^/]+$/, "") || "/" : `${cdCwd}/${dir}`;
-    sendInput(sessionId, `cd ${shellQuote(absPath)}\n`);
+    runInput(sessionId, `cd ${shellQuote(absPath)}`);
     fetchDirs(absPath);
   };
 
   const handleCdHome = () => {
     if (!sessionId) return;
-    sendInput(sessionId, "cd ~\n");
+    runInput(sessionId, "cd ~");
     // `~` is the shell's to expand, so the listing follows from asking the
     // terminal again rather than from a path guessed on this side.
     fetchDirs();
@@ -673,7 +688,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                 dialogTitle="Add command"
                 dialogHint="Becomes a button in the cmds group. Runs immediately."
                 commandPlaceholder="./deploy.sh --prod"
-                onRun={(command) => sessionId && sendInput(sessionId, command)}
+                onRun={runChip}
                 onAdd={(label, command) => addCommand({ label, command })}
                 onRemove={removeCommand}
                 onRestore={restoreCommand}
@@ -902,7 +917,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                           dialogTitle={`Add ${vendor.name} slash command`}
                           dialogHint={`Typed into ${vendor.name} when tapped — press Enter to run. Saved for ${vendor.name} only.`}
                           commandPlaceholder="/review"
-                          onRun={(command) => sessionId && sendInput(sessionId, command)}
+                          onRun={runChip}
                           onAdd={(label, command) => addSlash({ vendor: vendor.name, label, command })}
                           onRemove={(label, isCustom) => removeSlash(vendor.name, label, isCustom)}
                           onRestore={(label) => restoreSlash(vendor.name, label)}
@@ -986,7 +1001,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                         typing the one you want. */}
                     <button
                       onClick={() => {
-                        if (sessionId) sendInput(sessionId, `${vendor.name}\n`);
+                        if (sessionId) runInput(sessionId, vendor.name);
                       }}
                       disabled={!sessionId}
                       title={`Start ${vendor.name}`}
@@ -1021,7 +1036,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                     <button
                       key={cmd.label}
                       onClick={() => {
-                        if (sessionId) sendInput(sessionId, cmd.command);
+                        if (sessionId) runChip(cmd.command);
                       }}
                       disabled={!sessionId}
                       title={cmd.title}
