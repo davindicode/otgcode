@@ -243,6 +243,20 @@ workspace that is saved on the host rather than in the browser.
 
 ### Fixed
 
+- **The caret jumped to the end of the file while editing.** Saving sends the
+  buffer and the pane hands back what it wrote, which the editor took up as
+  though the file had changed underneath it. Over a tunnel a write takes long
+  enough to keep typing through, and when the older bytes came back Monaco
+  replaced its whole document with them — the caret landing at the end of the
+  file, and the characters typed in the meantime gone. A save's own echo is
+  recognised now and left alone, and the unsaved mark comes from the save
+  itself: clean if the buffer still matches what was written, dirty if it has
+  moved on.
+- **Reloading a file to discard edits handed them straight back.** Re-reading
+  tears the editor down and it is rebuilt from the browser's copy of the
+  unsaved buffer, which the second tap never cleared — so agreeing to throw
+  the edits away reopened the file with them still in it and the asterisk
+  still on.
 - **A phone came back on the left pane whatever it had been showing.** Which
   pane has your attention was kept in the workspace file on the host, in one
   slot shared by every device — but on a wide screen that means which pane has

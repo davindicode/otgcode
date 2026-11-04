@@ -285,24 +285,52 @@ export default function CodeEditor({
   const isHtml = ext === "html" || ext === "htm";
   const [htmlZoom, setHtmlZoom] = useState(saved.htmlZoom ?? 100);
 
-  // `value` is only seeded from `content` at mount, so a reload has to be taken
-  // up here. Keeps the chosen mode and zoom, which a remount would reset.
+  /**
+   * The bytes a save of ours wrote, so the file coming back down can be told
+   * apart from news about it.
+   */
+  const written = useRef<string | null>(null);
+  /** The buffer as it stands, for the async paths that cannot close over it. */
+  const latest = useRef(value);
+  latest.current = value;
+  const lastReload = useRef(reloadCount);
+
+  // `value` is only seeded from `content` at mount, so a changed file has to be
+  // taken up here. Keeps the chosen mode and zoom, which a remount would reset.
   //
-  // Keyed on the reload counter as well as the content, because a reload whose
+  // Watches the reload counter as well as the content, because a reload whose
   // bytes match what is already loaded leaves `content` identical — and then
   // this did nothing at all. Discarding edits by reloading was the visible
   // case: the file on disk still held what the tab had read, so the editor kept
   // the unsaved changes the second tap had just agreed to throw away.
   // Not on the first run, which is what the state above is already set to —
   // and which would otherwise overwrite a restored draft with the file.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadCount is the trigger, not a value the effect reads
   useEffect(() => {
-    if (mounted.current) {
-      setValue(content);
-      setDirty(false);
-      setDiscardArmed(false);
+    const asked = reloadCount !== lastReload.current;
+    lastReload.current = reloadCount;
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
     }
-    mounted.current = true;
+    /**
+     * Our own save coming back is not a changed file, and must not be taken
+     * up: the pane hands down the bytes it just wrote, and the buffer may have
+     * moved past them — a save over a tunnel takes long enough to keep typing
+     * through. Copying them back in undid that typing, and did it loudly:
+     * Monaco replaces its entire document when its `value` prop disagrees with
+     * its model, which leaves the caret at the end of the file. A pointer
+     * jumping to the bottom of the document mid-edit was this.
+     *
+     * The mark is not touched here either. `handleSave` knows the bytes it
+     * sent, so it is the one that can say whether the buffer is still them.
+     */
+    if (!asked && content === written.current) {
+      written.current = null;
+      return;
+    }
+    setValue(content);
+    setDirty(false);
+    setDiscardArmed(false);
   }, [content, reloadCount]);
 
   useEffect(() => {
@@ -377,6 +405,12 @@ export default function CodeEditor({
       return;
     }
     setDiscardArmed(false);
+    // Agreeing to lose the edits has to lose the browser's copy of them too.
+    // Re-reading the file tears this editor down — the pane shows a spinner
+    // while it reads — and a draft left behind is restored on the way back,
+    // which made the second tap re-read the file and hand the edits straight
+    // back with the asterisk still on.
+    clearDraft(path);
     onReload();
   };
 
@@ -435,7 +469,12 @@ export default function CodeEditor({
    * follows a changed file clears the mark.
    */
   const handleSave = async () => {
-    if (await onSave(value)) setDirty(false);
+    const snapshot = value;
+    if (!(await onSave(snapshot))) return;
+    written.current = snapshot;
+    // Clean, unless something was typed while the write was in flight: the
+    // file holds the snapshot and the buffer has moved past it.
+    setDirty(latest.current !== snapshot);
   };
 
   /**
