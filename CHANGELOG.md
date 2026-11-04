@@ -243,6 +243,18 @@ workspace that is saved on the host rather than in the browser.
 
 ### Fixed
 
+- **A phone came back on the left pane whatever it had been showing.** Which
+  pane has your attention was kept in the workspace file on the host, in one
+  slot shared by every device — but on a wide screen that means which pane has
+  the cursor, and on a phone, which draws one pane at a time, it means the only
+  pane you can see. So a click in the desktop's left pane moved the phone off
+  what it was reading, and a reload put the phone back on the left. A device
+  now remembers its own, in the browser beside the other per-device view state,
+  and uses the host's value only when it has nothing of its own — which a
+  restarted tunnel counts as, since local storage belongs to an origin and the
+  tunnel's hostname is new each time. The pane *count* stays on the host:
+  asking for one pane merges the right pane's tabs into the left, and where a
+  tab lives is shared.
 - **Text sent from the composer reached the terminal as keystrokes.** Send
   wrote the message down the same channel as a keypress, so to the program on
   the other end it was someone typing four hundred characters in a

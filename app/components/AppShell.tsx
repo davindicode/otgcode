@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { watchForExpiredSession } from "~/lib/api";
+import { readShownPane, saveShownPane } from "~/lib/shownPane";
 import { useSplitRoom } from "~/lib/useSplitRoom";
 import { useAuthStore } from "~/stores/authStore";
 import { usePresenceStore } from "~/stores/presenceStore";
@@ -30,7 +31,9 @@ function restoreTabs() {
   if (tabs.tabs.length > 0 || !saved) return;
 
   useTerminalStore.setState({ fontSize: saved.fontSize });
-  if (saved.tabs.length > 0) tabs.restore(saved.tabs, saved.activeIds, saved.focusedPane);
+  // Which pane this device was showing is the device's own (see `shownPane`);
+  // the host's value is what a device with nothing cached starts from.
+  if (saved.tabs.length > 0) tabs.restore(saved.tabs, saved.activeIds, readShownPane() ?? saved.focusedPane);
 }
 
 /** Mirror tab changes back into the workspace file (the store debounces). */
@@ -44,6 +47,7 @@ function watchTabs(): () => void {
     const key = JSON.stringify(payload);
     if (key === last) return;
     last = key;
+    saveShownPane(focusedPane);
     saveTabs(payload);
   };
 
