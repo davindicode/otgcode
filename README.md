@@ -37,8 +37,6 @@
 - **Split panes on a wide screen** — two side by side, each with its own tab
   strip, `+` and active tab; drag a tab across to move it. A narrow screen draws
   one at a time.
-- **Password-protected by default**, enforced server-side on every request, the
-  proxy and the terminal socket. One device holds the session at a time.
 
 ### Native tab interfaces
 
@@ -53,6 +51,8 @@
 - **Light and dark themes**, with seamless toggling.
 - **Localhost previews** through a built-in `/proxy/:port`, over the same
   tunnel. HTTP and WebSockets, so a dev server's HMR works.
+- **Password-protected by default**, enforced server-side on every request, the
+  proxy and the terminal socket. One device holds the session at a time.
 
 Full feature list, architecture and troubleshooting: **[DOCS.md](DOCS.md)**.
 Every release is described in [CHANGELOG.md](CHANGELOG.md).
