@@ -1,7 +1,8 @@
 # Contributing to OTG Code
 
 Thanks for your interest in improving OTG Code! This guide covers the dev
-setup, conventions, and PR workflow.
+setup, conventions, and PR workflow. What the app does and how it is put
+together is in [DOCS.md](DOCS.md).
 
 ## Prerequisites
 
@@ -88,15 +89,20 @@ app/                  React Router (SSR) frontend
   components/         UI — shell, tab bar, browser/, files/, terminal/
   routes/             routes + routes/api/ (file ops, tmux, system info)
   stores/             Zustand stores
-  lib/                shared client helpers (clipboard, socket, constants)
+  lib/                shared client helpers (clipboard, socket, workspace, constants)
 server/               Node backend
   index.ts            Express + Socket.IO entry
   auth.ts             access password, sessions, handshake gate
+  auth-routes.ts      login, logout and password-setup endpoints
   presence.ts         one device at a time
   pty-manager.ts      node-pty terminal sessions
   socket-handlers.ts  realtime terminal I/O
+  cwd.ts              server-side CWD detection (/proc, lsof, tmux)
+  cli.ts              which of tmux/claude/codex/opencode are installed
   proxy.ts            reverse proxy
   tunnel.ts           Cloudflare quick-tunnel management
   uploads.ts          streamed and chunked uploads
+  progress.ts         upload progress accounting
+  zip.ts              folder downloads
 start.sh              builds, installs cloudflared, runs server + tunnel
 ```

@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0] - 2026-10-31
 
-A rebuilt interface: one tabbed pane in place of the split panels, tmux as a
-tab kind, an access password on by default, light and dark themes, and a
-workspace that is saved on the host rather than in the browser.
+A rebuilt interface: one tab strip in place of the fixed split panels and the
+separate mobile tab bar, with the split now an optional two panes on a wide
+screen; tmux as a tab kind, an access password on by default, light and dark
+themes, and a workspace that is saved on the host rather than in the browser.
 
 ### Added
 
@@ -153,11 +154,13 @@ workspace that is saved on the host rather than in the browser.
 
 ### Changed
 
-- **One pane, one tab strip.** The split panes, per-panel tab rows and mobile
-  tab bar are gone: every tab — terminal, tmux, explorer or an open file — lives
-  in a single VS Code-style strip, and `+` asks which kind to create. Opening a
-  file spawns its own tab, so an explorer stays a file browser; the tab lands
-  next to the explorer it came from, and closing it returns there.
+- **One tab strip.** The fixed split panels, per-panel tab rows and separate
+  mobile tab bar are gone: every tab — terminal, tmux, explorer or an open file
+  — lives in one VS Code-style strip, and `+` asks which kind to create. Opening
+  a file spawns its own tab, so an explorer stays a file browser; the tab lands
+  next to the explorer it came from, and closing it returns there. A split is
+  now something you ask for rather than the shape of the app — see **A split
+  view on a wide screen** above.
 - **The nano, vim and tmux command wrappers are gone**, replaced by tmux as a
   tab kind.
 - **A fresh start opens on an empty board** rather than a shell you did not ask
@@ -219,7 +222,7 @@ workspace that is saved on the host rather than in the browser.
 - **Platform support is a statement rather than a half-implementation**: Linux,
   macOS, and Windows through WSL2. `start.sh` stops immediately under Git Bash,
   MSYS or Cygwin with a pointer to WSL2, instead of failing later on the native
-  module. The README gained a support matrix, per-distro prerequisites, a WSL2
+  module. The docs gained a support matrix, per-distro prerequisites, a WSL2
   walkthrough and a troubleshooting section.
 - `start.sh` prints a failing step's real log and exit code instead of hiding
   it behind tidy output.
@@ -250,9 +253,9 @@ workspace that is saved on the host rather than in the browser.
   closes its dialog first and then runs with the explorer frozen under a
   `Deleting big...` / `Moving big...` / `Renaming...` spinner, the way an
   upload already reported itself, so nothing is clickable and nothing is
-  unexplained until the new listing is in. The freeze was already there for
-  multi-select deletes and moves; what was missing was saying so, and single
-  deletes, renames and creates were not covered at all.
+  unexplained until the new listing is in. The same window after an upload
+  finishes is covered too: navigating in it used to reset you to the upload
+  directory.
 
 - **The caret jumped to the end of the file while editing.** Saving sends the
   buffer and the pane hands back what it wrote, which the editor took up as
@@ -263,11 +266,13 @@ workspace that is saved on the host rather than in the browser.
   recognised now and left alone, and the unsaved mark comes from the save
   itself: clean if the buffer still matches what was written, dirty if it has
   moved on.
-- **Reloading a file to discard edits handed them straight back.** Re-reading
-  tears the editor down and it is rebuilt from the browser's copy of the
-  unsaved buffer, which the second tap never cleared — so agreeing to throw
-  the edits away reopened the file with them still in it and the asterisk
-  still on.
+- **Reloading a file to discard edits handed them straight back.** Two ways
+  over: a reload that read the same bytes left the editor untouched, and once
+  it did re-seed, re-reading tears the editor down and it is rebuilt from the
+  browser's copy of the unsaved buffer — which the second tap never cleared. So
+  agreeing to throw the edits away reopened the file with them still in it and
+  the asterisk still on. The reload always re-seeds now, and it clears the
+  draft.
 - **A phone came back on the left pane whatever it had been showing.** Which
   pane has your attention was kept in the workspace file on the host, in one
   slot shared by every device — but on a wide screen that means which pane has
@@ -448,9 +453,6 @@ workspace that is saved on the host rather than in the browser.
   the same file read `1.5 kB` in a viewer and `1.5 KB` in the explorer.
 - The server console no longer floods with stack traces for bot probes on the
   public tunnel; real errors still log.
-- The explorer stays frozen from an upload finishing until the refreshed tree
-  is ready, so navigating in that window cannot reset you to the upload
-  directory. The same covers a group delete.
 - Breadcrumb navigation is disabled while the path is being edited, so the tree
   cannot desync from the field, and a Go button submits it on a phone.
 - A file with no extension no longer reports its whole path as its type.
@@ -467,9 +469,6 @@ workspace that is saved on the host rather than in the browser.
   reporting the version it first saw, which is why the notification sometimes
   never arrived. Nothing under `/api` is cacheable now; it all answers from the
   filesystem or the live host.
-- Reloading a file always re-seeds the editor. A reload that read back the same
-  bytes left the editor untouched, so discarding unsaved edits by reloading
-  kept the edits when the file on disk had not moved.
 - **The navigate drawer showed the directory a terminal tab started in.** Its
   listing was fetched once, when the drawer was tapped open, and the drawer
   stays open across a tab switch — so returning to a tab re-showed the login
