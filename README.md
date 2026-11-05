@@ -24,24 +24,46 @@
 
 ## What it is
 
-One tunnel, one browser tab, one tabbed workspace: terminals, tmux sessions,
-file explorers and the files you open from them.
+One tunnel, one browser tab, one tab system. Everything you open is a tab —
+there is no panel layout to arrange — and the tabs live on the host, so a phone
+and a laptop are the same session: open either and you are where you left off.
 
-- **Built for thumbs.** A phone has no Ctrl, no arrows and no Esc — so the
-  terminal brings its own composer underneath it, with the keys, the commands
-  and the per-CLI shortcuts a coding CLI is actually driven by. The same
-  composer on a desktop, so neither screen is the cut-down one.
-- **The same workspace on both screens.** Tabs, terminals, the split and your
-  preferences live on the host, so a phone and a laptop are one session — open
-  either and you are where you left off.
-- **tmux as a tab kind.** A tmux tab *is* its session, so a dropped phone
-  re-attaches instead of landing in a fresh shell. A plain terminal survives a
-  minute of lost signal too, so a walk past a dead spot doesn't kill a build.
-- **Files, viewed properly.** Monaco, markdown with KaTeX equations, notebooks,
-  PDFs, images, video and audio — each in a tab, next to the explorer it came
-  from.
-- **Localhost previews** through a built-in `/proxy/:port`, over the same
-  tunnel — HTTP and WebSockets, so a dev server with HMR works.
+### Three kinds of tab
+
+| | |
+|---|---|
+| **Terminal** | Your shell, in a pty on the host. It survives a minute of lost signal, so a walk past a dead spot doesn't kill a build |
+| **tmux** | A tmux session, not a shell that happens to run tmux — so a dropped phone re-attaches instead of landing in a fresh shell beside it |
+| **Explorer** | A file browser. Pick a file and it opens in a viewer or editor tab of its own, next to the explorer it came from |
+
+Monaco, markdown with KaTeX equations, notebooks, PDFs, images, video and audio
+each get their own tab that way, which is what keeps an explorer a file browser
+rather than an editor you have to navigate back out of.
+
+### Built for thumbs, not scaled down to them
+
+- **Task-specific action keyboards** under every terminal — `main` for the shell
+  itself, one per coding CLI (claude, codex, opencode) read from what that CLI
+  actually binds, `git`, your own saved commands, and a directory picker that
+  knows where the shell really is. A tmux tab also gets its session's controls.
+- **A dedicated text input box** for writing a line out in full — a prompt, a
+  commit message, a path — instead of typing it a key at a time. It goes in as a
+  *paste*, so a TUI reads it as text rather than four hundred keystrokes it
+  might have bindings for.
+
+### On a wide screen
+
+- **Split panes** — one pane or two side by side, each with its own tab strip,
+  its own `+` and its own active tab; drag a tab across to move it. A narrow
+  screen draws one pane at a time and remembers which one it was showing.
+
+### Throughout
+
+- **Light and dark**, both first-class: one token set drives the UI, the
+  terminal's ANSI palette and the editor's theme together, resolved server-side
+  so a reload never flashes the wrong one.
+- **Localhost previews** through a built-in `/proxy/:port`, over the same tunnel
+  — HTTP and WebSockets, so a dev server with HMR works.
 - **Password-protected by default**, enforced server-side on every request, the
   proxy and the terminal socket. One device holds the session at a time.
 

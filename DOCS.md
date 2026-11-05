@@ -5,8 +5,10 @@ is put together, and what to do when something does not start. Every release is
 described in [CHANGELOG.md](CHANGELOG.md); working on OTG Code itself is
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-- [Tabs and panes](#tabs-and-panes)
-- [Terminal, tmux and the on-screen keyboard](#terminal-tmux-and-the-on-screen-keyboard)
+- [The tab system](#the-tab-system)
+- [Panes and the split view](#panes-and-the-split-view)
+- [Light and dark](#light-and-dark)
+- [Action keyboards and the text input](#action-keyboards-and-the-text-input)
 - [File explorer](#file-explorer)
 - [Viewers and editors](#viewers-and-editors)
 - [Security](#security)
@@ -18,58 +20,56 @@ described in [CHANGELOG.md](CHANGELOG.md); working on OTG Code itself is
 - [Troubleshooting](#troubleshooting)
 - [Known limitations](#known-limitations)
 
-## Tabs and panes
+## The tab system
 
-**The same workspace on both screens.** The tabs, their terminals, the split
-and every preference live on the host rather than in the browser, so a phone
-and a laptop are one session: open either and you are where you left off. Only
-what your thumb is doing — the composer you had open, a half-typed command,
-which pane a phone is showing — stays on the device doing it.
+Everything you open is a tab, in one strip, VS Code style. There is no panel
+layout to arrange and nothing is pinned to a side of the screen.
 
-Tabs in one strip, VS Code style. Tabs come in four kinds — **Terminal**, **tmux
-session**, **Explorer**, and the **viewer/editor** tabs that open when you pick
-a file in an explorer. A tmux tab *is* its session: it runs tmux rather than a
-shell, so a reconnect re-attaches instead of dropping you into a shell outside
-it. `+` asks which kind to create; file tabs are spawned by the explorer, so an
-explorer always stays a file browser, and a file opens next to the explorer it
-came from. **Drag the selected tab to reorder it**; dragging any other tab
-slides the whole strip, for when there are more tabs than fit. On a phone the
-selected tab needs a hold first, so a swipe still scrolls.
+**The same workspace on both screens.** The tabs, their terminals, the split and
+every preference live on the host rather than in the browser, so a phone and a
+laptop are one session: open either and you are where you left off. Only what
+your thumb is doing — the keyboard you had open, a half-typed command, which
+pane a phone is showing — stays on the device doing it.
 
-On a wide screen you can **split the view in two**, from Settings → Appearance:
-a file on the left and a terminal on the right, with a divider to drag
-(double-click it to even the panes up). Each pane has its own tab strip, its own
-`+` and its own active tab, and a tab moves across by being dragged onto the
-other strip. On a phone — or any screen under 900px or taller than it is wide —
-one pane is drawn at a time and Settings grows a **Left / Right** switch for
-which one. Each pane still keeps its own tabs there, so the split you set on a
-laptop is the same workspace when you pick the phone up.
+### Three kinds of tab
 
-Each tab's controls sit in the bottom bar and change with the tab; localhost
-previews, system info, settings and your account live in popups under the header
-icons. Switching tabs never costs you a terminal — one stays live while you are
-in another. A fresh start opens on an empty board rather than a shell you did
-not ask for. Installed to a home screen it runs standalone, like an app.
+`+` offers exactly these three:
 
-**One device at a time.** The open tabs and their terminals are a single
-workspace on the host, so a second device is told who holds the session and
-waits for it rather than taking it — nothing reachable from the tunnel URL can
-pull a live terminal away from whoever is using it. It is told before the
-password, too, so there is no logging in to reach that screen. Signing out,
-closing the tab or letting the session expire frees it. tmux sessions keep
-running either way, which is what to use for two devices on one terminal.
+| | What it is |
+|---|---|
+| **Terminal** | Your login shell, in a pty on the host. Its processes and scrollback belong to the tab, so closing it asks first |
+| **tmux** | A tmux session, not a shell that happens to run tmux: the tab runs `tmux new -A`, so a reconnect re-attaches rather than landing you in a fresh shell beside it. Closing the tab detaches and the session keeps running, so it closes without asking |
+| **Explorer** | A file browser rooted wherever you point it, with its own breadcrumb and path field |
 
-## Terminal, tmux and the on-screen keyboard
+### Files open as their own tabs
 
-A phone has no modifier keys, no arrows, no second mouse button and no Esc —
-which is most of what a coding CLI is driven by. So the terminal brings its own:
-a composer underneath it with the keys, the commands and the CLI shortcuts that
-a shell actually needs, in rows sized for a thumb. It is the same composer on a
-desktop, so neither screen is the cut-down one.
+Pick a file in an explorer and it opens in a **viewer or editor tab** of its
+own, next to the explorer it came from; closing it returns there. This is why
+there are three kinds and not four — a file tab is something an explorer spawns,
+not something you create, which is what keeps an explorer a file browser rather
+than turning it into an editor you then have to navigate back out of.
 
-- Terminal tabs run your shell. **tmux tabs run tmux** (`tmux new -A`), so a
-  dropped phone or a closed laptop re-attaches to the same session instead of
-  landing in a fresh shell beside it
+### The strip
+
+- **Drag the selected tab to reorder it**; dragging any other tab slides the
+  whole strip, for when there are more tabs than fit. On a phone the selected
+  tab needs a hold first, so a swipe still scrolls
+- Tabs carry an icon for what they hold, a close button, and a name you can edit
+  in place. **Renaming a tmux tab renames the session** — the tab title, tmux
+  itself and the name a reconnect attaches by are one value, so the strip and
+  the session picker can never disagree
+- Switching tabs never costs you a terminal: one stays live while you are in
+  another, and **every tab keeps its own keyboard state** — your half-typed
+  command, the open keyboard and the chosen CLI stay with the tab rather than
+  following you to another session
+- Each tab's controls sit in the bottom bar and change with the tab. Localhost
+  previews, system info, settings and your account live in popups under the
+  header icons
+- A fresh start opens on an empty board rather than a shell you did not ask for.
+  Installed to a home screen it runs standalone, like an app
+
+### Terminal and tmux tabs
+
 - **A short drop does not cost you the shell.** A plain terminal's process keeps
   running for a minute after the connection goes, and a reconnect picks it up
   where it was, with whatever it printed in the meantime — so a walk past a dead
@@ -77,47 +77,120 @@ desktop, so neither screen is the cut-down one.
   tmux is for, and closing the tab still ends it there and then. A tmux tab
   needs none of this and gets none: tmux is already the thing that survives, so
   its client is dropped and re-attached cleanly
-- Picking **tmux session** from `+` opens a picker: attach to a running session,
-  start a new one, or kill one. Closing a tmux tab detaches; the session keeps
-  running
-- **Renaming a tmux tab renames the session.** The tab title, tmux itself, and
-  the name a reconnect attaches by are one value, so the picker and the strip
-  can never disagree
-- **Composer tabs** under the terminal, changing with the tab they belong to:
-  - **keyboard** — the input and send, over one row of keys that never grows.
-    Any row longer than the screen can be dragged sideways, or scrolled with a
-    wheel on a desktop. A mode picks what those keys are: `main` for the
-    terminal itself, a keyboard per coding CLI (claude, codex, opencode), or git
-    - **main** carries a key set — nav, numbers, letters, function, symbols —
-      and a sticky modifier beside it: Shift, Ctrl, Ctrl+Shift, Alt or Alt+Shift
-    - a **CLI** keyboard leads with Enter, then Bksp and the arrows for its
-      prompts, then its own shortcuts, a bare launch button, and **slash
-      commands you can add per CLI**, kept separately for each
-    - **git** — status, log, diff, add, fetch, pull, push, stash, branch, commit
-      with a message, and `user.name` / `user.email` setup
-  - **commands** — common shell commands (ls, top, df, free, nvidia-smi…), plus
-    **your own**: add, edit and remove, saved on the host
-  - **navigate** — directory picker with server-side CWD detection, so it
-    follows you inside tmux too
-  - **tmux session** — in-session controls, only on a tmux tab, so tmux keys can
-    never be typed into a plain shell: windows (new, next, prev, last, rename,
-    kill, list, and any index by number), panes (split, select, cycle, zoom,
-    kill, layout) and copy mode
-- **Text goes in as a paste, not as keystrokes.** Anything the composer sends as
-  a line — a prompt, a commit message, a `cd`, one of your own commands — is
-  wrapped in the bracketed paste markers when the program has asked for them,
-  which is what tells a TUI it is holding text rather than a burst of keys it
-  might have bindings for. The Enter is sent separately. Quick keys and the
-  slash-command chips still go as keys, since reaching those bindings is what
-  they are for
-- **Closing a tab asks first** only where it costs something — a terminal takes
-  its processes and scrollback with it, a file with unsaved edits says so. A
-  tmux tab closes without asking: the session keeps running on the host
-- **Every tab keeps its own composer state** — switching tabs leaves your
-  half-typed command, open group and chosen CLI where they were, rather than
-  carrying them to another session
+- Picking **tmux** from `+` opens a picker: attach to a running session, start a
+  new one, or kill one
+- **Closing a tab asks first** only where it costs something: a terminal takes
+  its processes and scrollback with it, and a file with unsaved edits says so. A
+  tmux tab closes without asking, since the session keeps running on the host
 - **System info** under the header — OS, kernel, CPU, memory, GPU, latency to
   the host, and which of tmux, claude, codex and opencode are installed
+
+### One device at a time
+
+The open tabs and their terminals are a single workspace on the host, so a
+second device is told who holds the session and waits for it rather than taking
+it — nothing reachable from the tunnel URL can pull a live terminal away from
+whoever is using it. It is told before the password, too, so there is no logging
+in to reach that screen. Signing out, closing the tab or letting the session
+expire frees it. tmux sessions keep running either way, which is what to use for
+two devices on one terminal.
+
+## Panes and the split view
+
+One pane, or **two side by side on a wide screen** — from Settings →
+Appearance. A file on the left and a terminal on the right, with a divider to
+drag; double-click it to even the panes up.
+
+- Each pane has **its own tab strip, its own `+` and its own active tab**, and a
+  tab moves across by being dragged onto the other strip
+- On a phone — or any screen under 900px, or taller than it is wide — one pane
+  is drawn at a time and Settings grows a **Left / Right** switch for which one.
+  Each pane still keeps its own tabs there, so the split you set on a laptop is
+  the same workspace when you pick the phone up
+- Which pane a device is showing is the device's own, since on a phone it is the
+  only pane you can see. The pane **count** is shared, because asking for one
+  pane merges the right pane's tabs into the left and where a tab lives is part
+  of the workspace
+- The divider is a grid track of its own, so neither pane puts a scrollbar under
+  it
+
+## Light and dark
+
+A **Dark / Light switch in Settings → Appearance**, and both are first-class
+rather than one being the other with the colours flipped.
+
+- One semantic colour token set drives the whole UI, the terminal's ANSI palette
+  and the code editor's theme together, so nothing is left on a stale palette
+  after a switch
+- **Content recedes and chrome advances in both.** The terminal is the darkest
+  surface in dark mode and shares the explorer's paper in light; light mode
+  inverts the dark layering deliberately rather than washing it out, which is
+  what lets a near-white control still read as raised
+- Resolved **server-side**, so a reload paints the right theme immediately
+  instead of flashing the wrong one. The switch itself cross-fades
+- Light-theme ANSI colours are re-checked against their own ground rather than
+  inherited from the dark set
+
+## Action keyboards and the text input
+
+A phone has no modifier keys, no arrows, no second mouse button and no Esc —
+which is most of what a coding CLI is driven by. So a terminal or tmux tab
+carries its own controls underneath it: **task-specific action keyboards**, in
+rows sized for a thumb, and a **text input box** for anything you would rather
+write than type a key at a time. Both are the same on a desktop, so neither
+screen is the cut-down one.
+
+Pick a keyboard from the row of tabs under the terminal; which ones are offered
+follows the tab they belong to.
+
+### keyboard — the text input, and the keys a terminal needs
+
+A **dedicated input box** for writing a line out in full — a prompt for a coding
+CLI, a commit message, a path — with Send beside it. It is one line that scrolls
+inside itself rather than pushing the bar around as you type, and it is per tab,
+so a half-written prompt stays with the session it was meant for. What you send
+goes in **as a paste, not as keystrokes** (see below).
+
+Under it, one row of keys that never grows. Any row longer than the screen can
+be dragged sideways, or scrolled with a wheel on a desktop. A mode picks what
+those keys are:
+
+- **main** — a key set for the terminal itself: nav, numbers, letters, function,
+  symbols, with a sticky modifier beside it (Shift, Ctrl, Ctrl+Shift, Alt or
+  Alt+Shift)
+- **claude / codex / opencode** — one keyboard per coding CLI, read from what
+  that CLI actually binds. Each leads with Enter, then Bksp and the arrows its
+  prompts are driven by, then its own shortcuts, a bare launch button, and
+  **slash commands you can add yourself**, kept separately per CLI
+- **git** — status, log, diff, add, fetch, pull, push, stash, branch, commit
+  with a message, and `user.name` / `user.email` setup
+
+### commands — shell commands worth a button
+
+Common ones (ls, top, df, free, nvidia-smi…), plus **your own**: add, edit and
+remove, saved on the host so they are there on every device.
+
+### navigate — go somewhere else
+
+A directory picker with server-side CWD detection, so it knows where the shell
+actually is and follows you inside tmux too. A directory it cannot establish is
+reported as one it cannot establish, and offers no buttons — every button in it
+sends a `cd`, and a wrong one moves the terminal somewhere nobody chose.
+
+### tmux — the session's own controls
+
+Only on a tmux tab, so tmux keys can never be typed into a plain shell: windows
+(new, next, prev, last, rename, kill, list, and any index by number), panes
+(split, select, cycle, zoom, kill, layout) and copy mode.
+
+### Text goes in as a paste, not as keystrokes
+
+Anything sent as a line — a prompt, a commit message, a `cd`, one of your own
+commands — is wrapped in the bracketed paste markers when the program has asked
+for them, which is what tells a TUI it is holding text rather than a burst of
+keys it might have bindings for. The Enter is sent separately, so no newline
+rides along inside the text. Quick keys and the slash-command chips still go as
+keys, since reaching those bindings is what they are for.
 
 ## File explorer
 
@@ -217,9 +290,8 @@ desktop, so neither screen is the cut-down one.
 
 ## Settings and preferences
 
-- **Dark and light themes** — one semantic colour token set drives the whole UI,
-  including the terminal and code editor palettes; resolved server-side so there
-  is no flash of the wrong theme on load
+- **Appearance** — the [Dark / Light switch](#light-and-dark), one pane or
+  [two](#panes-and-the-split-view), and which pane a narrow screen is showing
 - **Terminal and editor font sizes**, adjustable from Settings
 - **Saved on the host, not in the browser** — `~/.otgcode/workspace.json` keeps
   the theme, both font sizes, your custom commands and slash commands, the split

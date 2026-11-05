@@ -69,7 +69,7 @@ themes, and a workspace that is saved on the host rather than in the browser.
   Settings grows a Left / Right switch for which one. Each pane still keeps its
   own tabs there, so turning a tablet landscape restores both columns with
   everything where it was.
-- **One keyboard in the composer**, with five modes: `main` plus a keyboard per
+- **One action keyboard**, with five modes: `main` plus a keyboard per
   CLI — claude, codex, opencode — and git. `main` carries the key set (nav,
   numbers, letters, function, symbols) and a sticky modifier (Shift, Ctrl,
   Ctrl+Shift, Alt, Alt+Shift) beside it. The keys row never grows, so opening
@@ -84,7 +84,7 @@ themes, and a workspace that is saved on the host rather than in the browser.
 - **A launch button per CLI**, bare and without permission flags — start it,
   then confirm in the CLI itself.
 - **Custom commands and custom slash commands**, added, edited and removed from
-  the composer and saved on the host. Slash commands are kept per CLI, so the
+  the keyboard and saved on the host. Slash commands are kept per CLI, so the
   same label can mean different things in claude and codex.
 - **Move mode in the explorer** — pick an entry, browse to where it belongs,
   drop it there. Refuses to overwrite, refuses a folder into itself, and copies
@@ -170,13 +170,13 @@ themes, and a workspace that is saved on the host rather than in the browser.
   for, and closing every tab stays that way across a reload.
 - **Drag a tab to reorder it** — hold-and-drag on a phone, so a swipe still
   scrolls the strip. The order is saved.
-- **Each tab keeps its own composer state** — open group, typed text, chosen
+- **Each tab keeps its own keyboard state** — open keyboard, typed text, chosen
   CLI, commit message — instead of carrying your half-typed command between
   sessions.
-- **The composer is three tabs**: keyboard, commands and navigate, plus a tmux
-  tab's own session controls. The input is one line and scrolls inside itself
-  rather than moving the bar below it as you type, and the git drawer's commit
-  and config forms share one line.
+- **The action keyboards are three tabs**: keyboard, commands and navigate, plus
+  a tmux tab's own session controls. The text input is one line and scrolls
+  inside itself rather than moving the bar below it as you type, and the git
+  keyboard's commit and config forms share one line.
 - **100% zoom means the whole image or page is visible**, measured from the
   pane, rather than one image pixel per screen pixel — a phone photo is
   thousands of pixels wide, so 100% used to mean a corner of it. The tooltip
@@ -269,7 +269,7 @@ themes, and a workspace that is saved on the host rather than in the browser.
   recognised now and left alone, and the unsaved mark comes from the save
   itself: clean if the buffer still matches what was written, dirty if it has
   moved on.
-- **Text sent from the composer reached the terminal as keystrokes.** Send
+- **Text sent from the input box reached the terminal as keystrokes.** Send
   wrote the message down the same channel as a keypress, so to the program on
   the other end it was someone typing four hundred characters in a
   millisecond — and every one of them a key it might have a binding for.
