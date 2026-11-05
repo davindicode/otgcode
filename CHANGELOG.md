@@ -93,7 +93,10 @@ themes, and a workspace that is saved on the host rather than in the browser.
   download or delete.
 - **Folder downloads and uploads** — a folder downloads as a recursive zip and a
   group download bundles the whole selection; folders upload by picker or by
-  dragging them in, with the nested structure recreated on the host.
+  dragging them in, with the nested structure recreated on the host. The tree is
+  walked before the archive is written, so an unreadable file is named in an
+  `UNREADABLE.txt` inside it rather than truncating it; a symlinked file arrives
+  as its bytes, and a symlinked directory is left out rather than followed.
 - **Drag-and-drop upload**, with progress and per-file cancel, and chunked
   upload above 80 MB to clear Cloudflare's request limit.
 - **Reload a file in place**, for every type, since a file can change under an
@@ -266,25 +269,6 @@ themes, and a workspace that is saved on the host rather than in the browser.
   recognised now and left alone, and the unsaved mark comes from the save
   itself: clean if the buffer still matches what was written, dirty if it has
   moved on.
-- **Reloading a file to discard edits handed them straight back.** Two ways
-  over: a reload that read the same bytes left the editor untouched, and once
-  it did re-seed, re-reading tears the editor down and it is rebuilt from the
-  browser's copy of the unsaved buffer — which the second tap never cleared. So
-  agreeing to throw the edits away reopened the file with them still in it and
-  the asterisk still on. The reload always re-seeds now, and it clears the
-  draft.
-- **A phone came back on the left pane whatever it had been showing.** Which
-  pane has your attention was kept in the workspace file on the host, in one
-  slot shared by every device — but on a wide screen that means which pane has
-  the cursor, and on a phone, which draws one pane at a time, it means the only
-  pane you can see. So a click in the desktop's left pane moved the phone off
-  what it was reading, and a reload put the phone back on the left. A device
-  now remembers its own, in the browser beside the other per-device view state,
-  and uses the host's value only when it has nothing of its own — which a
-  restarted tunnel counts as, since local storage belongs to an origin and the
-  tunnel's hostname is new each time. The pane *count* stays on the host:
-  asking for one pane merges the right pane's tabs into the left, and where a
-  tab lives is shared.
 - **Text sent from the composer reached the terminal as keystrokes.** Send
   wrote the message down the same channel as a keypress, so to the program on
   the other end it was someone typing four hundred characters in a
@@ -302,31 +286,11 @@ themes, and a workspace that is saved on the host rather than in the browser.
   separate keystroke, so the newline that used to ride along inside a message
   is gone with it. Quick keys and the slash-command chips still go as keys:
   reaching the program's own bindings is what they are for.
-- **Composer keys were shaved along the bottom edge in light mode.** A row of
-  keys scrolls sideways, and a box that scrolls on one axis clips the other —
-  a control's drop shadow is not scrollable overflow, so the browser cut it off
-  where the row ended. Plainest in light mode, where that shadow also carries a
-  hairline ring. The rows now keep the shadow's 4px inside the scroller, which
-  is where the tab strips have always kept theirs.
-- **Replaying a GIF fetched it again, and it looped while it arrived.** The
-  replay changed the image's URL to defeat the cache, so a few megabytes came
-  down a second time — and a browser plays a GIF as it loads, looping over the
-  frames it has until the rest turns up. It remounts the image instead, and
-  the file route now carries `Last-Modified` and answers `304`, so reopening
-  anything is a revalidation rather than a download.
 - **A large GIF opened at the wrong size and then jumped.** The viewer waited
   for `onLoad` to learn the image's dimensions, which for an animated GIF is
   the last frame — seconds after the first one is already on screen, during
   which it rendered at 1:1 and filled the pane with a corner of itself. It is
   capped to the pane until then, so the first paint is already fitted.
-- **The chip rows had the same bottom edge shaved**, for the same reason as the
-  key rows. The cap that keeps them to three rows carries the shadow's room, so
-  three rows still means three rows.
-- **Actions on selected, in the explorer's bar, opened a menu nobody could
-  see.** It was an absolute menu inside a bar that scrolls sideways, so the bar
-  clipped it — and it opened downward from the bottom of the pane, off the
-  screen. It goes through a portal and opens upward now, like the composer's
-  selectors.
 - **`./start.sh` on Linux crashed with `Failed to load native module:
   pty.node`.** node-pty ships binaries for macOS and Windows only and compiles
   elsewhere, but pnpm 10 skips a dependency's build scripts unless it is
@@ -339,18 +303,6 @@ themes, and a workspace that is saved on the host rather than in the browser.
   or a shared `node_modules` repairs itself.
 - A missing toolchain stops with the install command for your distro, and a
   note for machines without `sudo`, rather than a page of compiler output.
-- **One unreadable file broke a whole folder download.** The archive streams as
-  it is built and an entry it cannot read is fatal, so the response was
-  destroyed part-way through the body — leaving a `.zip` with no central
-  directory, which will not open at all. Everything that had already streamed
-  was lost with it, and nothing was reported at either end. The tree is walked
-  before any of it is written now: unreadable files and folders are left out,
-  named in an `UNREADABLE.txt` inside the archive, and the rest arrives intact.
-- **A symlinked file in a folder download arrived as the link, not the file** —
-  a few bytes of target path in place of the content, extracting to a link that
-  pointed at a path on the host. Its bytes are copied instead. A link to a
-  directory is left out rather than followed, since one pointing back up its
-  own tree would recurse until the archive filled the disk.
 - **A file with a non-ASCII name could not be downloaded at all.** Both header
   APIs reject a character above 255, so `ファイル.txt` failed its own download —
   500 from the zip route, 400 from the single-file one — while an accented Latin
@@ -362,11 +314,6 @@ themes, and a workspace that is saved on the host rather than in the browser.
   was written as `ãã¹ã.txt`, every UTF-8 byte having become its own
   character, because the multipart parser defaults a filename to latin1 while
   browsers send UTF-8.
-- **A slash-command chip never ran its command.** It sent the text and a newline
-  in one write, which a coding CLI reads as a prompt rather than a submit.
-- **A new tab could take a name already on the strip** — closing Explorer 1
-  while Explorer 2 was open named the next one Explorer 2 as well. The number
-  is now the lowest one no tab is using.
 - **Switching away from a terminal tab and back could kill a running TUI**, with
   its mouse reporting left on. A hidden pane has no measurable size, so the
   terminal was being resized to a fraction of its real one; it is only measured
@@ -391,19 +338,6 @@ themes, and a workspace that is saved on the host rather than in the browser.
   reported as one it cannot establish: the picker says so and offers no
   buttons, because every button in it sends a `cd` and a wrong one moves the
   terminal somewhere nobody chose.
-- **A reconnected tmux tab painted only the top of the pane.** The terminal was
-  created at 80x24 and resized afterwards; a shell hides that by reflowing at
-  its next prompt, but tmux paints a whole screen the moment it attaches. It is
-  created at the size the pane already knows.
-- **A tmux session renamed from inside tmux no longer strands its tab** — tabs
-  are reconciled against tmux's own session ids, so a rename while a tab was
-  away re-attaches instead of opening a second tab for a session already on
-  screen.
-- **A restored explorer tab claimed `Empty directory`** — the saved path was the
-  one condition that skipped reading the listing. A path since deleted falls
-  back to the default directory.
-- **The account popup said "Login — this session"**, the fallback for a session
-  whose start time was unknown. The time is always real now.
 - Stopping the server with Ctrl+C shuts the Cloudflare tunnel down; running the
   server directly used to leave it alive.
 - **`start.sh` no longer kills cloudflared tunnels it did not start** — its exit
@@ -423,30 +357,14 @@ themes, and a workspace that is saved on the host rather than in the browser.
   straight at it, so a local `.html` was the same hole one step out. Those
   responses carry `Content-Security-Policy: sandbox` and `nosniff`, which
   leaves the images, video and audio a preview actually loads untouched.
-- **An unreadable `~/.otgcode/config.json` turned the access password off.** A
-  file truncated by a full disk or a power cut mid-write fell back to no
-  password and still looked configured from the inside, with one line on stderr
-  as the only sign. It refuses to start instead.
-- **A reconnect could leave a tmux tab dark and its mouse dead.** The pty was
-  held through a grace period meant for an ephemeral shell, so tmux kept a
-  client nobody was reading: no repaint, no mouse reporting re-sent, and the
-  window sized to a pane that no longer existed. A tmux client is dropped and
-  re-attached cleanly now.
 - **The editor's find bar could not be closed with the mouse.** Monaco's own
   tooltip opens above its button, which on a short widget means over it, and
   swallows the press — so Escape was the only way out of Ctrl+F, on every
   control in the bar.
-- **Ctrl/Cmd+S saved the wrong editor in a split**, or nothing at all.
 - **A browser could pin the app to one build** by answering the document from
   its own cache after an update.
 - Socket.IO no longer announces itself to every origin; the client is served by
   the same server, so a cross-origin socket was never a real one.
-- The Settings panel's Appearance section existed as dead code and was never
-  rendered, so there was no way to switch theme from the UI.
-- The terminal no longer shows dark bands after a theme switch.
-- The new-tab menu is positioned against the viewport and flips above the
-  button when there is no room below, instead of being clipped by the
-  scrolling tab strip.
 - The header regained its top padding, lost to a safe-area inset that replaced
   it on any device without a notch.
 - File sizes format consistently — three copies of the helper had drifted, so
