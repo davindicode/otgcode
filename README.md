@@ -25,14 +25,6 @@
 
 ## What it is
 
-### Three kinds of tab
-
-| | |
-|---|---|
-| **Terminal** | Your shell, in a pty on the host. It survives a minute of lost signal, so a walk past a dead spot costs you nothing |
-| **tmux** | A tmux session — the tab is a client of it, so a dropped phone re-attaches to the same session |
-| **Explorer** | A file browser. Pick a file and it opens in a viewer or editor tab of its own: Monaco for code, markdown with KaTeX equations, notebooks, PDFs, images, video and audio |
-
 ### Mobile-native UX for terminal workflows
 
 - **Task-specific action keyboards** under every terminal — `main` for the shell
@@ -46,6 +38,14 @@
   own tab strip, its own `+` and its own active tab; drag a tab across to move
   it. A narrow screen draws one pane at a time and remembers which one it was
   showing.
+
+### Native tab interfaces
+
+| | |
+|---|---|
+| **Terminal** | Your shell, in a pty on the host. It survives a minute of lost signal, so a walk past a dead spot costs you nothing |
+| **tmux** | A tmux session — the tab is a client of it, so a dropped phone re-attaches to the same session |
+| **Explorer** | A file browser. Pick a file and it opens in a viewer or editor tab of its own: Monaco for code, markdown with KaTeX equations, notebooks, PDFs, images, video and audio |
 
 ### Throughout
 
