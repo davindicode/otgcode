@@ -30,7 +30,10 @@
 - **Task-specific action keyboards** under every terminal — `main` for the shell
   itself, one per coding CLI (claude, codex, opencode) read from what that CLI
   actually binds, `git`, your own saved commands, and a directory picker that
-  knows where the shell really is. A tmux tab also gets its session's controls.
+  knows where the shell really is.
+- **tmux session controls as buttons** — windows, panes and copy mode, so
+  driving tmux takes no prefix chord. Only on a tmux tab, so tmux keys can never
+  land in a plain shell.
 - **A dedicated text input box** for writing a line out in full — a prompt, a
   commit message, a path — with Send beside it. It goes in as a *paste*, so a
   TUI reads it as text rather than a burst of keys it might have bindings for.
