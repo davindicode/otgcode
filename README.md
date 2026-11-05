@@ -43,8 +43,8 @@
 
 | | |
 |---|---|
-| **Terminal** | Your shell, in a pty on the host. It survives a minute of lost signal, so a walk past a dead spot costs you nothing |
-| **tmux** | A tmux session — the tab is a client of it, so a dropped phone re-attaches to the same session |
+| **Terminal** | Your shell, in a pty on the host. It survives a minute without a connection, so a drop and a reconnect cost you nothing |
+| **tmux** | A tmux session — the tab is a client of it, so a dropped connection re-attaches to the same session |
 | **Explorer** | A file browser. Pick a file and it opens in a viewer or editor tab of its own: Monaco for code, markdown with KaTeX equations, notebooks, PDFs, images, video and audio |
 
 ### Throughout

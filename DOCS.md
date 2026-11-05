@@ -25,10 +25,10 @@ described in [CHANGELOG.md](CHANGELOG.md); working on OTG Code itself is
 Everything you open is a tab, in one strip, VS Code style.
 
 **The same workspace on both screens.** The tabs, their terminals, the split and
-every preference live on the host rather than in the browser, so a phone and a
-laptop are one session: open either and you are where you left off. Only what
-your thumb is doing — the keyboard you had open, a half-typed command, which
-pane a phone is showing — stays on the device doing it.
+every preference live on the host rather than in the browser, so any two
+devices are one session: open either and you are where you left off. Only what
+you are in the middle of doing — the keyboard you had open, a half-typed
+command, which pane a narrow screen is showing — stays on the device doing it.
 
 ### Three kinds of tab
 
@@ -50,8 +50,8 @@ it gets follows the file — see [Viewers and editors](#viewers-and-editors).
 ### The strip
 
 - **Drag the selected tab to reorder it**; dragging any other tab slides the
-  whole strip, for when there are more tabs than fit. On a phone the selected
-  tab needs a hold first, so a swipe still scrolls
+  whole strip, for when there are more tabs than fit. On a touch screen the
+  selected tab needs a hold first, so a swipe still scrolls
 - Tabs carry an icon for what they hold, a close button, and a name you can edit
   in place. **Renaming a tmux tab renames the session** — the tab title, tmux
   itself and the name a reconnect attaches by are one value, so the strip and
@@ -70,9 +70,10 @@ it gets follows the file — see [Viewers and editors](#viewers-and-editors).
 
 - **A short drop does not cost you the shell.** A plain terminal's process keeps
   running for a minute after the connection goes, and a reconnect picks it up
-  where it was, with whatever it printed in the meantime — so a walk past a dead
-  spot costs you nothing. A minute, and no more: anything longer is what
-  tmux is for, and closing the tab still ends it there and then. A tmux tab
+  where it was, with whatever it printed in the meantime — a dead spot on the
+  way somewhere, or a lid closed and opened, costs you nothing. A minute, and no
+  more: anything longer is what tmux is for, and closing the tab still ends it
+  there and then. A tmux tab
   needs none of this and gets none: tmux is already the thing that survives, so
   its client is dropped and re-attached cleanly
 - Picking **tmux** from `+` opens a picker: attach to a running session, start a
@@ -101,12 +102,12 @@ drag; double-click it to even the panes up.
 
 - Each pane has **its own tab strip, its own `+` and its own active tab**, and a
   tab moves across by being dragged onto the other strip
-- On a phone — or any screen under 900px, or taller than it is wide — one pane
-  is drawn at a time and Settings grows a **Left / Right** switch for which one.
-  Each pane still keeps its own tabs there, so the split you set on a laptop is
-  the same workspace when you pick the phone up
-- Which pane a device is showing is the device's own, since on a phone it is the
-  only pane you can see. The pane **count** is shared, because asking for one
+- On a narrow screen — under 900px, or taller than it is wide — one pane is
+  drawn at a time and Settings grows a **Left / Right** switch for which one.
+  Each pane still keeps its own tabs there, so the split you set on one device
+  is the same workspace on another
+- Which pane a device is showing is the device's own, since on a narrow screen
+  it is the only pane you can see. The pane **count** is shared, because asking for one
   pane merges the right pane's tabs into the left and where a tab lives is part
   of the workspace
 
@@ -216,7 +217,7 @@ keys, since reaching those bindings is what they are for.
 - **Code editor** — Monaco with syntax highlighting and word wrap. Text opens in
   Plain and markdown in Preview; Edit is a deliberate switch. **Ctrl/Cmd+S
   saves** instead of opening the browser's save dialog, and undo/redo have
-  buttons for phones
+  buttons for touch, where there is no Ctrl+Z
 - **Markdown preview** — GitHub-flavored with prose styling, and **equations are
   typeset**: `$...$` inline and `$$...$$` display go through KaTeX, including
   the multi-line form a paper's worth of algebra actually arrives in. Prices and
@@ -517,6 +518,6 @@ Then re-run `./start.sh`.
 - **Work in progress does not follow you between devices.** Your tabs and layout
   are on the host, but an unsaved buffer, a half-written commit message and a
   viewer's zoom are kept in the browser that typed them — so a file edited and
-  not saved on a phone opens from disk on a laptop, with no sign a draft exists
-  elsewhere. Save before switching. The browser's share also ends with the
+  not saved on one device opens from disk on another, with no sign a draft
+  exists elsewhere. Save before switching. The browser's share also ends with the
   tunnel, since a Quick Tunnel's hostname is new on every start.
