@@ -89,10 +89,13 @@ function FileSessionView({ session }: { session: FileSession }) {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [groupMenu, setGroupMenu] = useState(false);
-  // True while a mutating op (delete/rename/create) is running its post-action
-  // reload. Folded into `busy` so the explorer stays frozen until the new tree
-  // is loaded — navigation can't slip in and then get reset to cwd.
-  const [opBusy, setOpBusy] = useState(false);
+  // What a mutating op (delete/move/rename/create) is doing, for as long as it
+  // and its post-action reload run. Folded into `busy` so the explorer stays
+  // frozen until the new tree is loaded — navigation can't slip in and then get
+  // reset to cwd. It carries a label rather than a flag because deleting a deep
+  // tree or moving something large takes long enough that a frozen explorer
+  // with nothing to say reads as the app having dropped the tap.
+  const [opLabel, setOpLabel] = useState<string | null>(null);
   // Set while the explorer is being used to pick a destination for an entry.
   // `originCwd` is where the move started, so Cancel can put the user back.
   const [moveSource, setMoveSource] = useState<{ name: string; path: string; originCwd: string } | null>(null);
@@ -102,15 +105,18 @@ function FileSessionView({ session }: { session: FileSession }) {
   // done-display + post-upload refresh is pending (uploadQueue not yet cleared),
   // or while another op is reloading. This closes the window where the user
   // could navigate after an upload finished but before the tree refreshed.
-  const busy = uploadQueue.length > 0 || opBusy;
+  const busy = uploadQueue.length > 0 || opLabel !== null;
 
-  // Run a mutating op with the explorer frozen until it (and its reload) finish.
-  const withBusy = async (fn: () => Promise<void>) => {
-    setOpBusy(true);
+  // Run a mutating op with the explorer frozen, under `label`, until it (and
+  // its reload) finish. Every write to the tree goes through here: the dialog
+  // that asked for it closes first, so its button cannot be pressed twice, and
+  // the explorer is both visibly busy and unclickable for the whole of it.
+  const withBusy = async (label: string, fn: () => Promise<void>) => {
+    setOpLabel(label);
     try {
       await fn();
     } finally {
-      setOpBusy(false);
+      setOpLabel(null);
     }
   };
 
@@ -242,13 +248,15 @@ function FileSessionView({ session }: { session: FileSession }) {
   const confirmNewFolder = async () => {
     const name = inputValue.trim();
     if (!name) return;
-    try {
-      await apiPost("/api/files/mkdir", { path: fullPath(name) });
-      await refresh();
-    } catch (err: unknown) {
-      showToast(errorMessage(err, `Could not create "${name}"`));
-    }
     setDialog(null);
+    await withBusy(`Creating ${name}...`, async () => {
+      try {
+        await apiPost("/api/files/mkdir", { path: fullPath(name) });
+        await refresh();
+      } catch (err: unknown) {
+        showToast(errorMessage(err, `Could not create "${name}"`));
+      }
+    });
   };
 
   const handleNewFile = () => {
@@ -258,36 +266,37 @@ function FileSessionView({ session }: { session: FileSession }) {
   const confirmNewFile = async () => {
     const name = inputValue.trim();
     if (!name) return;
-    try {
-      await apiPost("/api/files/write", { path: fullPath(name), content: "" });
-      await refresh();
-    } catch (err: unknown) {
-      showToast(errorMessage(err, `Could not create "${name}"`));
-    }
     setDialog(null);
+    await withBusy(`Creating ${name}...`, async () => {
+      try {
+        await apiPost("/api/files/write", { path: fullPath(name), content: "" });
+        await refresh();
+      } catch (err: unknown) {
+        showToast(errorMessage(err, `Could not create "${name}"`));
+      }
+    });
   };
 
   const handleDelete = (entry: FileEntry) => setDialog({ type: "delete", entry });
   const confirmDelete = async () => {
     if (dialog?.type !== "delete") return;
     const { name } = dialog.entry;
-    try {
-      await apiPost("/api/files/delete", { path: fullPath(name) });
-      await refresh();
-    } catch (err: unknown) {
-      showToast(errorMessage(err, `Could not delete "${name}"`));
-    }
     setDialog(null);
+    await withBusy(`Deleting ${name}...`, async () => {
+      try {
+        await apiPost("/api/files/delete", { path: fullPath(name) });
+        await refresh();
+      } catch (err: unknown) {
+        showToast(errorMessage(err, `Could not delete "${name}"`));
+      }
+    });
   };
 
   const confirmDeleteMany = async () => {
     if (dialog?.type !== "deleteMany") return;
     const items = dialog.entries;
     setDialog(null);
-    // This dialog closes before the work runs, so freeze the explorer for the
-    // whole delete loop + reload (otherwise navigation could slip in and then
-    // get reset to cwd by the refresh).
-    await withBusy(async () => {
+    await withBusy(`Deleting ${items.length} item${items.length === 1 ? "" : "s"}...`, async () => {
       let failed = 0;
       let reason = "";
       for (const entry of items) {
@@ -315,17 +324,17 @@ function FileSessionView({ session }: { session: FileSession }) {
   const confirmRename = async () => {
     if (dialog?.type !== "rename") return;
     const newName = inputValue.trim();
-    if (!newName || newName === dialog.entry.name) {
-      setDialog(null);
-      return;
-    }
-    try {
-      await apiPost("/api/files/rename", { oldPath: fullPath(dialog.entry.name), newPath: fullPath(newName) });
-      await refresh();
-    } catch (err: unknown) {
-      showToast(errorMessage(err, `Could not rename to "${newName}"`));
-    }
+    const oldName = dialog.entry.name;
     setDialog(null);
+    if (!newName || newName === oldName) return;
+    await withBusy(`Renaming ${oldName}...`, async () => {
+      try {
+        await apiPost("/api/files/rename", { oldPath: fullPath(oldName), newPath: fullPath(newName) });
+        await refresh();
+      } catch (err: unknown) {
+        showToast(errorMessage(err, `Could not rename to "${newName}"`));
+      }
+    });
   };
 
   const handleInfo = (entry: FileEntry) => setDialog({ type: "info", entry });
@@ -348,7 +357,7 @@ function FileSessionView({ session }: { session: FileSession }) {
 
   const confirmMove = async () => {
     if (!moveSource) return;
-    await withBusy(async () => {
+    await withBusy(`Moving ${moveSource.name}...`, async () => {
       try {
         await apiPost("/api/files/move", { sourcePath: moveSource.path, destDir: cwd });
         setMoveSource(null);
@@ -363,7 +372,7 @@ function FileSessionView({ session }: { session: FileSession }) {
   // The same move without the mode: dropping a row on a folder you can
   // already see says where it is going, so there is nothing to pick.
   const moveInto = async (entry: FileEntry, destName: string) => {
-    await withBusy(async () => {
+    await withBusy(`Moving ${entry.name}...`, async () => {
       try {
         await apiPost("/api/files/move", { sourcePath: fullPath(entry.name), destDir: fullPath(destName) });
         await refresh();
@@ -388,7 +397,7 @@ function FileSessionView({ session }: { session: FileSession }) {
 
   // When all jobs reach a terminal status, briefly show the result, then refresh
   // the tree and clear the queue. The explorer stays frozen (busy) the whole
-  // time: queue is non-empty during the delay, and opBusy covers the reload —
+  // time: queue is non-empty during the delay, and opLabel covers the reload —
   // so navigation can't slip in and then get reset by the background refresh.
   useEffect(() => {
     if (uploadQueue.length === 0) return;
@@ -407,16 +416,16 @@ function FileSessionView({ session }: { session: FileSession }) {
     }
     let cancelled = false;
     const timer = setTimeout(async () => {
-      setOpBusy(true);
+      setOpLabel("Refreshing...");
       await loadDirectory(cwd); // load the new tree first, while still frozen
       if (cancelled) {
-        setOpBusy(false);
+        setOpLabel(null);
         return;
       }
       uploadXhrs.current.clear();
       cancelledIndices.current.clear();
       setUploadQueue([]); // clear the queue only once the new tree is ready
-      setOpBusy(false);
+      setOpLabel(null);
     }, 1500);
     return () => {
       cancelled = true;
@@ -704,6 +713,18 @@ function FileSessionView({ session }: { session: FileSession }) {
           cancelUpload={cancelUpload}
           disabled={busy}
         />
+      )}
+
+      {/* What the explorer is doing while it is frozen. `pointer-events-none`
+          because nothing here is to be pressed: the list and the toolbar are
+          already blocked by `busy`, which stays the one thing deciding that. */}
+      {opLabel && (
+        <div className="absolute inset-x-0 top-0 z-40 flex justify-center pt-10 pointer-events-none">
+          <span className="glass rounded-panel px-3 py-2 flex items-center gap-2 text-sm text-ink-dim" role="status">
+            <span className="spinner spinner-sm" aria-hidden="true" />
+            <span className="max-w-[60vw] truncate">{opLabel}</span>
+          </span>
+        </div>
       )}
 
       {/* Dialogs */}

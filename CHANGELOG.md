@@ -243,6 +243,17 @@ workspace that is saved on the host rather than in the browser.
 
 ### Fixed
 
+- **The explorer accepted a delete or a move silently and left its buttons
+  live.** Deleting a deep folder or moving something large takes a while, and
+  the confirmation dialog stayed up with its button pressable for the whole of
+  it — a second tap ran the whole thing again. Every write to the tree now
+  closes its dialog first and then runs with the explorer frozen under a
+  `Deleting big...` / `Moving big...` / `Renaming...` spinner, the way an
+  upload already reported itself, so nothing is clickable and nothing is
+  unexplained until the new listing is in. The freeze was already there for
+  multi-select deletes and moves; what was missing was saying so, and single
+  deletes, renames and creates were not covered at all.
+
 - **The caret jumped to the end of the file while editing.** Saving sends the
   buffer and the pane hands back what it wrote, which the editor took up as
   though the file had changed underneath it. Over a tunnel a write takes long
