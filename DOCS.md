@@ -270,13 +270,14 @@ keys, since reaching those bindings is what they are for.
   unticked, it also expires after 30 minutes so coming back later asks again
 
 > [!WARNING]
-> **Keep the tunnel URL private.** Anyone who opens it gets a terminal on the
-> host as the user that launched OTG Code, plus read/write access to that user's
-> files. If you declined the access password, the URL is the only thing
-> protecting that shell; you can turn one on at any time from the Settings cog.
+> The tunnel URL reaches a shell on your host, as the user that launched OTG
+> Code, with read/write access to that user's files. With the access password on,
+> that is what stands in the way. **Without it, the URL is the only thing
+> protecting that shell, so keep it private** — and you can turn a password on at
+> any time from the Settings cog.
 >
-> Locked yourself out? Set `passwordEnabled` to `false` in
-> `~/.otgcode/config.json` on the host and restart.
+> Locked out? Set `passwordEnabled` to `false` in `~/.otgcode/config.json` on
+> the host and restart.
 
 ## Localhost preview
 

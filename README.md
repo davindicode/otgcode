@@ -41,7 +41,7 @@ Monaco, markdown with KaTeX equations, notebooks, PDFs, images, video and audio
 each get their own tab that way, which is what keeps an explorer a file browser
 rather than an editor you have to navigate back out of.
 
-### Built for thumbs, not scaled down to them
+### Mobile-native UX for terminal workflows
 
 - **Task-specific action keyboards** under every terminal — `main` for the shell
   itself, one per coding CLI (claude, codex, opencode) read from what that CLI
@@ -51,12 +51,10 @@ rather than an editor you have to navigate back out of.
   commit message, a path — instead of typing it a key at a time. It goes in as a
   *paste*, so a TUI reads it as text rather than four hundred keystrokes it
   might have bindings for.
-
-### On a wide screen
-
-- **Split panes** — one pane or two side by side, each with its own tab strip,
-  its own `+` and its own active tab; drag a tab across to move it. A narrow
-  screen draws one pane at a time and remembers which one it was showing.
+- **Split panes on a wide screen** — one pane or two side by side, each with its
+  own tab strip, its own `+` and its own active tab; drag a tab across to move
+  it. A narrow screen draws one pane at a time and remembers which one it was
+  showing.
 
 ### Throughout
 
@@ -108,16 +106,16 @@ Tunnel URL not resolving? [Set your DNS to 1.1.1.1](DOCS.md#tunnel-url-not-resol
 `pnpm dev` runs the same app with HMR if you are working on OTG Code itself.
 
 > [!WARNING]
-> **Keep the tunnel URL private.** Anyone who opens it gets a terminal on the
-> host as the user that launched OTG Code, plus read/write access to that user's
-> files. First start asks you to set an **access password** for exactly this
-> reason — it is enforced server-side on every request, the localhost proxy and
-> the terminal socket, not just in the UI. If you declined it, the URL is the
-> only thing protecting that shell; you can turn one on at any time from the
-> Settings cog in the header.
+> The tunnel URL reaches a shell on your host, as the user that launched OTG
+> Code, with read/write access to that user's files. **With the access password
+> on, that is what stands in the way** — enforced server-side on every request,
+> the localhost proxy and the terminal socket, not just in the UI.
 >
-> Locked yourself out? Set `passwordEnabled` to `false` in
-> `~/.otgcode/config.json` on the host and restart.
+> **Without it, the URL is the only thing protecting that shell, so keep it
+> private.** You can turn a password on at any time from the Settings cog.
+>
+> Locked out? Set `passwordEnabled` to `false` in `~/.otgcode/config.json` on
+> the host and restart.
 
 ## Docs
 
