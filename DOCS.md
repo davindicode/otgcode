@@ -22,8 +22,7 @@ described in [CHANGELOG.md](CHANGELOG.md); working on OTG Code itself is
 
 ## The tab system
 
-Everything you open is a tab, in one strip, VS Code style. There is no panel
-layout to arrange and nothing is pinned to a side of the screen.
+Everything you open is a tab, in one strip, VS Code style.
 
 **The same workspace on both screens.** The tabs, their terminals, the split and
 every preference live on the host rather than in the browser, so a phone and a
@@ -38,16 +37,15 @@ pane a phone is showing — stays on the device doing it.
 | | What it is |
 |---|---|
 | **Terminal** | Your login shell, in a pty on the host. Its processes and scrollback belong to the tab, so closing it asks first |
-| **tmux** | A tmux session, not a shell that happens to run tmux: the tab runs `tmux new -A`, so a reconnect re-attaches rather than landing you in a fresh shell beside it. Closing the tab detaches and the session keeps running, so it closes without asking |
+| **tmux** | A tmux session. The tab runs `tmux new -A`, so it is a client of the session rather than a shell containing it, and a reconnect re-attaches. Closing the tab detaches and the session keeps running, so it closes without asking |
 | **Explorer** | A file browser rooted wherever you point it, with its own breadcrumb and path field |
 
 ### Files open as their own tabs
 
 Pick a file in an explorer and it opens in a **viewer or editor tab** of its
-own, next to the explorer it came from; closing it returns there. This is why
-there are three kinds and not four — a file tab is something an explorer spawns,
-not something you create, which is what keeps an explorer a file browser rather
-than turning it into an editor you then have to navigate back out of.
+own; closing it returns you to the explorer. A file tab is something an explorer
+spawns, which is why `+` offers three kinds and not four. Which viewer or editor
+it gets follows the file — see [Viewers and editors](#viewers-and-editors).
 
 ### The strip
 
@@ -65,15 +63,15 @@ than turning it into an editor you then have to navigate back out of.
 - Each tab's controls sit in the bottom bar and change with the tab. Localhost
   previews, system info, settings and your account live in popups under the
   header icons
-- A fresh start opens on an empty board rather than a shell you did not ask for.
-  Installed to a home screen it runs standalone, like an app
+- A fresh start opens on an empty board, and `+` makes the first tab. Installed
+  to a home screen it runs standalone, like an app
 
 ### Terminal and tmux tabs
 
 - **A short drop does not cost you the shell.** A plain terminal's process keeps
   running for a minute after the connection goes, and a reconnect picks it up
   where it was, with whatever it printed in the meantime — so a walk past a dead
-  spot no longer kills a build. A minute, and no more: anything longer is what
+  spot costs you nothing. A minute, and no more: anything longer is what
   tmux is for, and closing the tab still ends it there and then. A tmux tab
   needs none of this and gets none: tmux is already the thing that survives, so
   its client is dropped and re-attached cleanly
@@ -111,25 +109,20 @@ drag; double-click it to even the panes up.
   only pane you can see. The pane **count** is shared, because asking for one
   pane merges the right pane's tabs into the left and where a tab lives is part
   of the workspace
-- The divider is a grid track of its own, so neither pane puts a scrollbar under
-  it
 
 ## Light and dark
 
-A **Dark / Light switch in Settings → Appearance**, and both are first-class
-rather than one being the other with the colours flipped.
+A **Dark / Light switch in Settings → Appearance**. Both are designed rather
+than one derived from the other.
 
 - One semantic colour token set drives the whole UI, the terminal's ANSI palette
-  and the code editor's theme together, so nothing is left on a stale palette
-  after a switch
+  and the code editor's theme together, so everything switches at once
 - **Content recedes and chrome advances in both.** The terminal is the darkest
   surface in dark mode and shares the explorer's paper in light; light mode
-  inverts the dark layering deliberately rather than washing it out, which is
-  what lets a near-white control still read as raised
-- Resolved **server-side**, so a reload paints the right theme immediately
-  instead of flashing the wrong one. The switch itself cross-fades
-- Light-theme ANSI colours are re-checked against their own ground rather than
-  inherited from the dark set
+  inverts the dark layering rather than lightening it, which is what lets a
+  near-white control read as raised
+- Resolved **server-side**, so a reload paints the right theme immediately. The
+  switch itself cross-fades
 
 ## Action keyboards and the text input
 
@@ -137,8 +130,7 @@ A phone has no modifier keys, no arrows, no second mouse button and no Esc —
 which is most of what a coding CLI is driven by. So a terminal or tmux tab
 carries its own controls underneath it: **task-specific action keyboards**, in
 rows sized for a thumb, and a **text input box** for anything you would rather
-write than type a key at a time. Both are the same on a desktop, so neither
-screen is the cut-down one.
+write than type a key at a time. Both are there on a desktop too.
 
 Pick a keyboard from the row of tabs under the terminal; which ones are offered
 follows the tab they belong to.
@@ -147,8 +139,8 @@ follows the tab they belong to.
 
 A **dedicated input box** for writing a line out in full — a prompt for a coding
 CLI, a commit message, a path — with Send beside it. It is one line that scrolls
-inside itself rather than pushing the bar around as you type, and it is per tab,
-so a half-written prompt stays with the session it was meant for. What you send
+inside itself, so the bar keeps its height however much you write, and it is per
+tab, so a half-written prompt stays with the session it was meant for. What you send
 goes in **as a paste, not as keystrokes** (see below).
 
 Under it, one row of keys that never grows. Any row longer than the screen can
@@ -204,10 +196,10 @@ keys, since reaching those bindings is what they are for.
   destination picker. Either way the move refuses to overwrite, to put a folder
   inside itself, or to land somewhere it already is, and copies instead of
   renaming across filesystems
-- **Nothing is accepted silently.** Deleting a deep tree or moving something
-  large takes a while, so the dialog that asked closes first and the explorer
-  freezes under a `Deleting…` / `Moving…` spinner until the new listing is in —
-  no second tap can run it twice, and no tap in the meantime is swallowed
+- **A slow delete or move says so.** Deleting a deep tree or moving something
+  large takes a while, so the dialog closes the moment you confirm and the
+  explorer freezes under a `Deleting…` / `Moving…` spinner until the new listing
+  is in: one confirmation, one operation, and nothing clickable in between
 - Row menu on right-click, or by holding a row and letting go; file paths stay
   selectable and scrollable
 - Drag-and-drop file upload with progress tracking and per-file cancel
@@ -215,10 +207,9 @@ keys, since reaching those bindings is what they are for.
   limit
 - **Reload a file in place** from its own bar, for every type. The editor also
   carries the version it read, so a save that would land on a file something
-  else has changed since is refused rather than quietly winning
-- Failures say what actually went wrong — `"TODO.md" is a file, not a folder`,
-  `No such folder "saves"`, `Permission denied` — rather than relaying an errno
-  and a syscall name
+  else has changed since is refused, and says which
+- Failures name the cause — `"TODO.md" is a file, not a folder`, `No such folder
+  "saves"`, `Permission denied`
 
 ## Viewers and editors
 
@@ -299,7 +290,7 @@ keys, since reaching those bindings is what they are for.
   and every open tab in order with its directory, file or tmux session.
   Preferences save themselves as you change them and follow you across
   refreshes, reconnects and devices
-- Errors arrive as toasts rather than inline text that shifts the layout
+- Errors arrive as toasts, so nothing in the layout shifts under them
 - **Installable** — web app manifest, standalone display, maskable icons and iOS
   safe-area handling
 
@@ -314,7 +305,7 @@ keys, since reaching those bindings is what they are for.
 
 Native Windows is not supported: the terminal rests on a Linux/macOS pty.
 `start.sh` stops with a pointer to WSL2 if you run it under Git Bash, MSYS or
-Cygwin, rather than getting halfway through a build first.
+Cygwin.
 
 macOS needs no setup beyond Node and pnpm — `node-pty` ships a binary for it,
 and `start.sh` clears the Gatekeeper quarantine flag on it for you.
@@ -333,9 +324,8 @@ you do not need one installed:
 | macOS | `xcode-select --install`, only if a prebuilt binary is ever missing |
 
 `cloudflared` is downloaded to `.bin/` for Linux and macOS (x64/arm64) if it
-isn't already on your PATH. `./start.sh` checks all of this up front and says
-exactly what to install, rather than failing later at the first terminal you
-open.
+isn't already on your PATH. `./start.sh` checks all of this before it builds and
+names the command to install whatever is missing.
 
 ### Windows: running under WSL2
 

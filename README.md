@@ -25,21 +25,13 @@
 
 ## What it is
 
-One tunnel, one browser tab, one tab system. Everything you open is a tab —
-there is no panel layout to arrange — and the tabs live on the host, so a phone
-and a laptop are the same session: open either and you are where you left off.
-
 ### Three kinds of tab
 
 | | |
 |---|---|
-| **Terminal** | Your shell, in a pty on the host. It survives a minute of lost signal, so a walk past a dead spot doesn't kill a build |
-| **tmux** | A tmux session, not a shell that happens to run tmux — so a dropped phone re-attaches instead of landing in a fresh shell beside it |
-| **Explorer** | A file browser. Pick a file and it opens in a viewer or editor tab of its own, next to the explorer it came from |
-
-Monaco, markdown with KaTeX equations, notebooks, PDFs, images, video and audio
-each get their own tab that way, which is what keeps an explorer a file browser
-rather than an editor you have to navigate back out of.
+| **Terminal** | Your shell, in a pty on the host. It survives a minute of lost signal, so a walk past a dead spot costs you nothing |
+| **tmux** | A tmux session — the tab is a client of it, so a dropped phone re-attaches to the same session |
+| **Explorer** | A file browser. Pick a file and it opens in a viewer or editor tab of its own: Monaco for code, markdown with KaTeX equations, notebooks, PDFs, images, video and audio |
 
 ### Mobile-native UX for terminal workflows
 
@@ -48,9 +40,8 @@ rather than an editor you have to navigate back out of.
   actually binds, `git`, your own saved commands, and a directory picker that
   knows where the shell really is. A tmux tab also gets its session's controls.
 - **A dedicated text input box** for writing a line out in full — a prompt, a
-  commit message, a path — instead of typing it a key at a time. It goes in as a
-  *paste*, so a TUI reads it as text rather than four hundred keystrokes it
-  might have bindings for.
+  commit message, a path — with Send beside it. It goes in as a *paste*, so a
+  TUI reads it as text rather than a burst of keys it might have bindings for.
 - **Split panes on a wide screen** — one pane or two side by side, each with its
   own tab strip, its own `+` and its own active tab; drag a tab across to move
   it. A narrow screen draws one pane at a time and remembers which one it was
@@ -58,9 +49,9 @@ rather than an editor you have to navigate back out of.
 
 ### Throughout
 
-- **Light and dark**, both first-class: one token set drives the UI, the
-  terminal's ANSI palette and the editor's theme together, resolved server-side
-  so a reload never flashes the wrong one.
+- **Light and dark** — one token set drives the UI, the terminal's ANSI palette
+  and the editor's theme together, resolved server-side so a reload paints the
+  right theme immediately.
 - **Localhost previews** through a built-in `/proxy/:port`, over the same tunnel
   — HTTP and WebSockets, so a dev server with HMR works.
 - **Password-protected by default**, enforced server-side on every request, the
