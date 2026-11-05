@@ -9,6 +9,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/github/package-json/v/davindicode/otgcode?color=blue" alt="Version">
+  <a href="https://github.com/davindicode/otgcode/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/davindicode/otgcode/ci.yml?branch=main&label=CI" alt="CI"></a>
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status: alpha">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D20.19-brightgreen" alt="Node >= 20.19">
