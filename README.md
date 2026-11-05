@@ -23,7 +23,7 @@
   <a href="public/videos/demo.gif" title="OTG Code on a desktop browser and on a phone"><img src="public/videos/demo.gif" alt="The same workspace on a desktop browser and on a phone: file explorer and markdown preview beside a terminal and tmux on the left, the phone running a coding CLI over the on-screen key rows on the right" width="900"></a>
 </p>
 
-## What it is
+## Features
 
 ### Mobile-native UX for terminal workflows
 
