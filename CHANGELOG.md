@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-10-31
+## [0.2.0] - 2026-11-06
 
 A rebuilt interface: one tab strip in place of the fixed split panels and the
 separate mobile tab bar, with the split now an optional two panes on a wide
