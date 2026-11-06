@@ -281,7 +281,7 @@ and `start.sh` clears the Gatekeeper quarantine flag on it for you.
 
 On Linux, and anywhere else `node-pty` has no prebuilt binary, it compiles
 `pty.node` from source and needs a **C/C++ toolchain and Python 3** — without
-them the terminal cannot start. `node-gyp` itself is a pinned devDependency, so
+them the terminal cannot start. `node-gyp` is a devDependency of OTG Code itself, so
 you do not need one installed:
 
 | | |
@@ -444,7 +444,7 @@ crash on every load rather than failing cleanly. Debian and Ubuntu ship
 measured at 0/10 successful loads, against 10/10 for the same source under a
 current node-gyp.
 
-The pinned devDependency is what prevents it, so this only bites a checkout that
+The local devDependency is what prevents it, so this only bites a checkout that
 predates it. Rebuild with the local one:
 
 ```bash

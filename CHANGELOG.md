@@ -100,7 +100,7 @@ themes, and a workspace that is saved on the host rather than in the browser.
 - **Drag-and-drop upload**, with progress and per-file cancel, and chunked
   upload above 80 MB to clear Cloudflare's request limit.
 - **Reload a file in place**, for every type, since a file can change under an
-  open tab whoever is changing it.
+  open tab.
 - **A file changing on disk is noticed, and never overwritten unasked** — the
   editor carries the version it read, and a save that would land on something
   newer is refused and says so.
@@ -134,8 +134,8 @@ themes, and a workspace that is saved on the host rather than in the browser.
   is for, and closing the tab still ends it there and then. A tmux tab needs
   none of this and gets none, since tmux is already the thing that survives.
 - **Equations are typeset in markdown preview** — `$...$` inline and `$$...$$`
-  display through KaTeX, including the multi-line form a paper's worth of
-  algebra actually arrives in. Prices and shell variables are left as written.
+  display through KaTeX, including the multi-line form. Prices and shell
+  variables are left as written.
 - **Work in progress survives a page torn down under you.** A phone evicts a
   backgrounded tab and reloads it silently, and the workspace used to come
   back with every editor showing what was on disk — which looks like nothing
@@ -295,8 +295,8 @@ themes, and a workspace that is saved on the host rather than in the browser.
   pty.node`.** node-pty ships binaries for macOS and Windows only and compiles
   elsewhere, but pnpm 10 skips a dependency's build scripts unless it is
   allowlisted — while still exiting 0, so the failure surfaced later as a stack
-  trace. node-pty is allowlisted, `node-gyp` is a pinned devDependency because
-  pnpm supplies none, and a Native modules step loads the module to check:
+  trace. node-pty is allowlisted, `node-gyp` is a devDependency because pnpm
+  supplies none, and a Native modules step loads the module to check:
   a compile that runs is not the same as one that worked, and an outdated
   node-gyp produces a `pty.node` that segfaults on every load. The same check
   catches a binary built for another Node version or machine, so an nvm switch
@@ -406,12 +406,11 @@ themes, and a workspace that is saved on the host rather than in the browser.
   gate runs after the handshake and after a frame has been parsed. Three
   advisories land there — polling-transport connection exhaustion, a
   protocol-revision mismatch on upgrade, and zero-attachment memory exhaustion.
-- One advisory has no published fix: `braces` stack exhaustion on deeply nested
-  patterns, where `micromatch` still depends on the latest release. It is
-  unreachable here — neither proxy passes a path filter, so no pattern is ever
-  compiled from input — and is recorded in `pnpm.auditConfig` with that
-  reasoning rather than left to sit red, which is how a real advisory gets
-  missed.
+- **`minimatch` crosses a major rather than sitting on an advisory.** 10.x has
+  no patched release, so the override takes archiver's `readdir-glob` to
+  ^11.0.1, which still exports the `Minimatch` class it asks for. No advisory
+  is suppressed: the audit ignore list is gone, since every one of them now has
+  a fix in the tree.
 
 ## [0.1.1] - 2026-06-13
 

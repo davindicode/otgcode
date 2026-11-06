@@ -72,7 +72,7 @@ Releases are cut manually:
 
 1. Update the version in `package.json` and add a section to `CHANGELOG.md`
    (group changes under Added / Changed / Fixed / Security).
-2. Check `pnpm audit` is clean. An advisory with no published fix is recorded
+2. Check `pnpm audit` is clean. If an advisory has no published fix, record it
    in `pnpm.auditConfig` with the reason it does not apply, so that a red audit
    always means something new.
 3. Merge to `main`.
@@ -92,6 +92,7 @@ app/                  React Router (SSR) frontend
   lib/                shared client helpers (clipboard, socket, workspace, constants)
 server/               Node backend
   index.ts            Express + Socket.IO entry
+  dev.ts              the same server for `pnpm dev`, with Vite middleware
   auth.ts             access password, sessions, handshake gate
   auth-routes.ts      login, logout and password-setup endpoints
   presence.ts         one device at a time
