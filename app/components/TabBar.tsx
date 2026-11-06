@@ -524,6 +524,28 @@ export default function TabBar({ pane }: { pane: PaneIndex }) {
   const stripRef = useRef<HTMLDivElement>(null);
   const { onPointerDown } = useTabReorder(stripRef, activeId);
 
+  /**
+   * Keep the active tab in sight, against the left edge of the strip.
+   *
+   * A strip with more tabs than fit always opened at offset 0, so restoring a
+   * session onto a tab past the fold — or switching to one from the keyboard —
+   * came up with that tab out of view and no sign of which one was active.
+   * Assigning `scrollLeft` is all it takes: the browser clamps it, so the last
+   * few tabs settle against the right edge instead of being hauled further.
+   * A tab already fully visible is left where it is, so tapping one in the
+   * middle of the strip doesn't yank the rest of it sideways.
+   */
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip || !activeId) return;
+    const tab = strip.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeId)}"]`);
+    if (!tab) return;
+    const t = tab.getBoundingClientRect();
+    const s = strip.getBoundingClientRect();
+    if (t.left >= s.left && t.right <= s.right) return;
+    strip.scrollLeft += t.left - s.left;
+  }, [activeId]);
+
   const pick = (kind: NewKind) => {
     setMenuOpen(false);
     // Open it here, in the pane whose + was pressed.
