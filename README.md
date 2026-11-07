@@ -33,7 +33,7 @@
 - **tmux session controls as buttons** — windows, panes and copy mode, no prefix
   chord. Only on a tmux tab.
 - **A dedicated text input box** for a prompt, a commit message, a path. Sent as
-  a paste, not as keystrokes.
+  a paste, not as keystrokes, and nothing is submitted until you press Enter.
 - **Split panes on a wide screen** — two side by side, each with its own tab
   strip, `+` and active tab; drag a tab across to move it. A narrow screen draws
   one at a time.

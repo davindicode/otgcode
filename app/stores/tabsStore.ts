@@ -68,8 +68,8 @@ interface TabsState {
    * was itself changing: a tab leaving a strip shortened the content that
    * strip scrolls, the browser clamped a scroll offset that content could no
    * longer reach, and the next pointermove read the tabs off their new
-   * positions. The row of keyboard buttons in the composer has never had any
-   * of this trouble because it only ever scrolls. So now this is the whole
+   * positions. The row of keyboard buttons below the terminal has never had
+   * any of this trouble because it only ever scrolls. So now this is the whole
    * preview, the strips are still underneath it, and the single move happens
    * when the drag is let go.
    *
@@ -179,7 +179,7 @@ export function reorder<T>(items: T[], from: number, to: number): T[] {
  *
  * Not the same as having the cursor: in a split, both panes draw a tab and
  * only one of them is focused. Everything that asks "am I on screen" — a
- * viewer deciding to watch its file, a composer drawer deciding to re-read a
+ * viewer deciding to watch its file, an action keyboard deciding to re-read a
  * directory — wants this rather than the focused tab.
  */
 export function isTabVisible(state: Pick<TabsState, "tabs" | "activeIds">, id: string): boolean {
@@ -370,7 +370,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     // down and rebuilt under you; surviving a deliberate close as well would
     // mean a file you shut quietly came back edited.
     if (tab.kind === "viewer" && tab.path) clearDraft(tab.path);
-    // Same rule for a composer's commit message: the tab going is a decision.
+    // Same rule for a half-written commit message: the tab going is a decision.
     // A tab id is never reused, so this is hygiene rather than correctness —
     // it frees the entry now instead of leaving it to age out of the cap.
     writeCommitDraft(id, "");

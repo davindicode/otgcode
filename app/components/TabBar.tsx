@@ -283,7 +283,7 @@ export function dropIndex(others: { left: number; width: number }[], x: number):
  * itself when there are more tabs than fit. Splitting them by *which* tab is
  * under the pointer settles it without a mode: only the tab you have already
  * selected can be picked up, and dragging any other one slides the strip, the
- * way the composer's key rows already work. A plain mouse has no sideways
+ * way the action keyboards' key rows already work. A plain mouse has no sideways
  * gesture, so before this the overflowing half of a long strip was simply out
  * of reach on the desktop.
  *
@@ -298,7 +298,7 @@ export function dropIndex(others: { left: number; width: number }[], x: number):
  * jump at the ends of the strip: the gesture was measuring a layout it was
  * changing underneath itself, and once a strip's content got shorter or longer
  * the browser clamped its scroll offset and every tab in it shifted. The
- * composer's key rows have always worked because they only ever scroll — this
+ * action keyboards' key rows have always worked because they only ever scroll — this
  * now does the same, and does the arithmetic on top of a strip that is sitting
  * still.
  */
@@ -586,10 +586,10 @@ export default function TabBar({ pane }: { pane: PaneIndex }) {
     // in, and the active tab's own highlight already says where you are.
     <div className="bar-edge relative flex shrink-0 items-center border-b border-line bg-surface">
       {/* The scroller and the row it scrolls are two elements, the way the
-          composer's key rows have always had them. A flex container that is
+          action keyboards' key rows have always had them. A flex container that is
           also the scroll container measures its own scrollable overflow
           differently in Safari, which is the one difference between this strip
-          and the rows in the composer that have never had any of this trouble
+          and those key rows, which have never had any of this trouble
           — and the drag reads scrollWidth, clientWidth and scrollLeft off this
           element to decide everything. */}
       <div

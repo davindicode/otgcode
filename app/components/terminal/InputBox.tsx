@@ -222,13 +222,14 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
     return () => clearTimeout(timer);
   }, [activeGroup]);
   const sendInput = useTerminalStore((s) => s.sendInput);
+  const pasteInput = useTerminalStore((s) => s.pasteInput);
   const runInput = useTerminalStore((s) => s.runInput);
   const resetModes = useTerminalStore((s) => s.resetModes);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
   /**
    * Whether this tab is the one its pane is drawing — which is what makes this
-   * drawer visible. Not the focused tab: in a split the other pane's composer
+   * drawer visible. Not the focused tab: in a split the other pane's keyboard
    * is on screen too, and its listing goes stale the same way.
    */
   const visible = useTabsStore((s) => isTabVisible(s, sessionId));
@@ -241,15 +242,28 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
   const cdCwd = session?.cdCwd ?? "";
 
   // --- Handlers ---
+  /**
+   * Put what was typed into the program's own input, and stop there.
+   *
+   * `pasteInput`, not `runInput`: Enter is not ours to send. A TUI's prompt is
+   * somewhere to draft in — send a paragraph, read it back, send another, and
+   * submit when it reads right — and a tmux session keeps that draft across a
+   * reconnect. Appending Enter took that away and submitted on every Send.
+   * Enter is a key on the row below, so sending it is one tap when it is
+   * wanted.
+   *
+   * The text goes as written, trailing newlines and all: a newline inside a
+   * paste is a newline, and the only ones in there are the ones that were
+   * typed.
+   */
   const handleSend = () => {
-    const body = text.trimEnd();
-    if (!sessionId || !body) return;
-    runInput(sessionId, body);
+    if (!sessionId || !text.trim()) return;
+    pasteInput(sessionId, text);
     setText("");
     textareaRef.current?.focus();
   };
 
-  /** The one composer field that outlives the page, so every edit goes through here. */
+  /** The one input field that outlives the page, so every edit goes through here. */
   const editCommitMsg = (message: string) => {
     setGitCommitMsg(message);
     writeCommitDraft(sessionId, message);
@@ -862,7 +876,7 @@ export default function InputBox({ sessionId }: { sessionId: string }) {
                   onClick={handleSend}
                   disabled={!text || !sessionId}
                   aria-label="Send"
-                  title="Send"
+                  title="Send to the terminal — Enter to submit"
                   className="relief-accent shrink-0 self-end rounded-panel p-2.5 text-white transition-colors disabled:bg-control disabled:text-ink-faint"
                 >
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

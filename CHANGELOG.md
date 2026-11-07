@@ -176,7 +176,10 @@ themes, and a workspace that is saved on the host rather than in the browser.
 - **The action keyboards are three tabs**: keyboard, commands and navigate, plus
   a tmux tab's own session controls. The text input is one line and scrolls
   inside itself rather than moving the bar below it as you type, and the git
-  keyboard's commit and config forms share one line.
+  keyboard's commit and config forms share one line. Send puts the text into
+  the program's own prompt and stops there — nothing is submitted until you
+  press Enter, so a long message can be built up over several sends and read
+  back before it goes, and in a tmux tab that draft survives a reconnect.
 - **100% zoom means the whole image or page is visible**, measured from the
   pane, rather than one image pixel per screen pixel — a phone photo is
   thousands of pixels wide, so 100% used to mean a corner of it. The tooltip
@@ -282,10 +285,11 @@ themes, and a workspace that is saved on the host rather than in the browser.
   command line goes the same way — the git drawer's commit message, the
   directory drawer's `cd`, your own saved commands — because a path or a
   commit message is as free to hold a `!` as a sentence is, and quoting it for
-  the shell never said anything about the program in between. The Enter is a
-  separate keystroke, so the newline that used to ride along inside a message
-  is gone with it. Quick keys and the slash-command chips still go as keys:
-  reaching the program's own bindings is what they are for.
+  the shell never said anything about the program in between. A command carries
+  its own Enter as a keystroke of its own, so the newline that used to ride
+  along inside the text is gone with it; the input box sends no Enter at all.
+  Quick keys and the slash-command chips still go as keys: reaching the
+  program's own bindings is what they are for.
 - **A large GIF opened at the wrong size and then jumped.** The viewer waited
   for `onLoad` to learn the image's dimensions, which for an animated GIF is
   the last frame — seconds after the first one is already on screen, during

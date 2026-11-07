@@ -35,9 +35,9 @@ export const writeDraft = (path: string, content: string): void => drafts.write(
 export const clearDraft = (path: string): void => drafts.clear(path);
 
 /**
- * Commit messages half-written in a composer's git drawer.
+ * Commit messages half-written in the git keyboard.
  *
- * Everything else in that composer is a keystroke or a menu position: typed
+ * Everything else down there is a keystroke or a menu position: typed
  * text waiting on Enter, which page of the soft keyboard is showing, which
  * drawer is open. All of it lives in the component and is meant to, because
  * it describes what a thumb is doing rather than what is being worked on. A

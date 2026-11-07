@@ -45,7 +45,7 @@ interface TerminalState {
   /**
    * Send text the user wrote, rather than keys they pressed.
    *
-   * The composer used to send straight down `sendInput`, which is the stream a
+   * The input box used to send straight down `sendInput`, which is the stream a
    * keystroke goes down: to the program on the other end that is someone
    * typing four hundred characters in one millisecond, and every one of them
    * is a key it may have a binding for. opencode binds a bare `!` to its shell

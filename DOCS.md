@@ -127,6 +127,12 @@ beside it. One line that scrolls inside itself, so the bar keeps its height, and
 per tab, so a half-written prompt stays with its session. What you send goes in
 **as a paste, not as keystrokes** (see below).
 
+**Send puts the text in; it does not submit it.** Nothing is appended, so a long
+message can go over in several sends — read it back in the program's own prompt,
+add to it, and press **Enter** on the row below when it reads right. In a tmux
+tab that draft sits in the session, so it survives a reconnect. A newline in
+what you send is one you typed.
+
 Under it, one row of keys. A row longer than the screen can be dragged sideways,
 or scrolled with a wheel on a desktop. A mode picks what those keys are:
 
@@ -160,8 +166,10 @@ Only on a tmux tab, so tmux keys can never be typed into a plain shell: windows
 Anything sent as a line — a prompt, a commit message, a `cd`, one of your own
 commands — is wrapped in bracketed paste markers when the program has asked for
 them. That tells a TUI it is holding text, not keys it may have bindings for.
-Enter is sent separately, so no newline rides along inside the text. Quick keys
-and the slash-command chips go as keys.
+
+A **command** carries its own Enter, since running it is the point: the git
+keyboard's commit, the directory picker's `cd`, a command chip. The **input
+box** does not — see above. Quick keys and the slash-command chips go as keys.
 
 ## File explorer
 

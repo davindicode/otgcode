@@ -146,7 +146,7 @@ describe("commit message drafts", () => {
 
   it("stores nothing for an emptied field", () => {
     writeCommitDraft("tab-1", "typed then deleted");
-    // What the composer does on send, and on the last backspace. An entry
+    // What the input box does on send, and on the last backspace. An entry
     // holding "" would take a slot in the cap and read back as a draft.
     writeCommitDraft("tab-1", "");
 

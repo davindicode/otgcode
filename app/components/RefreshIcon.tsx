@@ -1,7 +1,7 @@
 /**
  * The reload glyph, in one place.
  *
- * The explorer, every file viewer and the terminal composer all offer the same
+ * The explorer, every file viewer and the terminal's own bar all offer the same
  * action, and the path was pasted into each — seven copies of twenty bytes of
  * bezier that have to agree for them to look like one app.
  */

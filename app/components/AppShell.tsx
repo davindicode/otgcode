@@ -233,10 +233,10 @@ export default function AppShell() {
             gridTemplateColumns: split
               ? `calc(${splitFraction * 100}% - ${GUTTER_PX}px) ${GUTTER_PX}px ${(1 - splitFraction) * 100}%`
               : "100%",
-            // Two rows, not three. A row for the composers would have been one
+            // Two rows, not three. A row for the keyboards would have been one
             // height shared by both columns, so opening the keyboard in one
             // pane shrank the other pane's terminal with it. Each tab's
-            // composer sits inside its own cell instead, where only that
+            // controls sit inside their own cell instead, where only that
             // pane's content gives up the space.
             gridTemplateRows: "auto minmax(0, 1fr)",
           }}
@@ -285,7 +285,7 @@ export default function AppShell() {
                 {tab.kind === "explorer" && <FilesPage sessionId={tab.id} />}
                 {tab.kind === "viewer" && tab.path && <ViewerPane tabId={tab.id} path={tab.path} />}
                 {/* The tab's own control surface, below its own pane and
-                      nowhere else. One shared composer bound to the active
+                      nowhere else. One shared keyboard bound to the active
                       session carried the open drawer and the typed text
                       across tabs, and could leave a tmux drawer open on a tab
                       with no tmux session behind it. The terminal gives up the
