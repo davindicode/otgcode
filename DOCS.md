@@ -159,7 +159,13 @@ picker says so and offers no buttons, since every button sends a `cd`.
 
 Only on a tmux tab, so tmux keys can never be typed into a plain shell: windows
 (new, next, prev, last, rename, kill, list, and any index by number), panes
-(split, select, cycle, zoom, kill, layout) and copy mode.
+(split, select, cycle, zoom, kill, layout), **scroll** and copy.
+
+**scroll** is reading back through a pane's output: in, page up and down, a line
+at a time, and out again. **copy** is the rest of copy mode — finding a line and
+pasting the buffer back. Scrolling works whichever way `mode-keys` is set;
+starting a search is the one thing tmux binds differently, so both keys are
+there and each says which mode it belongs to.
 
 ### Text goes in as a paste, not as keystrokes
 

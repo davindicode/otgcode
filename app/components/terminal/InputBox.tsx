@@ -93,7 +93,9 @@ const DRAWER_MS = 280;
  * them. Which group is selected should not decide whether you can leave.
  */
 const TMUX_GENERAL_KEYS: QuickKey[] = [
-  { label: "Esc", key: "\x1b", title: "Leave a tmux list, prompt or copy mode" },
+  // Not copy mode: Escape cancels it under `mode-keys emacs` and only clears
+  // the selection under vi. `q` in the scroll group leaves it either way.
+  { label: "Esc", key: "\x1b", title: "Leave a tmux list or prompt" },
   { label: "Enter", key: "\r", title: "Confirm" },
 ];
 
@@ -130,15 +132,46 @@ const TMUX_GROUPS: { label: string; keys: QuickKey[] }[] = [
       { label: "x kill", key: "\x02x", title: "Kill this pane" },
     ],
   },
+  /**
+   * Scrolling this pane's output, which is copy mode whether or not you came
+   * for the copying. It is its own group because reading back through a build
+   * log is not the same errand as copying a line out of it, and the keys that
+   * do it were sitting behind a tab labelled `copy`.
+   *
+   * Only the entry carries the prefix; the rest are the keys copy mode itself
+   * reads. All of them are bound the same way in both `copy-mode` and
+   * `copy-mode-vi`, so none of them depends on how `mode-keys` is set:
+   * PPage/NPage page, Ctrl+arrow scrolls a line, and `q` cancels.
+   */
+  {
+    label: "scroll",
+    keys: [
+      { label: "[ scroll", key: "\x02[", title: "Scroll back through this pane's output" },
+      { label: "PgUp", key: "\x1b[5~", title: "Page up" },
+      { label: "PgDn", key: "\x1b[6~", title: "Page down" },
+      { label: "↑ line", key: "\x1b[1;5A", title: "Scroll up one line" },
+      { label: "↓ line", key: "\x1b[1;5B", title: "Scroll down one line" },
+      { label: "q exit", key: "q", title: "Leave scroll mode" },
+    ],
+  },
+  /**
+   * What is left of copy mode once scrolling has its own group: finding a line
+   * and pasting one back.
+   *
+   * `n` and `N` walk the matches in either key table. The prompt that starts a
+   * search does not — `/` and `?` are vi's, and `mode-keys emacs` puts it on
+   * Ctrl+R — so both are offered and each says which it is. Not emacs's
+   * forward search: that is Ctrl+S, which outside copy mode is XOFF, and a
+   * mistap would stop the terminal's output with nothing on screen saying why.
+   */
   {
     label: "copy",
     keys: [
-      { label: "[ scroll", key: "\x02[", title: "Enter copy mode to scroll back" },
-      // No prefix on these three: inside copy mode they are the keys
-      // themselves, and the nav set's arrows and paging work there too.
-      { label: "/ search", key: "/", title: "Search backward — inside copy mode" },
-      { label: "? fwd", key: "?", title: "Search forward — inside copy mode" },
-      { label: "q quit", key: "q", title: "Leave copy mode" },
+      { label: "? up", key: "?", title: "Search backward — vi mode-keys" },
+      { label: "/ down", key: "/", title: "Search forward — vi mode-keys" },
+      { label: "^R find", key: "\x12", title: "Search backward — emacs mode-keys" },
+      { label: "n next", key: "n", title: "Next match" },
+      { label: "N prev", key: "N", title: "Previous match" },
       { label: "] paste", key: "\x02]", title: "Paste the tmux buffer" },
     ],
   },

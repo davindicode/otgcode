@@ -21,9 +21,12 @@ themes, and a workspace that is saved on the host rather than in the browser.
   landing in a fresh shell beside it. `+` → tmux session opens a picker to
   attach, create or kill, and closing the tab only detaches. Renaming the tab
   renames the session, so the strip and the picker cannot disagree.
-- **In-session tmux controls** on tmux tabs — windows, panes, copy mode and
+- **In-session tmux controls** on tmux tabs — windows, panes, scroll, copy and
   session actions, with any window reachable by index rather than only the
-  first few.
+  first few. Scrolling has its own group rather than sitting behind `copy`:
+  in, page up and down with the same PgUp/PgDn the keyboard offers, a line at a
+  time, and out. Every key in it is bound the same way under `mode-keys emacs`
+  and `copy-mode-vi`, so none of them depends on which is set.
 - **An access password, set up on first run.** A fresh install asks for one
   before the app opens; declining takes a deliberate second step that repeats
   what the tunnel exposes. Enforced server-side on every route, the localhost

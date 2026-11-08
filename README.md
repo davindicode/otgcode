@@ -30,8 +30,8 @@
 - **Task-specific action keyboards** under every terminal: `main` for the shell,
   one per coding CLI (claude, codex, opencode), `git`, your own saved commands,
   and a directory picker.
-- **tmux session controls as buttons** — windows, panes and copy mode, no prefix
-  chord. Only on a tmux tab.
+- **tmux session controls as buttons** — windows, panes, scrollback and copy
+  mode, no prefix chord. Only on a tmux tab.
 - **A dedicated text input box** for a prompt, a commit message, a path. Sent as
   a paste, not as keystrokes, and nothing is submitted until you press Enter.
 - **Split panes on a wide screen** — two side by side, each with its own tab
