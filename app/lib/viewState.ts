@@ -36,6 +36,16 @@ export interface ViewState {
    * viewer because they never key by the same path.
    */
   scroll?: number;
+  /**
+   * How far down a rendered view of the same file had been read.
+   *
+   * Its own field rather than `scroll` because a file has both: the source in
+   * the text views and the document the preview makes of it. They are
+   * different heights, so one offset cannot serve both — which is why the
+   * preview used to come back at the top however far into it you were.
+   * A PDF has only the one view, so it keeps `scroll`.
+   */
+  previewScroll?: number;
   /** Editor: edit, plain or preview, since the default is not always right. */
   mode?: string;
   /** Editor: an HTML preview's zoom, which is its own control. */

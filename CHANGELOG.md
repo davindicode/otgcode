@@ -144,8 +144,13 @@ themes, and a workspace that is saved on the host rather than in the browser.
   back with every editor showing what was on disk — which looks like nothing
   was lost, and is exactly when something was. An editor's unsaved buffer, a
   half-written commit message, an explorer's directory and how a file was
-  being looked at are kept in the browser, bounded and expiring. Closing a tab
-  is a decision, so it throws its buffer away.
+  being looked at are kept in the browser, bounded and expiring — the mode, an
+  image's zoom and pan, a PDF's zoom and place, how far down a file or a
+  preview had been read, how far a video had got. A preview keeps its own
+  offset, since a file's source and the document it renders to are different
+  heights, and a pane whose content arrives late is put back as it grows
+  rather than once at mount. Closing a tab is a decision, so it throws its
+  buffer away.
 - **The session gate comes before the password.** Another device holding the
   session is answered by the status endpoint now, so a second device is told
   who has it rather than asked for a password that could only land on the same

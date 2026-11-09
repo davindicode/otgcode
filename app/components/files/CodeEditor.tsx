@@ -4,6 +4,7 @@ import RefreshIcon from "~/components/RefreshIcon";
 import { clearDraft, readDraft, writeDraft } from "~/lib/drafts";
 import { isSaveShortcut } from "~/lib/keys";
 import { renderMarkdown, rewriteLocalAssets, sanitizeHtml } from "~/lib/markdown";
+import { useRestoredScroll } from "~/lib/useRestoredScroll";
 import { readView, saveView } from "~/lib/viewState";
 import { showToast } from "~/stores/toastStore";
 import { useWorkspaceStore } from "~/stores/workspaceStore";
@@ -79,8 +80,13 @@ function MarkdownPreview({ content, fontSize, path }: { content: string; fontSiz
     return rewriteLocalAssets(renderMarkdown(content), path);
   }, [content, path]);
 
+  const ref = useRef<HTMLDivElement>(null);
+  const onScroll = useRestoredScroll(ref, path, "previewScroll");
+
   return (
     <div
+      ref={ref}
+      onScroll={onScroll}
       className="prose prose-invert max-w-none p-4 overflow-auto h-full bg-app"
       style={{ fontSize: `${fontSize}px` }}
       dangerouslySetInnerHTML={{ __html: html }}
@@ -129,7 +135,10 @@ function joinSource(s: string | string[] | undefined): string {
   return Array.isArray(s) ? s.join("") : s;
 }
 
-function NotebookPreview({ content, fontSize }: { content: string; fontSize: number }) {
+function NotebookPreview({ content, fontSize, path }: { content: string; fontSize: number; path: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const onScroll = useRestoredScroll(ref, path, "previewScroll");
+
   const cells = useMemo(() => {
     try {
       const nb = JSON.parse(content);
@@ -146,7 +155,12 @@ function NotebookPreview({ content, fontSize }: { content: string; fontSize: num
   }
 
   return (
-    <div className="overflow-auto h-full bg-app p-4 space-y-3" style={{ fontSize: `${fontSize}px` }}>
+    <div
+      ref={ref}
+      onScroll={onScroll}
+      className="overflow-auto h-full bg-app p-4 space-y-3"
+      style={{ fontSize: `${fontSize}px` }}
+    >
       {cells.map((cell, i) => (
         <div key={i} className="rounded-control border border-line overflow-hidden">
           {/* Cell header */}
@@ -678,7 +692,7 @@ export default function CodeEditor({
       <div className="flex-1 min-h-0">
         {mode === "preview" && canPreview ? (
           ext === "ipynb" ? (
-            <NotebookPreview content={value} fontSize={editorFontSize} />
+            <NotebookPreview content={value} fontSize={editorFontSize} path={path} />
           ) : ext === "html" || ext === "htm" ? (
             <HtmlPreview content={value} zoom={htmlZoom} />
           ) : (

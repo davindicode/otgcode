@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { fileKind, getExt } from "~/lib/fileTypes";
+import { useRestoredScroll } from "~/lib/useRestoredScroll";
 import { readView, saveView } from "~/lib/viewState";
 import CannotDisplay from "./CannotDisplay";
 import CopyPathButton from "./CopyPathButton";
@@ -232,6 +233,10 @@ function PdfViewer({
   }, [path, scale]);
   const [paneWidth, setPaneWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  // A PDF has one view, so the plain `scroll` offset is its own. Restored
+  // across frames because a page is a placeholder until it is rasterised, and
+  // the document only reaches its real height as that happens.
+  const onScroll = useRestoredScroll(containerRef, path);
 
   // Watched, not read once: rotating a phone or splitting a window changes it.
   // A zero width means the tab is hidden, which is nothing to fit to.
@@ -315,7 +320,7 @@ function PdfViewer({
           </button>
         </div>
       </div>
-      <div ref={containerRef} className="flex-1 min-h-0 overflow-auto bg-app">
+      <div ref={containerRef} onScroll={onScroll} className="flex-1 min-h-0 overflow-auto bg-app">
         <Document
           file={pdfUrl}
           onLoadSuccess={onDocumentLoadSuccess}

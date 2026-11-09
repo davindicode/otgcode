@@ -222,6 +222,13 @@ box** does not — see above. Quick keys and the slash-command chips go as keys.
 - Anything else — a HEIC, a `.docx`, a format the browser cannot decode — gets
   one screen with the file's name, size and why, and offers the download or the
   raw bytes
+- **Where you were is remembered, per file** — the mode, an image's zoom and
+  pan, a PDF's zoom and page, how far you had read, and how far a video had
+  got. The source and the preview keep their own offsets, since the same file
+  is two documents of different heights. A pane whose content arrives late —
+  images, equations, a PDF's pages — is put back as it grows rather than once
+  at mount. Kept in the browser, so it is per device, and it outlives closing
+  the tab: reopening a file lands where you left it
 
 ## Security
 
