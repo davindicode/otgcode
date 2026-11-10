@@ -356,9 +356,9 @@ export default function CodeEditor({
    *
    * One offset for both text views, which is right because they are the same
    * monospace text at the same size — switching between them should not jump,
-   * and it already did not. Preview is left out on purpose: it is a rendered
-   * document of its own height, so an offset from the source means nothing in
-   * it, and the clamp would land you somewhere arbitrary rather than nowhere.
+   * and it already did not. Preview keeps `previewScroll` instead: it is a
+   * rendered document of a different height, so an offset from the source
+   * means nothing in it.
    */
   const plainRef = useRef<HTMLTextAreaElement>(null);
   const settle = useRef(0);
