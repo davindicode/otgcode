@@ -891,14 +891,24 @@ html.light .glow {
    — the standalone layout service hands out the active editor's DOM node — so
    above a button three pixels from that container's top there is nowhere to
    put one, and contextview's fallback, in its own words, is to "lay it over
-   the anchor". The tooltip lands on the close button, and the hover swallows
-   mousedown to keep text selectable, so hovering the X flickered the tooltip
-   and clicking it did nothing: Escape was the only way out of find. Every
-   control up there — match case, regex, next, previous, close — had it.
+   the anchor". The tooltip lands on the close button, and a button under an
+   overlay gets no press: hovering the X flickered the tooltip and clicking it
+   did nothing, so Escape was the only way out of find. Every control up there
+   — match case, regex, next, previous, close — had it.
 
    A tooltip has nothing to click, so it does not need the pointer. `.locked`
    is the keyboard-invoked hover, which does.
+
+   The rule has to sit on contextview's wrapper, not on the hover container
+   itself. The container is rendered into a `.context-view`, which is
+   absolutely positioned and shrink-wrapped around it — a box of its own, over
+   the button, hit-testing on its own. Making only the container transparent
+   left that box in the way, so the press still never landed and the pointer
+   still crossed in and out of the button: tooltip, no tooltip, tooltip. The
+   property inherits, so the wrapper covers both. Scoped with `:has` because
+   `.context-view` is also what menus are rendered into, and those are there
+   to be clicked.
 --------------------------------------------------------------------------- */
-.workbench-hover-container:not(.locked) {
+.context-view:has(> .workbench-hover-container:not(.locked)) {
   pointer-events: none;
 }
