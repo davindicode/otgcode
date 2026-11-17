@@ -14,6 +14,21 @@ interface TmuxSession {
 }
 
 /**
+ * What the server has said, if it has said anything yet.
+ *
+ * One value with the question in it, because the absent `version` that means
+ * "no tmux on this host" and the absent one that means "nobody has asked yet"
+ * used to be the same `null`. The absent-tmux branch is tested first, so for
+ * as long as the listing took the popup said tmux was not installed — the
+ * loading branch under it could not be reached. A failed request is its own
+ * answer too: it is not news about tmux.
+ */
+type Listing =
+  | { state: "loading" }
+  | { state: "failed" }
+  | { state: "ready"; sessions: TmuxSession[]; version: string | null };
+
+/**
  * Picks the tmux session a new tab attaches to.
  *
  * Shown before the tab exists, because a tmux tab *is* its session: it spawns
@@ -26,8 +41,7 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
   const closeTmuxTabs = useTabsStore((s) => s.closeTmuxTabs);
   const showToast = useToastStore((s) => s.show);
 
-  const [sessions, setSessions] = useState<TmuxSession[] | null>(null);
-  const [version, setVersion] = useState<string | null>(null);
+  const [listing, setListing] = useState<Listing>({ state: "loading" });
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   /** The session whose X was tapped. Killing one ends its processes for good. */
@@ -42,11 +56,12 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
     try {
       const res = await fetch("/api/tmux/sessions");
       const data = (await res.json()) as { sessions: TmuxSession[]; version: string | null };
-      setSessions(data.sessions);
-      setVersion(data.version);
+      setListing({ state: "ready", ...data });
     } catch {
-      setSessions([]);
+      setListing({ state: "failed" });
     }
+    // Not back to `loading` on the way in: a re-list after a kill keeps the
+    // sessions on screen until the new ones arrive, and `busy` holds the taps.
   }, [syncTmuxNames]);
 
   useEffect(() => {
@@ -119,7 +134,10 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
       >
         <div className="flex shrink-0 items-center justify-between border-b border-line px-3 py-2">
           <span className="text-xs font-medium text-ink-muted">
-            tmux session {version && <span className="ml-1 font-mono text-[10px] text-ink-ghost">v{version}</span>}
+            tmux session
+            {listing.state === "ready" && listing.version && (
+              <span className="ml-1 font-mono text-[10px] text-ink-ghost">v{listing.version}</span>
+            )}
           </span>
           <button onClick={onClose} className="text-ink-faint transition-colors hover:text-ink" aria-label="Close">
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,15 +147,19 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {version === null ? (
+          {listing.state === "loading" ? (
+            <div className="flex items-center justify-center py-4">
+              <span className="spinner spinner-sm" aria-hidden="true" />
+            </div>
+          ) : listing.state === "failed" ? (
+            <p className="text-[11px] text-yellow-400">Could not list tmux sessions. Close this and try again.</p>
+          ) : listing.version === null ? (
             <p className="text-[11px] text-yellow-400">tmux is not installed. Install it via your package manager.</p>
-          ) : sessions === null ? (
-            <p className="text-[11px] text-ink-faint">Loading…</p>
-          ) : sessions.length === 0 ? (
+          ) : listing.sessions.length === 0 ? (
             <p className="text-[11px] text-ink-faint">No sessions yet. Name one below to start it.</p>
           ) : (
             <div className="flex flex-wrap gap-1">
-              {sessions.map((s) => (
+              {listing.sessions.map((s) => (
                 <span key={s.name} className="relief flex items-center rounded-control">
                   <button
                     onClick={() => attach(s.name, s.id)}
@@ -166,7 +188,10 @@ export default function TmuxPicker({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {version !== null && (
+        {/* Hidden only once tmux is known to be missing: while the listing is
+            still out, a name typed into it is a session `tmux new -A` can make
+            — and a footer that appears late moves everything above it. */}
+        {!(listing.state === "ready" && listing.version === null) && (
           <div className="flex shrink-0 items-center gap-2 border-t border-line px-3 py-2">
             <input
               value={name}

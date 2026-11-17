@@ -260,6 +260,12 @@ themes, and a workspace that is saved on the host rather than in the browser.
 
 ### Fixed
 
+- **The tmux picker said tmux was not installed while it was still looking for
+  sessions.** An absent version is how the server reports no tmux on the host,
+  and an absent version was also what not having asked yet looked like — so the
+  warning was on screen for as long as the listing took, with the loading line
+  below it unreachable. The popup now spins while it asks, and a request that
+  fails says so rather than blaming tmux.
 - **The explorer accepted a delete or a move silently and left its buttons
   live.** Deleting a deep folder or moving something large takes a while, and
   the confirmation dialog stayed up with its button pressable for the whole of
