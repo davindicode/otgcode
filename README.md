@@ -165,7 +165,7 @@ Install the [qURL CLI](https://github.com/layervai/qurl-integrations#installatio
    qurl share '<CRID>' --ttl 5m --session-duration 5m
    ```
 
-   Open the full returned link in your browser. Treat it as a secret: device approval controls who can issue it; the browser link can be used by its holder until its limits apply. Use the effective expiry reported by qURL. The browser UI and terminal round trip were checked with OTG Code 0.1.1; localhost preview/HMR, file uploads, and long-running sessions were not checked.
+   Open the full returned link in your browser. Treat it as a secret: device approval controls who can issue it; the browser link can be used by its holder until its limits apply. Use the effective expiry reported by qURL.
 
 5. When done, delete the resource on the workspace host before stopping or reusing its port:
 
