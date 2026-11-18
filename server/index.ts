@@ -213,7 +213,7 @@ async function main() {
   const { createRequestHandler } = await import("@react-router/express");
   app.all("/{*splat}", createRequestHandler({ build }));
 
-  httpServer.listen(PORT, () => {
+  httpServer.listen(PORT, process.env.OTG_HOST, () => {
     console.log(`\n  OTG Code running on http://localhost:${PORT}\n`);
   });
 

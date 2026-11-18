@@ -135,6 +135,46 @@ ipconfig /flushdns
 | `pnpm start:tunnel` | Production server + Cloudflare tunnel |
 | `./start.sh` | Install + build + start + tunnel (all-in-one) |
 
+## Optional private access with qURL
+
+[qURL](https://qurl.link/share-without-deploying/?utm_source=otgcode-github&utm_medium=referral&utm_campaign=first-share-pilot) is a hosted alternative to the Cloudflare Quick Tunnel. It checks the publishing or approved CLI device identity before issuing a short-lived browser link. OTG Code stays on your machine with no public inbound application port. This does not add user roles to OTG Code: anyone who opens a valid link can use its terminal and file tools. Use a disposable workspace first, and share only with people you trust with that workspace.
+
+Install the [qURL CLI](https://github.com/layervai/qurl-integrations#installation) on the workspace host and the device that will open it. No qURL account is required for this device workflow.
+
+1. Build as above, then start without the built-in tunnel:
+
+   ```bash
+   OTG_HOST=127.0.0.1 pnpm start
+   ```
+
+   Do not use `./start.sh` or `pnpm start:tunnel` for this method. `OTG_HOST` controls the production server's bind address; leaving it unset preserves the existing bind behavior. For a container, bind the server inside the container as required and publish its port on **host loopback only**, for example `-p 127.0.0.1:7777:7777`.
+
+2. On the opening device, run `qurl whoami -o json` and send its `device_public_key_b64` to the workspace owner through a trusted channel. Send only the public key, not the full output or identity files.
+
+3. On the workspace host, publish a new private resource, replacing the key and choosing a fresh local ID:
+
+   ```bash
+   qurl publish http://127.0.0.1:7777 --id otg-private-review --name "OTG workspace" --allow-device-key '<device-public-key>' --foreground -o json
+   ```
+
+   Keep this process and OTG Code running. Verify `private: true` and `found_existing: false`, and save the returned CRID. This direct device-key method does not use `--access` policy modes.
+
+4. On the approved device, request a short session:
+
+   ```bash
+   qurl share '<CRID>' --ttl 5m --session-duration 5m
+   ```
+
+   Open the full returned link in your browser. Treat it as a secret: device approval controls who can issue it; the browser link can be used by its holder until its limits apply. Use the effective expiry reported by qURL.
+
+5. When done, delete the resource on the workspace host before stopping or reusing its port:
+
+   ```bash
+   qurl delete '<CRID>'
+   ```
+
+   Stop the foreground publisher and OTG Code. To stop a device from issuing new links, use `qurl grants '<CRID>' --remove '<device-public-key>'`. Removing the device alone does not invalidate links it already issued; delete the resource when ending workspace access.
+
 ## Architecture
 
 Single Express server on one port handles everything:
