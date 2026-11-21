@@ -5,7 +5,7 @@
 <h1 align="center">OTG Code</h1>
 <p align="center"><em>On-The-Go Code — a mobile-first, terminal-focused development environment in the browser</em></p>
 
-<p align="center">Work on your VPS or home machine from anywhere — phone, tablet, or desktop — with zero client-side installation. A mobile-optimised terminal built for coding CLIs, with file explorer, code editor, and localhost proxy — all in a single browser tab, accessible via a single Cloudflare Quick Tunnel.</p>
+<p align="center">Work on your VPS or home machine from anywhere — phone, tablet, or desktop — with zero client-side installation. A mobile-optimised IDE built for managing coding agents, with key features including integrated tmux terminal tabs, file explorers, text editors, and localhost proxy — all in a single browser tab, accessible via a single Cloudflare Quick Tunnel.</p>
 
 <p align="center">
   <img src="https://img.shields.io/github/package-json/v/davindicode/otgcode?color=blue" alt="Version">
