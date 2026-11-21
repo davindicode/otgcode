@@ -1,5 +1,21 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { formatSize } from "~/lib/format";
+import { readView, saveView } from "~/lib/viewState";
 import type { FileEntry } from "~/stores/fileStore";
+
+/** Quiet period before a scroll position is written down. */
+const SCROLL_SETTLE_MS = 400;
+
+/** A mouse this far from where it went down is dragging, not clicking. */
+const DRAG_SLOP_PX = 6;
+/** How long a finger has to rest on a row before it picks it up. */
+const TOUCH_HOLD_MS = 500;
+/** Under this a finger is resting, not moving. */
+const TOUCH_JITTER_PX = 3;
+/** How near an edge a drag has to be before the list starts creeping. */
+const EDGE_PX = 40;
+/** How far it creeps per frame while held there. */
+const EDGE_SPEED_PX = 8;
 
 interface UploadFile {
   name: string;
@@ -11,22 +27,27 @@ interface UploadFile {
 
 interface FileListProps {
   entries: FileEntry[];
+  /** The directory being listed, which is what its scroll position is keyed by. */
+  cwd: string;
   onOpen: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
   onInfo: (entry: FileEntry) => void;
   onRename: (entry: FileEntry) => void;
   onDownload: (entry: FileEntry) => void;
   onCopyPath: (entry: FileEntry) => void;
+  onMove: (entry: FileEntry) => void;
+  /** Drop of a dragged row onto a folder in the same listing. */
+  onMoveInto?: (entry: FileEntry, destName: string) => void;
+  /** Picking a destination for `movingName`: rows lose their menus. */
+  moveMode?: boolean;
+  /** Name of the entry being moved, highlighted while it is in view. */
+  movingName?: string | null;
+  selectMode?: boolean;
+  selectedNames?: Set<string>;
+  onToggleSelect?: (entry: FileEntry) => void;
   uploadQueue?: UploadFile[];
   cancelUpload?: (index: number) => void;
   disabled?: boolean;
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
 }
 
 interface ContextMenuState {
@@ -39,14 +60,29 @@ interface ContextMenuState {
   vpBottom: number; // anchor bottom within the visible container (flip decision)
 }
 
+const MENU_TRIGGER_ATTR = "data-file-menu-trigger";
+
+/** True when the open menu belongs to this row's 3-dot button. */
+function isButtonMenuFor(menu: ContextMenuState | null, entry: FileEntry): boolean {
+  return !!menu && menu.rightAlign && menu.entry.name === entry.name;
+}
+
 export default function FileList({
   entries,
+  cwd,
   onOpen,
   onDelete,
   onInfo,
   onRename,
   onDownload,
   onCopyPath,
+  onMove,
+  onMoveInto,
+  moveMode = false,
+  movingName = null,
+  selectMode = false,
+  selectedNames,
+  onToggleSelect,
   uploadQueue,
   cancelUpload,
   disabled,
@@ -58,8 +94,33 @@ export default function FileList({
     visible: false,
   });
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Put the list back where it was, per directory rather than per tab.
+   *
+   * Keyed by the path because that is what you come back to: walking into a
+   * folder and out again lands where you left, and a page rebuilt under you
+   * does the same. Restoring waits for the rows, since a scroll offset is
+   * clamped to its content and there is none until they are rendered — and it
+   * runs again whenever the directory changes, which is the other half of the
+   * same behaviour.
+   */
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || entries.length === 0) return;
+    el.scrollTop = readView(cwd).scroll ?? 0;
+  }, [cwd, entries.length]);
+
+  const settle = useRef(0);
+  const rememberScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const scroll = el.scrollTop;
+    clearTimeout(settle.current);
+    settle.current = window.setTimeout(() => saveView(cwd, { scroll }), SCROLL_SETTLE_MS);
+  };
+  useEffect(() => () => clearTimeout(settle.current), []);
   const menuRef = useRef<HTMLDivElement>(null);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Open the menu anchored to a point (right-click / long-press), stored in the
   // scroll container's content coordinates so it stays attached on scroll.
@@ -79,8 +140,14 @@ export default function FileList({
     });
   };
 
-  // Open the menu from the 3-dot button, right-aligned to the button.
+  // Toggle the menu from the 3-dot button, right-aligned to the button. A
+  // second click on the same row closes it; clicking a different row's button
+  // moves the menu there, so only one is ever open.
   const openMenuFromButton = (e: React.MouseEvent, entry: FileEntry) => {
+    if (isButtonMenuFor(menu, entry)) {
+      setMenu(null);
+      return;
+    }
     const container = scrollRef.current;
     if (!container) return;
     const cRect = container.getBoundingClientRect();
@@ -101,7 +168,9 @@ export default function FileList({
   useEffect(() => {
     if (!menu) return;
     const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Element | null;
+      if (target?.closest(`[${MENU_TRIGGER_ATTR}]`)) return;
+      if (menuRef.current && !menuRef.current.contains(target as Node)) {
         setMenu(null);
       }
     };
@@ -146,18 +215,126 @@ export default function FileList({
     openMenuAtPoint(e.clientX, e.clientY, entry);
   };
 
-  const handleTouchStart = (e: React.TouchEvent, entry: FileEntry) => {
-    const touch = e.touches[0];
-    longPressTimer.current = setTimeout(() => {
-      openMenuAtPoint(touch.clientX, touch.clientY, entry);
-    }, 500);
-  };
+  /**
+   * One gesture for a row: hold it, then either let go for the menu or drag
+   * it onto a folder to move it there.
+   *
+   * A finger has no second button and no hover, so the hold is what
+   * distinguishes acting *on* a row from opening it — and once a row is held,
+   * the two things worth doing with it are the menu and the move. The menu
+   * now comes on release rather than at the end of the hold, because the
+   * alternative is a menu opening under a finger that is about to drag.
+   *
+   * A mouse skips the wait: pressing and moving is already unambiguous, and
+   * the right button has always opened the menu.
+   *
+   * Dragging and scrolling the list are the same gesture to the browser, so a
+   * finger that moves before the hold is through has given the drag up: a
+   * scroll is already under way by then, and `touch-action` is read when the
+   * gesture begins, so nothing here can call it off. Once the drag has
+   * started it is the other way round, and `touchmove` is cancelled by hand.
+   */
+  const [drag, setDrag] = useState<{ name: string; over: string | null } | null>(null);
 
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
+  const startDrag = (e: React.PointerEvent, entry: FileEntry) => {
+    if (e.button !== 0 || moveMode || selectMode || disabled || !onMoveInto) return;
+    // The 3-dot button and the checkbox own their own gestures.
+    if ((e.target as Element).closest("button[data-file-menu-trigger], button[title]")) return;
+
+    const { pointerId, clientX: startX, clientY: startY } = e;
+    const holdFirst = e.pointerType !== "mouse";
+    let held = !holdFirst;
+    let dragging = false;
+    let over: string | null = null;
+    let at = { x: startX, y: startY };
+    let hold: ReturnType<typeof setTimeout> | null = null;
+    let creep = 0;
+
+    const lift = () => {
+      hold = null;
+      held = true;
+      setDrag({ name: entry.name, over: null });
+    };
+
+    /**
+     * Which folder the pointer is over, if any. A folder is not its own home.
+     *
+     * Takes a position rather than an event because the creep below calls it
+     * again while the pointer sits still: the folder you want can be off the
+     * bottom of a long listing, and the pointer cannot reach what it has to
+     * scroll to. Measured after the scroll, so the hit test reads the rows
+     * where they ended up.
+     */
+    const place = (x: number, y: number) => {
+      at = { x, y };
+      const list = scrollRef.current;
+      if (list && list.scrollHeight > list.clientHeight) {
+        const box = list.getBoundingClientRect();
+        const dir = y < box.top + EDGE_PX ? -1 : y > box.bottom - EDGE_PX ? 1 : 0;
+        if (dir !== 0) {
+          list.scrollTop += dir * EDGE_SPEED_PX;
+          creep ||= requestAnimationFrame(() => {
+            creep = 0;
+            if (dragging) place(at.x, at.y);
+          });
+        }
+      }
+      const row = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-entry-dir]");
+      const name = row?.dataset.entryDir ?? null;
+      over = name === entry.name ? null : name;
+      setDrag({ name: entry.name, over });
+    };
+
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      const moved = Math.hypot(ev.clientX - startX, ev.clientY - startY);
+      if (!dragging) {
+        if (!held) {
+          if (moved > TOUCH_JITTER_PX) end();
+          return;
+        }
+        if (!holdFirst && moved <= DRAG_SLOP_PX) return;
+        dragging = true;
+      }
+      place(ev.clientX, ev.clientY);
+    };
+
+    const onTouchMove = (ev: TouchEvent) => {
+      if (dragging) ev.preventDefault();
+    };
+
+    function end() {
+      if (hold) clearTimeout(hold);
+      if (creep) cancelAnimationFrame(creep);
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", end);
+      document.removeEventListener("pointercancel", end);
+      document.removeEventListener("touchmove", onTouchMove);
+      setDrag(null);
+
+      if (dragging) {
+        // A pointerup on a row is followed by a click on it, and a row's click
+        // opens it. Dropping a file on a folder would otherwise move it and
+        // then walk into the folder it came from.
+        const swallow = (ev: Event) => {
+          ev.stopPropagation();
+          ev.preventDefault();
+        };
+        document.addEventListener("click", swallow, { capture: true, once: true });
+        setTimeout(() => document.removeEventListener("click", swallow, { capture: true }), 100);
+        if (over) onMoveInto?.(entry, over);
+        return;
+      }
+      // Held still and let go: that is the long press, and it opens the menu
+      // where the finger was.
+      if (held && holdFirst) openMenuAtPoint(at.x, at.y, entry);
     }
+
+    if (holdFirst) hold = setTimeout(lift, TOUCH_HOLD_MS);
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", end);
+    document.addEventListener("pointercancel", end);
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
   };
 
   const menuAction = (action: (entry: FileEntry) => void) => {
@@ -168,69 +345,125 @@ export default function FileList({
   };
 
   if (entries.length === 0 && (!uploadQueue || uploadQueue.length === 0)) {
-    return <div className="flex items-center justify-center h-full text-gray-500 text-sm">Empty directory</div>;
+    return <div className="flex items-center justify-center h-full text-ink-faint text-sm">Empty directory</div>;
   }
 
   return (
-    <div ref={scrollRef} className="overflow-y-auto flex-1 relative">
+    <div ref={scrollRef} onScroll={rememberScroll} className="overflow-y-auto flex-1 relative">
       <div className={disabled ? "pointer-events-none opacity-50" : ""}>
-        {entries.map((entry) => (
-          <div key={entry.name} className="w-full flex items-center border-b border-gray-800">
-            {/* Clickable file/folder area */}
-            <button
-              onClick={() => onOpen(entry)}
-              onContextMenu={(e) => handleContextMenu(e, entry)}
-              onTouchStart={(e) => handleTouchStart(e, entry)}
-              onTouchEnd={handleTouchEnd}
-              onTouchMove={handleTouchEnd}
-              className="flex-1 flex items-center gap-3 px-3 py-2 hover:bg-[#1a1a2e] active:bg-[#1a1a2e] transition-colors text-left min-w-0"
+        {entries.map((entry) => {
+          const isSelected = selectMode && !!selectedNames?.has(entry.name);
+          const menuOpen = isButtonMenuFor(menu, entry);
+          const isMoving = moveMode && entry.name === movingName;
+          // The row a drag is over, and the row it picked up. The target wears
+          // the same highlight the destination-picking mode gives a row, since
+          // it means the same thing; the picked-up row fades like a tab being
+          // dragged between panes.
+          const isTarget = entry.isDirectory && drag?.over === entry.name;
+          const isLifted = drag?.name === entry.name;
+          // In move mode only folders are worth clicking — they are the
+          // destinations; opening a file would drop you out of the flow.
+          const rowDisabled = moveMode && !entry.isDirectory;
+          return (
+            <div
+              key={entry.name}
+              data-entry-dir={entry.isDirectory ? entry.name : undefined}
+              onPointerDown={(e) => startDrag(e, entry)}
+              className={`w-full flex items-center border-b border-line-soft ${
+                isMoving || isTarget
+                  ? "bg-blue-600/25 ring-1 ring-inset ring-blue-500/60"
+                  : isSelected
+                    ? "bg-blue-600/15"
+                    : ""
+              } ${isLifted ? "opacity-60" : ""}`}
             >
-              {/* Icon */}
-              <span className="text-lg shrink-0">
-                {entry.isDirectory ? (
-                  <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
+              {/* Clickable file/folder area */}
+              <button
+                onClick={() => (selectMode ? onToggleSelect?.(entry) : onOpen(entry))}
+                onContextMenu={moveMode ? undefined : (e) => handleContextMenu(e, entry)}
+                disabled={rowDisabled}
+                className={`flex-1 flex items-center gap-3 px-3 py-2 transition-colors text-left min-w-0 ${
+                  rowDisabled ? "opacity-45 cursor-default" : "hover:bg-raised active:bg-raised"
+                }`}
+              >
+                {/* Icon */}
+                <span className="text-lg shrink-0">
+                  {entry.isDirectory ? (
+                    <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-ink-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                  )}
+                </span>
+                {/* Name */}
+                <span className={`flex-1 text-sm truncate ${isMoving ? "text-ink font-medium" : "text-ink-muted"}`}>
+                  {entry.name}
+                </span>
+                {isMoving && <span className="shrink-0 text-[10px] text-blue-300 uppercase tracking-wide">moving</span>}
+                {/* Size */}
+                {!entry.isDirectory && (
+                  <span className="text-xs text-ink-faint shrink-0">{formatSize(entry.size)}</span>
                 )}
-              </span>
-              {/* Name */}
-              <span className="flex-1 text-sm text-gray-200 truncate">{entry.name}</span>
-              {/* Size */}
-              {!entry.isDirectory && <span className="text-xs text-gray-500 shrink-0">{formatSize(entry.size)}</span>}
-            </button>
-            {/* Three-dot menu button — separate from file click */}
-            <button
-              className="shrink-0 p-2 text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 active:bg-gray-700 transition-colors"
-              onClick={(e) => openMenuFromButton(e, entry)}
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
-              </svg>
-            </button>
-          </div>
-        ))}
+              </button>
+              {/* Right control: checkbox in select mode, the 3-dot menu normally,
+                  and nothing at all while picking a move destination. */}
+              {moveMode ? null : selectMode ? (
+                <button
+                  onClick={() => onToggleSelect?.(entry)}
+                  className="shrink-0 p-2 text-ink-dim hover:text-ink transition-colors"
+                  title={isSelected ? "Deselect" : "Select"}
+                >
+                  {isSelected ? (
+                    <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path
+                        fillRule="evenodd"
+                        d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 011.42-1.42l2.79 2.79 6.79-6.79a1 1 0 011.42 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  ) : (
+                    <span className="block w-4 h-4 rounded-control border border-line-strong" />
+                  )}
+                </button>
+              ) : (
+                <button
+                  {...{ [MENU_TRIGGER_ATTR]: entry.name }}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  aria-label={`Actions for ${entry.name}`}
+                  className={`shrink-0 p-2 transition-colors ${
+                    menuOpen
+                      ? "bg-hover text-ink"
+                      : "text-ink-faint hover:text-ink-muted hover:bg-control/50 active:bg-control"
+                  }`}
+                  onClick={(e) => openMenuFromButton(e, entry)}
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Upload queue inline rows */}
       {uploadQueue &&
         uploadQueue.length > 0 &&
         uploadQueue.map((file, i) => (
-          <div key={`upload-${i}`} className="w-full flex items-center gap-3 px-3 py-2 border-b border-gray-800">
+          <div key={`upload-${i}`} className="w-full flex items-center gap-3 px-3 py-2 border-b border-line-soft">
             <span className="shrink-0">
               {file.status === "uploading" || file.status === "pending" ? (
-                <svg className="w-5 h-5 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
+                <span className="spinner spinner-sm" aria-hidden="true" />
               ) : file.status === "done" ? (
                 <svg
                   className="w-5 h-5 text-green-500"
@@ -253,8 +486,8 @@ export default function FileList({
                 </svg>
               )}
             </span>
-            <span className="flex-1 text-sm text-gray-400 truncate">{file.name}</span>
-            <span className="text-xs text-gray-500 shrink-0">
+            <span className="flex-1 text-sm text-ink-dim truncate">{file.name}</span>
+            <span className="text-xs text-ink-faint shrink-0">
               {file.status === "uploading"
                 ? `${file.progress}%`
                 : file.status === "error"
@@ -264,7 +497,7 @@ export default function FileList({
             {(file.status === "pending" || file.status === "uploading") && cancelUpload && (
               <button
                 onClick={() => cancelUpload(i)}
-                className="shrink-0 p-0.5 text-gray-500 hover:text-red-400 transition-colors"
+                className="shrink-0 p-0.5 text-ink-faint hover:text-red-400 transition-colors"
                 title="Cancel upload"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -279,49 +512,53 @@ export default function FileList({
       {menu && (
         <div
           ref={menuRef}
-          className="absolute z-50 bg-[#1e1e3a] border border-gray-600 rounded-lg shadow-xl py-1 min-w-[160px]"
+          className="absolute z-50 glass rounded-panel py-1 min-w-[160px]"
           style={{
             left: menuStyle.left,
             top: menuStyle.top,
             visibility: menuStyle.visible ? "visible" : "hidden",
           }}
         >
-          <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700 truncate">{menu.entry.name}</div>
+          <div className="px-3 py-1.5 text-xs text-ink-dim border-b border-line truncate">{menu.entry.name}</div>
           <button
             onClick={() => menuAction(onOpen)}
-            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
           >
             Open
           </button>
           <button
             onClick={() => menuAction(onRename)}
-            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
           >
             Rename
           </button>
           <button
+            onClick={() => menuAction(onMove)}
+            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
+          >
+            Move
+          </button>
+          <button
             onClick={() => menuAction(onCopyPath)}
-            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
           >
             Copy path
           </button>
-          {!menu.entry.isDirectory && (
-            <button
-              onClick={() => menuAction(onDownload)}
-              className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
-            >
-              Download
-            </button>
-          )}
+          <button
+            onClick={() => menuAction(onDownload)}
+            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
+          >
+            {menu.entry.isDirectory ? "Download (zip)" : "Download"}
+          </button>
           <button
             onClick={() => menuAction(onInfo)}
-            className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-[#2a2a4a] transition-colors"
+            className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-hover transition-colors"
           >
             Info
           </button>
           <button
             onClick={() => menuAction(onDelete)}
-            className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-[#2a2a4a] transition-colors"
+            className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-hover transition-colors"
           >
             Delete
           </button>

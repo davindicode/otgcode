@@ -1,24 +1,165 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import DownloadIcon from "~/components/DownloadIcon";
+import RefreshIcon from "~/components/RefreshIcon";
+import { readView, saveView } from "~/lib/viewState";
+import CannotDisplay from "./CannotDisplay";
 import CopyPathButton from "./CopyPathButton";
 
 interface ImageViewerProps {
   path: string;
-  onClose: () => void;
+  onReload: () => void;
+  /** Bumped per reload, so the browser refetches rather than reusing its copy. */
+  version: number;
+  /** The file has changed on disk since it was read. */
+  stale: boolean;
 }
 
-export default function ImageViewer({ path, onClose }: ImageViewerProps) {
-  const [zoom, setZoom] = useState(1);
+/** The container's padding, which the image has to fit inside. */
+const PAD = 32;
+
+/** Quiet period before a pan is written down. */
+const PAN_SETTLE_MS = 400;
+
+export default function ImageViewer({ path, onReload, version, stale }: ImageViewerProps) {
+  /**
+   * Where this image was last being looked at, read once at mount. Zoom comes
+   * back immediately; the pan has to wait for the image to have a size to be
+   * panned within, which the effect below does once.
+   */
+  const [saved] = useState(() => readView(path));
+  const [zoom, setZoom] = useState(saved.zoom ?? 1);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // What the pane can show, watched rather than read once: rotating a phone,
+  // opening the keyboard and splitting a window all change it. A zero-sized
+  // box means the tab is hidden (`display: none`), which has no size to fit to.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      if (el.clientWidth > 0 && el.clientHeight > 0) setBox({ w: el.clientWidth, h: el.clientHeight });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  /**
+   * Scale at which the whole image is visible — 100%, as every image viewer
+   * means it. Natural pixels are the wrong unit on a phone: a photo from that
+   * same phone is 4000px wide, so "100%" used to mean a tenth of one corner
+   * and a lot of dragging.
+   *
+   * Never above 1: a 48px icon blown up to fill a desktop pane is not what
+   * fitting it means, and the whole thing is visible either way.
+   */
+  const fit = !naturalSize || !box ? 1 : Math.min(1, (box.w - PAD) / naturalSize.w, (box.h - PAD) / naturalSize.h);
+  const scale = fit * zoom;
+
+  // GIFs animate via the <img> itself, and an animation starts when its
+  // element does — so the replay remounts the <img> rather than changing its
+  // URL. It used to add a cache-busting parameter, which fetched the file
+  // again: a few megabytes of GIF arriving while it played, which a browser
+  // shows by looping over the frames it has until the rest turns up. Same
+  // URL, same bytes, and the request behind it is a revalidation.
+  const isGif = path.split(".").pop()?.toLowerCase() === "gif";
+  const [replayKey, setReplayKey] = useState(0);
+  const src = `/api/files/download?path=${encodeURIComponent(path)}&inline=1&v=${version}`;
 
   const zoomIn = () => setZoom((z) => Math.min(5, z + 0.25));
   const zoomOut = () => setZoom((z) => Math.max(0.1, z - 0.25));
   const zoomFit = () => setZoom(1);
 
+  useEffect(() => {
+    saveView(path, { zoom });
+  }, [path, zoom]);
+
+  /**
+   * Put the pane back where it was, once there is something to scroll.
+   *
+   * Pan is the container's own scroll offset rather than React state, and a
+   * scroll offset is clamped to the content — so setting it before the image
+   * has loaded and been laid out would have clamped it to zero. Waiting for
+   * both the natural size and the pane's own box is waiting for exactly that.
+   * Once only: after this the user is panning, and this would fight them.
+   */
+  const panRestored = useRef(false);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || panRestored.current || !naturalSize || !box) return;
+    panRestored.current = true;
+    if (saved.left) el.scrollLeft = saved.left;
+    if (saved.top) el.scrollTop = saved.top;
+  }, [naturalSize, box, saved.left, saved.top]);
+
+  /**
+   * Panning writes where it got to, once it settles. Scroll fires far too
+   * often to store on each one, and the offset after a zoom is the browser's
+   * doing rather than the user's — but it is still where they are looking, so
+   * it is still worth keeping.
+   */
+  const panTimer = useRef(0);
+  const handleScroll = () => {
+    const el = containerRef.current;
+    if (!el || !panRestored.current) return;
+    const { scrollLeft: left, scrollTop: top } = el;
+    clearTimeout(panTimer.current);
+    panTimer.current = window.setTimeout(() => saveView(path, { left, top }), PAN_SETTLE_MS);
+  };
+  useEffect(() => () => clearTimeout(panTimer.current), []);
+
+  /**
+   * The image's size, in the two stages the browser gives it to us.
+   *
+   * `onLoad` is the last byte, not the first picture. An animated GIF paints
+   * its first frame as soon as that frame has arrived and keeps loading the
+   * rest, so for a few megabytes there is a second or two where it is on
+   * screen and `naturalSize` is still null — and with no size of our own the
+   * image rendered at 1:1, filling the pane with a corner of itself until the
+   * load finally landed and it snapped down to fit. A still image hides this
+   * because it has nothing to show before the end.
+   *
+   * So until then it is capped to the pane instead, which is what fitting it
+   * comes to anyway: the first paint is already the right size, and `onLoad`
+   * only hands over to the zoomable version of the same number.
+   */
+  const sizing = naturalSize
+    ? { width: naturalSize.w * scale, height: naturalSize.h * scale }
+    : box
+      ? { maxWidth: box.w - PAD, maxHeight: box.h - PAD }
+      : undefined;
+
   const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
     setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
   }, []);
+
+  /**
+   * Why the image did not render, once we know. An <img> reports a failure
+   * without a reason, and the two reasons are different: the server refused
+   * (a JSON error on the same URL, which by now is a few bytes), or the bytes
+   * are not a format this browser decodes — a .heic someone renamed .jpg, a
+   * progressive variant, a truncated file.
+   */
+  const [failure, setFailure] = useState<{ src: string; reason: string } | null>(null);
+  const reportFailure = useCallback(async () => {
+    let reason = "";
+    try {
+      const data = (await (await fetch(src)).json()) as { error?: string };
+      reason = data.error ?? "";
+    } catch {
+      // Not JSON either, so the server served it happily.
+    }
+    setFailure({ src, reason: reason || "The bytes are there, but this browser does not decode this image format." });
+  }, [src]);
+
+  // Held against the URL it belongs to rather than cleared by an effect: the
+  // failure replaces the <img>, so a reload would have nothing left to fire
+  // onLoad and clear it. A new `src` simply stops matching.
+  const failed = failure?.src === src ? failure.reason : null;
 
   // Pinch-to-zoom
   const lastDistance = useRef(0);
@@ -66,90 +207,94 @@ export default function ImageViewer({ path, onClose }: ImageViewerProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 bg-[#16162a] border-b border-gray-700 shrink-0">
-        <span
-          className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
-          title={path}
-        >
-          {path}
-        </span>
-        <CopyPathButton path={path} />
+      <div className="bar-edge flex items-center px-3 py-2 bg-surface border-b border-line shrink-0">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="min-w-0 truncate text-sm text-ink-muted select-none" title={path}>
+            {path}
+          </span>
+          <CopyPathButton path={path} />
+        </div>
+        <div className="min-w-2 flex-1" />
         <div className="flex items-center gap-2 shrink-0">
+          {isGif && (
+            <button
+              onClick={() => setReplayKey((k) => k + 1)}
+              className="relief p-1 text-ink-muted hover:text-ink rounded-control"
+              title="Replay GIF"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M1 4v6h6" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+              </svg>
+            </button>
+          )}
           {/* Zoom controls */}
-          <div className="flex items-center gap-1 border border-gray-700 rounded overflow-hidden">
-            <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">
+          <div className="flex items-center gap-1 border border-line rounded-control overflow-hidden">
+            <button onClick={zoomOut} className="px-2 py-0.5 text-xs text-ink-dim hover:text-ink hover:bg-control">
               -
             </button>
             <button
               onClick={zoomFit}
-              className="px-2 py-0.5 text-[10px] text-gray-400 hover:text-white hover:bg-gray-700 tabular-nums"
+              title={`${Math.round(scale * 100)}% of actual size — tap to fit`}
+              className="px-2 py-0.5 text-[10px] text-ink-dim hover:text-ink hover:bg-control tabular-nums"
             >
               {Math.round(zoom * 100)}%
             </button>
-            <button onClick={zoomIn} className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700">
+            <button onClick={zoomIn} className="px-2 py-0.5 text-xs text-ink-dim hover:text-ink hover:bg-control">
               +
             </button>
           </div>
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
             download
-            className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
             title="Download"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"
-              />
-            </svg>
+            <DownloadIcon />
           </a>
           <button
-            onClick={onClose}
-            className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
-            title="Close"
+            onClick={onReload}
+            className={`relief p-1 rounded-control ${
+              stale ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70" : "text-ink-muted hover:text-ink"
+            }`}
+            title={stale ? "Changed on disk — reload" : "Reload from disk"}
+            aria-label="Reload from disk"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <RefreshIcon className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
-      <div
-        ref={containerRef}
-        className={`flex-1 overflow-auto bg-[#0d0d1a] select-none ${grabbing ? "cursor-grabbing" : "cursor-grab"}`}
-        onMouseDown={handleMouseDown}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
+      {failed ? (
+        <CannotDisplay path={path} title="This image could not be displayed" detail={failed} />
+      ) : (
         <div
-          className="flex items-center justify-center p-4"
-          style={{
-            minWidth: naturalSize
-              ? Math.max(naturalSize.w * zoom + 32, containerRef.current?.clientWidth ?? 0)
-              : "100%",
-            minHeight: naturalSize
-              ? Math.max(naturalSize.h * zoom + 32, containerRef.current?.clientHeight ?? 0)
-              : "100%",
-          }}
+          ref={containerRef}
+          className={`flex-1 overflow-auto bg-app select-none ${grabbing ? "cursor-grabbing" : "cursor-grab"}`}
+          onMouseDown={handleMouseDown}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onScroll={handleScroll}
         >
-          <img
-            src={`/api/files/download?path=${encodeURIComponent(path)}&inline=1`}
-            alt={path}
-            className="max-w-none"
-            draggable={false}
-            onLoad={handleImageLoad}
-            style={
-              naturalSize
-                ? {
-                    width: naturalSize.w * zoom,
-                    height: naturalSize.h * zoom,
-                  }
-                : undefined
-            }
-          />
+          <div
+            className="flex items-center justify-center p-4"
+            style={{
+              minWidth: naturalSize ? Math.max(naturalSize.w * scale + PAD, box?.w ?? 0) : "100%",
+              minHeight: naturalSize ? Math.max(naturalSize.h * scale + PAD, box?.h ?? 0) : "100%",
+            }}
+          >
+            <img
+              key={replayKey}
+              src={src}
+              alt={path}
+              className="max-w-none"
+              draggable={false}
+              onLoad={handleImageLoad}
+              onError={reportFailure}
+              style={sizing}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

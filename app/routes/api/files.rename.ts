@@ -1,4 +1,5 @@
-import { rename } from "fs/promises";
+import { rename } from "node:fs/promises";
+import { fsErrorMessage } from "~/lib/errors";
 import type { Route } from "./+types/files.rename";
 
 export async function action({ request }: Route.ActionArgs) {
@@ -14,7 +15,9 @@ export async function action({ request }: Route.ActionArgs) {
   try {
     await rename(oldPath, newPath);
     return Response.json({ success: true });
-  } catch (err: any) {
-    return Response.json({ error: err.message }, { status: 400 });
+  } catch (err: unknown) {
+    // A rename fails on the destination far more often than the source —
+    // the name is taken, or the folder it names is missing.
+    return Response.json({ error: fsErrorMessage(err, "path", newPath) }, { status: 400 });
   }
 }

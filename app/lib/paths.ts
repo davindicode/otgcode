@@ -46,3 +46,30 @@ export function isExternalUrl(src: string): boolean {
 export function toInlineDownloadUrl(absPath: string): string {
   return `/api/files/download?path=${encodeURIComponent(absPath)}&inline=1`;
 }
+
+/** Last segment of a path. */
+export function basename(path: string): string {
+  const normalized = normalizePath(path);
+  const i = normalized.lastIndexOf("/");
+  return i < 0 ? normalized : normalized.slice(i + 1);
+}
+
+/**
+ * Work out where a move would land and reject the cases that would destroy
+ * data or fail opaquely. Pure, so the rules are testable and the rule set is
+ * shared by the client and the move endpoint.
+ */
+export function planMove(sourcePath: string, destDir: string): { target: string; name: string; error: string | null } {
+  const source = normalizePath(sourcePath);
+  const dest = normalizePath(destDir);
+  const name = basename(source);
+  const target = normalizePath(`${dest}/${name}`);
+
+  let error: string | null = null;
+  if (source === target || dirname(source) === dest) {
+    error = `"${name}" is already in this folder`;
+  } else if (target.startsWith(`${source}/`)) {
+    error = "A folder can't be moved inside itself";
+  }
+  return { target, name, error };
+}

@@ -1,5 +1,8 @@
-import { readFile, stat } from "fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { lookup } from "mime-types";
+import { fsErrorMessage } from "~/lib/errors";
+import { looksBinary } from "~/lib/fileTypes";
+import { fileVersion } from "~/lib/fileVersion";
 import type { Route } from "./+types/files.read";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -25,12 +28,26 @@ export async function loader({ request }: Route.LoaderArgs) {
       mimeType.includes("toml");
 
     if (isText || stats.size < 10 * 1024 * 1024) {
-      const content = await readFile(filePath, "utf-8");
-      return Response.json({ path: filePath, content, mimeType, size: stats.size });
+      const bytes = await readFile(filePath);
+      // Answered instead of the content, so the viewer can say which format it
+      // is and let the user decide. `raw=1` is that decision: decode it anyway.
+      if (url.searchParams.get("raw") !== "1" && looksBinary(bytes)) {
+        return Response.json({ binary: true, mimeType, size: stats.size, version: fileVersion(stats) });
+      }
+      const content = bytes.toString("utf-8");
+      // The version the caller is holding, so a later write can tell whether
+      // the file moved underneath it.
+      return Response.json({
+        path: filePath,
+        content,
+        mimeType,
+        size: stats.size,
+        version: fileVersion(stats),
+      });
     }
 
     return Response.json({ error: "File too large for text preview", size: stats.size, mimeType }, { status: 413 });
-  } catch (err: any) {
-    return Response.json({ error: err.message }, { status: 400 });
+  } catch (err: unknown) {
+    return Response.json({ error: fsErrorMessage(err, "file", filePath) }, { status: 400 });
   }
 }

@@ -1,6 +1,7 @@
-import type { Express } from "express";
-import type { Server } from "http";
+import type { IncomingMessage, Server, ServerResponse } from "node:http";
+import type { Express, Request } from "express";
 import { createProxyMiddleware, type RequestHandler } from "http-proxy-middleware";
+import { isRequestAuthenticated } from "./auth.js";
 
 const BLOCKED_PORTS = new Set<number>();
 for (let p = 1; p <= 1023; p++) {
@@ -22,7 +23,7 @@ function getProxy(port: number): RequestHandler {
       changeOrigin: true,
       selfHandleResponse: true,
       pathRewrite: (_path, req) => {
-        const originalUrl = (req as any).originalUrl || req.url || "";
+        const originalUrl = (req as Request).originalUrl || req.url || "";
         const prefix = `/proxy/${port}`;
         return originalUrl.startsWith(prefix) ? originalUrl.slice(prefix.length) || "/" : originalUrl;
       },
@@ -37,7 +38,7 @@ function getProxy(port: number): RequestHandler {
             delete headers[h];
           }
           if (isText) delete headers["content-length"];
-          (res as any).writeHead(proxyRes.statusCode || 200, headers);
+          (res as ServerResponse).writeHead(proxyRes.statusCode || 200, headers);
 
           if (isText) {
             const chunks: Buffer[] = [];
@@ -73,16 +74,16 @@ function getProxy(port: number): RequestHandler {
               // Rewrite new URL("/path", ...) patterns
               body = body.replace(/(new\s+URL\s*\(\s*["'])\/((?!proxy\/)[^"']+["'])/g, `$1${prefix}/$2`);
 
-              (res as any).end(body);
+              (res as ServerResponse).end(body);
             });
           } else {
-            proxyRes.pipe(res as any);
+            proxyRes.pipe(res as ServerResponse);
           }
         },
         error: (_err, _req, res) => {
           if ("writeHead" in res) {
-            (res as any).writeHead(502);
-            (res as any).end(`Cannot reach localhost:${port}`);
+            (res as ServerResponse).writeHead(502);
+            (res as ServerResponse).end(`Cannot reach localhost:${port}`);
           }
         },
       },
@@ -114,18 +115,24 @@ export function mountProxy(app: Express, httpServer: Server, otgPort: number): v
 
   app.use("/proxy/:port", (req, res, next) => {
     const port = parseInt(req.params.port, 10);
-    if (isNaN(port) || BLOCKED_PORTS.has(port)) {
+    if (Number.isNaN(port) || BLOCKED_PORTS.has(port)) {
       res.status(403).json({ error: `Port ${port} is not allowed` });
       return;
     }
     getProxy(port)(req, res, next);
   });
 
-  // WebSocket upgrade for proxy
+  // WebSocket upgrade for proxy. Express middleware (including the auth gate)
+  // never sees upgrades, so the password has to be re-checked here.
   httpServer.on("upgrade", (req, socket, head) => {
     const url = req.url || "";
     const match = url.match(/^\/proxy\/(\d+)(\/.*)?$/);
     if (!match) return;
+
+    if (!isRequestAuthenticated(req.headers.cookie)) {
+      socket.destroy();
+      return;
+    }
 
     const port = parseInt(match[1], 10);
     if (BLOCKED_PORTS.has(port)) {
@@ -133,6 +140,10 @@ export function mountProxy(app: Express, httpServer: Server, otgPort: number): v
       return;
     }
 
-    (getWsProxy(port) as any).upgrade(req, socket, head);
+    // `upgrade` exists on the middleware but is absent from its public type.
+    const wsProxy = getWsProxy(port) as RequestHandler & {
+      upgrade: (req: IncomingMessage, socket: NodeJS.Socket, head: Buffer) => void;
+    };
+    wsProxy.upgrade(req, socket, head);
   });
 }

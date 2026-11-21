@@ -1,7 +1,8 @@
 # Contributing to OTG Code
 
 Thanks for your interest in improving OTG Code! This guide covers the dev
-setup, conventions, and PR workflow.
+setup, conventions, and PR workflow. What the app does and how it is put
+together is in [DOCS.md](DOCS.md).
 
 ## Prerequisites
 
@@ -31,7 +32,8 @@ CI runs these on every PR; they must pass.
 pnpm lint         # Biome lint + format check (biome ci)
 pnpm format       # auto-fix formatting and safe lint issues
 pnpm typecheck    # React Router typegen + tsc
-pnpm run build    # production build
+pnpm test         # Vitest
+pnpm build        # production build
 ```
 
 ## Code style
@@ -61,7 +63,7 @@ the changelog — there is no separate security-advisory file.
 
 1. Branch off `main`.
 2. Make your change; keep commits focused and Conventionally named.
-3. Ensure `pnpm lint`, `pnpm typecheck`, and `pnpm run build` pass.
+3. Ensure `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build` pass.
 4. Open a PR against `main` with a short description of what and why.
 
 ## Releasing (maintainers)
@@ -70,26 +72,38 @@ Releases are cut manually:
 
 1. Update the version in `package.json` and add a section to `CHANGELOG.md`
    (group changes under Added / Changed / Fixed / Security).
-2. Merge to `main`.
-3. Tag and push: `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`.
-4. Create a GitHub Release for the tag, using the changelog section as the notes.
+2. Check `pnpm audit` is clean. If an advisory has no published fix, record it
+   in `pnpm.auditConfig` with the reason it does not apply, so that a red audit
+   always means something new.
+3. Merge to `main`.
+4. Tag and push: `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`.
+5. Create a GitHub Release for the tag, using the changelog section as the notes.
 
-The in-app version (shown in the header) is read from `package.json` at build
+The in-app version (System Info popup) is read from `package.json` at build
 time, so bumping `package.json` is enough to update it.
 
 ## Project layout
 
 ```
 app/                  React Router (SSR) frontend
-  components/         UI — browser/, files/, terminal/
+  components/         UI — shell, tab bar, browser/, files/, terminal/
   routes/             routes + routes/api/ (file ops, tmux, system info)
   stores/             Zustand stores
-  lib/                shared client helpers (clipboard, socket, constants)
+  lib/                shared client helpers (clipboard, socket, workspace, constants)
 server/               Node backend
   index.ts            Express + Socket.IO entry
+  dev.ts              the same server for `pnpm dev`, with Vite middleware
+  auth.ts             access password, sessions, handshake gate
+  auth-routes.ts      login, logout and password-setup endpoints
+  presence.ts         one device at a time
   pty-manager.ts      node-pty terminal sessions
   socket-handlers.ts  realtime terminal I/O
+  cwd.ts              server-side CWD detection (/proc, lsof, tmux)
+  cli.ts              which of tmux/claude/codex/opencode are installed
   proxy.ts            reverse proxy
   tunnel.ts           Cloudflare quick-tunnel management
+  uploads.ts          streamed and chunked uploads
+  progress.ts         upload progress accounting
+  zip.ts              folder downloads
 start.sh              builds, installs cloudflared, runs server + tunnel
 ```

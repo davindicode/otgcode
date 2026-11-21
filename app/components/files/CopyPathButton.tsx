@@ -13,7 +13,7 @@ export default function CopyPathButton({ path }: { path: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="p-1 text-gray-500 hover:text-white transition-colors shrink-0"
+      className="p-1 text-ink-faint hover:text-ink transition-colors shrink-0"
       title={copied ? "Copied!" : "Copy path"}
     >
       {copied ? (

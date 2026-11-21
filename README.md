@@ -5,170 +5,111 @@
 <h1 align="center">OTG Code</h1>
 <p align="center"><em>On-The-Go Code — a mobile-first, terminal-focused development environment in the browser</em></p>
 
-<p align="center">Work on your VPS or home machine from anywhere — phone, tablet, or desktop — with zero client-side installation. A mobile-optimised terminal built for coding CLIs, with file explorer, code editor, and localhost proxy — all in a single browser tab, accessible via a single Cloudflare Quick Tunnel.</p>
+<p align="center">Work on your VPS or home machine from anywhere — phone, tablet, or desktop — with zero client-side installation. A mobile-optimised IDE built for managing coding agents, with key features including integrated tmux terminal tabs, file explorers, text editors, and localhost proxy — all in a single browser tab, accessible via a single Cloudflare Quick Tunnel.</p>
 
 <p align="center">
   <img src="https://img.shields.io/github/package-json/v/davindicode/otgcode?color=blue" alt="Version">
+  <a href="https://github.com/davindicode/otgcode/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/davindicode/otgcode/ci.yml?branch=main&label=CI" alt="CI"></a>
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status: alpha">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
-  <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen" alt="Node >= 20">
+  <img src="https://img.shields.io/badge/node-%3E%3D20.19-brightgreen" alt="Node >= 20.19">
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20WSL2-lightgrey" alt="Platform: Linux, macOS, WSL2">
   <img src="https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/React_Router-v7-red?logo=reactrouter&logoColor=white" alt="React Router">
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome">
 </p>
 
+<p align="center">
+  <a href="public/videos/demo.gif" title="OTG Code on a desktop browser and on a phone"><img src="public/videos/demo.gif" alt="The same workspace on a desktop browser and on a phone: file explorer and markdown preview beside a terminal and tmux on the left, the phone running a coding CLI over the on-screen key rows on the right" width="900"></a>
+</p>
+
 ## Features
 
-<!-- Product demo previews (GIFs) -> use table for consistent GitHub layout -->
-<table align="center">
-  <tr>
-    <td align="center" style="padding:8px">
-    <a href="public/videos/demo_explorer.gif" title="Open Explorer GIF"><img src="public/videos/demo_explorer.gif" alt="File explorer" width="220" style="max-width:220px;height:auto;"></a>
-      <div style="font-size:13px;color:#555;margin-top:8px;">File explorer</div>
-    </td>
-    <td align="center" style="padding:8px">
-      <a href="public/videos/demo_terminal.gif" title="Open Terminal GIF"><img src="public/videos/demo_terminal.gif" alt="Terminal interface" width="220" style="max-width:220px;height:auto;"></a>
-      <div style="font-size:13px;color:#555;margin-top:8px;">Terminal interface</div>
-    </td>
-    <td align="center" style="padding:8px">
-      <a href="public/videos/demo_localhost.gif" title="Open Localhost GIF"><img src="public/videos/demo_localhost.gif" alt="Localhost preview" width="220" style="max-width:220px;height:auto;"></a>
-      <div style="font-size:13px;color:#555;margin-top:8px;">Localhost preview</div>
-    </td>
-  </tr>
-</table>
+### Mobile-native UX for terminal workflows
 
+- **Task-specific action keyboards** under every terminal: `main` for the shell,
+  one per coding CLI (claude, codex, opencode), `git`, your own saved commands,
+  and a directory picker.
+- **tmux session controls as buttons** — windows, panes, scrollback and copy
+  mode, no prefix chord. Only on a tmux tab.
+- **A dedicated text input box** for a prompt, a commit message, a path. Sent as
+  a paste, not as keystrokes, and nothing is submitted until you press Enter.
+- **Split panes on a wide screen** — two side by side, each with its own tab
+  strip, `+` and active tab; drag a tab across to move it. A narrow screen draws
+  one at a time.
 
-Three panels — **Terminal**, **Files**, and **Browser** — responsive 3-column layout on desktop/landscape, single-panel with bottom tab bar on mobile/portrait (orientation-aware breakpoint). All panels stay mounted in the DOM with CSS visibility toggling, preserving terminal state, WebSocket connections, and iframe content across navigation. Everything routes through a single Cloudflare Quick Tunnel.
+### Native tab interfaces
 
-### Terminal
-- Multi-session tabs (renamable), xterm.js with configurable font size
-- **Quick action tab groups** — color-coded action tabs (blue) and app tabs (green):
-  - **cmds** — common shell commands (ls, top, df, free, nvidia-smi, etc.)
-  - **cd** — visual directory picker with server-side CWD detection (works inside tmux)
-  - **Ctrl+** — sticky modifier combos (Ctrl, Ctrl+Shift, Alt, Alt+Shift) with full A-Z and 0-9
-  - **code** — coding CLI launchers (Claude Code, Codex, OpenCode) with vendor selector, permission presets, and slash commands
-  - **git** — quick actions (status, log, diff, add, fetch, pull, push, stash, branch), commit with message input, git config setup (user.name/email)
-  - **nano / vim** — file opener with version detection, in-app command buttons, save/exit shortcuts
-  - **tmux** — session manager (list, attach, create, kill), in-session window/pane controls, auto extended-keys compatibility
-- **Always-visible nav keys** below input — Enter, Bksp, arrows, Esc, Tab, PgUp/PgDn
-- **Context-aware tabs** — editor mode (nano/vim) disables action tabs; tmux mode hides nano/vim; plain terminal shows everything
-- Auto-reset of tmux/editor state on socket reconnect
-- System info popup with OS, kernel, CPU, memory, GPU details
-- Tool version detection (nano, vim, tmux, claude, codex, opencode)
+| | |
+|---|---|
+| **Terminal** | Your shell, in a pty on the host. It survives a minute without a connection |
+| **tmux** | A tmux session. The tab is a client of it, so a dropped connection re-attaches |
+| **Explorer** | A file browser. Files open in their own tab: Monaco for code, markdown with KaTeX equations, notebooks, PDFs, images, video, audio |
 
-### File Explorer
-- Multi-session tabs (renamable), breadcrumb + editable path navigation
-- Create, rename, delete files and folders; file info dialog; hidden files toggle
-- Context menu (right-click / long-press), selectable/scrollable file paths
-- Drag-and-drop file upload with progress tracking and per-file cancel
-- Chunked upload for large files (>80 MB) to bypass Cloudflare's 100 MB request limit
-- **Built-in viewers & editors:**
-  - **Code Editor** — Monaco with syntax highlighting, configurable font size, word wrap
-  - **Markdown Preview** — GitHub-flavored with prose styling
-  - **Jupyter Notebook** — cells with type badges, rendered markdown, code, and outputs
-  - **HTML Preview** — live rendered in sandboxed iframe
-  - **PDF Viewer** — inline rendering with zoom and pinch-to-zoom
-  - **Image Viewer** — zoom controls with full pan/scroll at any zoom level, pinch-to-zoom
-  - **Video Player** — mp4, webm, ogg, mov, mkv, avi
-  - **Audio Player** — mp3, wav, ogg, flac, aac, m4a
+### Additional built-in features
 
-### Localhost Preview
-- Preview any localhost port in a new tab via the built-in `/proxy/:port` reverse proxy
-- Multi-tab port list with reachability checks and green/amber status indicators
-- All localhost previews route through the same main tunnel of the app
+- **Light and dark themes**, with seamless toggling.
+- **Localhost previews** through a built-in `/proxy/:port`, over the same
+  tunnel. HTTP and WebSockets, so a dev server's HMR works.
+- **Password-protected by default**, enforced server-side on every request, the
+  proxy and the terminal socket. One device holds the session at a time.
 
-## Quick Start
-
-```bash
-# Clone and install
-git clone https://github.com/davindicode/otgcode.git
-cd otgcode
-pnpm install
-
-# Create .env
-cp .env.example .env
-# Edit .env to set OTG_PORT, DEFAULT_SHELL, DEFAULT_CWD
-
-# Production with Cloudflare tunnel (all-in-one)
-./start.sh
-```
-
-The `start.sh` script installs dependencies if needed, builds the app, starts the server, and launches a Cloudflare Quick Tunnel — printing a public URL you can open on any device. On macOS it also clears Gatekeeper quarantine flags on node-pty binaries. If `cloudflared` is not found in your PATH, the script auto-downloads it to `.bin/` (supports macOS, Linux, and Windows on x64/arm64).
-
-<details>
-<summary><strong>DNS tip:</strong> Tunnel URL not resolving? Set your DNS to 1.1.1.1</summary>
-
-The Quick Tunnel URL (e.g. `xxxx.trycloudflare.com`) resolves instantly on Cloudflare DNS but may take time on ISP/router DNS servers, or fail entirely if a stale NXDOMAIN gets cached. Set your DNS to **1.1.1.1** (Cloudflare) for instant resolution.
-
-**macOS:**
-```bash
-networksetup -setdnsservers Wi-Fi 1.1.1.1 1.0.0.1
-sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
-# To revert: networksetup -setdnsservers Wi-Fi empty
-```
-
-**Linux (systemd-resolved):**
-```bash
-resolvectl dns $(ip route show default | awk '{print $5}') 1.1.1.1 1.0.0.1
-# Or permanently via /etc/systemd/resolved.conf:
-# [Resolve]
-# DNS=1.1.1.1 1.0.0.1
-# sudo systemctl restart systemd-resolved
-```
-
-**Windows (PowerShell as Admin):**
-```powershell
-Get-NetAdapter | Select Name, Status
-Set-DnsClientServerAddress -InterfaceAlias "Wi-Fi" -ServerAddresses 1.1.1.1,1.0.0.1
-ipconfig /flushdns
-# To revert: Set-DnsClientServerAddress -InterfaceAlias "Wi-Fi" -ResetServerAddresses
-```
-</details>
-
-## Scripts
-
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Dev server with HMR (Socket.IO + proxy on same port) |
-| `pnpm build` | Production build |
-| `pnpm start` | Production server |
-| `pnpm start:tunnel` | Production server + Cloudflare tunnel |
-| `./start.sh` | Install + build + start + tunnel (all-in-one) |
-
-## Architecture
-
-Single Express server on one port handles everything:
-
-```
-Express (port 7777)
-├── React Router v7 — UI (SSR shell + client-side app)
-├── Socket.IO — real-time terminal I/O via node-pty
-├── REST API — file operations (list, read, write, rename, delete, upload, download, mkdir)
-├── Reverse Proxy — /proxy/:port/* forwards HTTP + WebSocket to localhost services
-└── Cloudflare Tunnel — single optional tunnel via cloudflared (all traffic)
-```
-
-### Reverse Proxy
-
-The `/proxy/:port` reverse proxy is how localhost previews work — no extra tunnels or processes needed. It handles:
-- **Path rewriting** — strips the `/proxy/:port` prefix before forwarding to `127.0.0.1:<port>`
-- **WebSocket upgrades** — WS connections on `/proxy/:port/...` are forwarded (supports Vite HMR, webpack-dev-server, etc.)
-- **Header stripping** — removes `X-Frame-Options` and CSP headers so content can embed in the preview iframe
-- **Asset path rewriting** — rewrites absolute paths in HTML, CSS, and JS (src, href, url(), ES imports) to include the `/proxy/:port` prefix so assets load correctly through the proxy
-- **Port blocking** — blocks privileged ports (1–1023, except 80/443) and the OTG server port itself
-
-**Dev server notes:** Most dev servers (Vite, webpack, Next.js) work out of the box since both HTTP and WebSocket traffic are proxied. However, dev servers that hardcode their WebSocket URL to `ws://localhost:<port>` in client-side code (bypassing the proxy path) will fail over the tunnel — the HMR connection won't reach the VPS. Vite works because its HMR client connects relative to the page origin. If a dev server's HMR breaks, configure it to use a relative or custom WebSocket path.
-
-## Tech Stack
-
-React Router v7, Express, Socket.IO, node-pty, xterm.js, Monaco Editor, Zustand, Tailwind CSS v4, TypeScript
+Full feature list, architecture and troubleshooting: **[DOCS.md](DOCS.md)**.
+Every release is described in [CHANGELOG.md](CHANGELOG.md).
 
 ## Requirements
 
-- **Node.js** 20+
-- **pnpm** (package manager)
-- **C compiler** for node-pty on Linux (`apt install build-essential`)
-- **cloudflared** (auto-installed by `start.sh` if not found) for remote access via Cloudflare tunnel
+- **Linux, macOS, or Windows via [WSL2](https://learn.microsoft.com/windows/wsl/install)** — the terminal rests on a Unix pty
+- **Node.js** 20.19 or newer, and **pnpm** 10 or newer (`npm install -g pnpm`)
+- **A C/C++ toolchain and Python 3 on Linux** — `node-pty` compiles there
+  (`sudo apt install -y build-essential python3` on Debian/Ubuntu). macOS needs
+  nothing extra
+
+`./start.sh` checks all of this before it builds and names what to install. See
+[Platforms](DOCS.md#platforms) for the other distros and the WSL2 walkthrough.
+
+## Quick start
+
+```bash
+git clone https://github.com/davindicode/otgcode.git
+cd otgcode
+
+# Optional: port, shell and starting directory
+cp .env.example .env
+
+# Install, build, start, and open a Cloudflare tunnel
+./start.sh
+
+# ...or on another port
+./start.sh --port 8080
+```
+
+`start.sh` installs, builds, starts the server and opens a Cloudflare Quick
+Tunnel, printing the public URL and the LAN addresses. First start asks you to
+set an access password.
+
+Tunnel URL not resolving? [Set your DNS to 1.1.1.1](DOCS.md#tunnel-url-not-resolving-set-your-dns-to-1111).
+`pnpm dev` runs the same app with HMR if you are working on OTG Code itself.
+
+> [!WARNING]
+> The tunnel URL reaches a shell on your host, as the user that launched OTG
+> Code, with read/write access to that user's files. **With the access password
+> on, that is what stands in the way** — enforced server-side on every request,
+> the localhost proxy and the terminal socket, not just in the UI.
+>
+> **Without it, the URL is the only thing protecting that shell, so keep it
+> private.** You can turn a password on at any time from the Settings cog.
+>
+> Locked out? Set `passwordEnabled` to `false` in `~/.otgcode/config.json` on
+> the host and restart.
+
+## Docs
+
+| | |
+|---|---|
+| [DOCS.md](DOCS.md) | Features in full, platforms, scripts, architecture, troubleshooting, known limitations |
+| [CHANGELOG.md](CHANGELOG.md) | What changed in each release |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, conventions, PR workflow |
 
 ## License
 

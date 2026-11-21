@@ -3,6 +3,8 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal } from "@xterm/xterm";
 import { useEffect, useRef } from "react";
 import { useTerminalStore } from "~/stores/terminalStore";
+import { useWorkspaceStore } from "~/stores/workspaceStore";
+import { xtermTheme } from "./xtermTheme";
 import "@xterm/xterm/css/xterm.css";
 
 export default function TerminalPanel({ sessionId }: { sessionId: string }) {
@@ -12,25 +14,33 @@ export default function TerminalPanel({ sessionId }: { sessionId: string }) {
 
   const registerTerminal = useTerminalStore((s) => s.registerTerminal);
   const sendInput = useTerminalStore((s) => s.sendInput);
-  const resizeTerminal = useTerminalStore((s) => s.resizeTerminal);
+  const refitSession = useTerminalStore((s) => s.refitSession);
   const fontSize = useTerminalStore((s) => s.fontSize);
+  const theme = useWorkspaceStore((s) => s.theme);
+
+  // Terminals are created once and reused, so a theme swap has to be pushed
+  // into the live instance rather than waiting for a remount.
+  useEffect(() => {
+    const term = useTerminalStore.getState().sessions[sessionId]?.terminal;
+    if (!term) return;
+    term.options.theme = xtermTheme(theme);
+    // options.theme repaints the rows, but the viewport element keeps the
+    // inline background it was constructed with — that leftover is the band
+    // that shows above and below the rows after a theme switch.
+    const viewport = term.element?.querySelector<HTMLElement>(".xterm-viewport");
+    if (viewport) viewport.style.backgroundColor = "";
+    term.refresh(0, term.rows - 1);
+  }, [theme, sessionId]);
 
   useEffect(() => {
     const el = terminalRef.current;
     if (!el || initialized.current) return;
 
-    // Check if this session already has a terminal in the store (re-attach)
-    const session = useTerminalStore.getState().sessions[sessionId];
-    if (session?.terminal) {
-      initialized.current = true;
-      el.innerHTML = "";
-      session.terminal.open(el);
-      setTimeout(() => {
-        session.fitAddon?.fit();
-        session.terminal!.refresh(0, session.terminal!.rows - 1);
-      }, 50);
-      return;
-    }
+    // No re-attach branch: a pane is never unmounted while its session lives,
+    // so a terminal that already exists cannot need opening into a new element.
+    // The branch that used to do that called `open()` on an already-opened
+    // terminal, which renders nothing at all — it was reachable only because
+    // the session gate replaced the app instead of covering it.
 
     // Delay to ensure the container has dimensions after layout
     const timer = setTimeout(() => {
@@ -41,29 +51,7 @@ export default function TerminalPanel({ sessionId }: { sessionId: string }) {
         cursorBlink: true,
         fontSize,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-        theme: {
-          background: "#1a1a2e",
-          foreground: "#e0e0e0",
-          cursor: "#e0e0e0",
-          cursorAccent: "#1a1a2e",
-          selectionBackground: "#264f78",
-          black: "#1a1a2e",
-          red: "#f44747",
-          green: "#6a9955",
-          yellow: "#dcdcaa",
-          blue: "#569cd6",
-          magenta: "#c586c0",
-          cyan: "#4ec9b0",
-          white: "#d4d4d4",
-          brightBlack: "#808080",
-          brightRed: "#f44747",
-          brightGreen: "#6a9955",
-          brightYellow: "#dcdcaa",
-          brightBlue: "#569cd6",
-          brightMagenta: "#c586c0",
-          brightCyan: "#4ec9b0",
-          brightWhite: "#ffffff",
-        },
+        theme: xtermTheme(useWorkspaceStore.getState().theme),
         scrollback: 10000,
         allowProposedApi: true,
         wordSeparator: " ()[]{}',\"`",
@@ -75,25 +63,21 @@ export default function TerminalPanel({ sessionId }: { sessionId: string }) {
 
       term.open(el);
 
-      // Fit after opening
-      requestAnimationFrame(() => {
-        fitAddon.fit();
-        resizeTerminal(sessionId, term.rows, term.cols);
-      });
-
-      // Register with store — flushes buffered output
+      // Register with store — flushes buffered output. Before the fit below,
+      // which measures through the store and so needs the terminal in it.
       registerTerminal(sessionId, term, fitAddon);
+
+      requestAnimationFrame(() => refitSession(sessionId));
 
       // Wire up keyboard input from xterm to the pty
       term.onData((data) => {
         sendInput(sessionId, data);
       });
 
-      // Re-fit on container resize (panel drag) and window resize
-      const doFit = () => {
-        fitAddon.fit();
-        resizeTerminal(sessionId, term.rows, term.cols);
-      };
+      // Re-fit on container resize (panel drag) and window resize. This also
+      // fires with a zero-sized box when the tab is switched away from, which
+      // is why the fit is guarded rather than done here.
+      const doFit = () => refitSession(sessionId);
 
       const ro = new ResizeObserver(() => doFit());
       ro.observe(el);
@@ -112,7 +96,7 @@ export default function TerminalPanel({ sessionId }: { sessionId: string }) {
   }, [sessionId]);
 
   return (
-    <div className="absolute inset-0 bg-[#1a1a2e]">
+    <div className="absolute inset-0 bg-terminal">
       <div ref={terminalRef} className="h-full w-full" />
     </div>
   );

@@ -3,6 +3,9 @@ import type { Terminal } from "@xterm/xterm";
 import { create } from "zustand";
 import { DEFAULT_FONT_SIZE } from "~/lib/constants";
 import { getSocket } from "~/lib/socket";
+import { useAuthStore } from "./authStore";
+import { usePresenceStore } from "./presenceStore";
+import { useWorkspaceStore } from "./workspaceStore";
 
 interface TerminalSession {
   id: string;
@@ -12,38 +15,206 @@ interface TerminalSession {
   fitAddon: FitAddon | null;
   error: string | null;
   outputBuffer: string[];
-  inTmux: boolean;
-  inEditor: "nano" | "vim" | null;
+  /** Set when this terminal *is* a tmux session rather than a shell. */
+  tmuxSession?: string;
+  /** tmux's own id for it, which a rename does not change. */
+  tmuxSessionId?: string;
+  /**
+   * Which socket connection this session's pty was asked for. Compared against
+   * the current one to decide what needs recreating, because `status` is a
+   * belief about the server that can be wrong — and a session believed
+   * connected with no pty behind it is a tab where nothing works and nothing
+   * says why.
+   */
+  gen: number;
   cdCwd: string;
 }
 
 interface TerminalState {
   sessions: Record<string, TerminalSession>;
-  activeSessionId: string | null;
   socketConnected: boolean;
   fontSize: number;
   defaultCwd: string;
 
   initSocket: () => void;
-  createSession: (sessionId: string, name?: string, cwd?: string) => void;
+  /** Ask the server for the session again, on the user's say-so. */
+  retryNow: () => void;
+  createSession: (sessionId: string, name?: string, cwd?: string, tmuxSession?: string, tmuxSessionId?: string) => void;
   registerTerminal: (sessionId: string, terminal: Terminal, fitAddon: FitAddon) => void;
   sendInput: (sessionId: string, data: string) => void;
-  resizeTerminal: (sessionId: string, rows: number, cols: number) => void;
+  /**
+   * Send text the user wrote, rather than keys they pressed.
+   *
+   * The input box used to send straight down `sendInput`, which is the stream a
+   * keystroke goes down: to the program on the other end that is someone
+   * typing four hundred characters in one millisecond, and every one of them
+   * is a key it may have a binding for. opencode binds a bare `!` to its shell
+   * mode while the cursor is at the start of a row, and the check that gates it
+   * does not re-run inside a burst — so a question with a `!` in it flipped the
+   * prompt to shell mode partway through and the whole thing went to bash,
+   * which answered "syntax error near unexpected token `('".
+   *
+   * A terminal does not have this problem: a paste arrives wrapped in the
+   * bracketed paste markers, which say "text, not keys", and every TUI worth
+   * the name honours them. xterm.js writes those markers — and only when the
+   * program has actually asked for them, which is the reason this goes through
+   * the terminal instead of building the sequence here.
+   */
+  pasteInput: (sessionId: string, text: string) => void;
+  /**
+   * Run a command line: `pasteInput` for the line, then Enter on its own.
+   *
+   * Every composed command goes through here — the git drawer's `git commit`,
+   * the directory drawer's `cd`, a command chip — because a command line is
+   * text too, and a path or a commit message is as free to hold a `!` as a
+   * sentence is. `shellQuote` makes it safe for the shell on the other side;
+   * it does nothing about the program in between taking it for a keystroke.
+   */
+  runInput: (sessionId: string, command: string) => void;
   closeSession: (sessionId: string) => void;
-  setActiveSession: (sessionId: string) => void;
-  renameSession: (sessionId: string, name: string) => void;
+  /** Ask for a new pty for a session whose own has gone. */
+  restartSession: (sessionId: string) => void;
+  /**
+   * Put the terminal back to a known state: out of the alternate screen, no
+   * scroll region, cursor showing, nothing reporting. For a shell left behind
+   * by a program that exited badly.
+   */
+  resetModes: (sessionId: string) => void;
+  /** Re-measure a pane and tell its pty, if the pane is on screen. */
+  refitSession: (sessionId: string) => void;
+  /** `tmuxSession` moves with the name for a tmux tab: the two are the same thing. */
+  renameSession: (sessionId: string, name: string, tmuxSession?: string, tmuxSessionId?: string) => void;
   setFontSize: (size: number) => void;
   setDefaultCwd: (cwd: string) => void;
-  setInTmux: (sessionId: string, inTmux: boolean) => void;
-  setInEditor: (sessionId: string, editor: "nano" | "vim" | null) => void;
   setCdCwd: (sessionId: string, cwd: string) => void;
 }
 
 let socketInitialized = false;
 
+/**
+ * Bumped on every socket connection. A session carries the generation its pty
+ * was requested in; anything older has no pty on the server, because the
+ * server kills them when their socket goes.
+ */
+let generation = 0;
+
+/** Asks the server for this session's pty, and records that we did. */
+function requestPty(
+  sessionId: string,
+  get: () => TerminalState,
+  set: (partial: Partial<TerminalState>) => void,
+  cwd?: string,
+): void {
+  const socket = getSocket();
+  const session = get().sessions[sessionId];
+  if (!session || !socket.connected) return;
+
+  set({
+    sessions: { ...get().sessions, [sessionId]: { ...session, status: "connecting", gen: generation } },
+  });
+
+  socket.emit("create_terminal", {
+    sessionId,
+    cwd: cwd || get().defaultCwd || undefined,
+    // The whole point of a tmux tab: reconnecting re-attaches rather than
+    // leaving you in a fresh shell outside the session.
+    tmuxSession: session.tmuxSession,
+    // Found again by id rather than by name, so a session renamed while this
+    // tab was away is re-attached instead of being recreated empty.
+    tmuxSessionId: session.tmuxSessionId,
+    // The pane has been on screen since before the drop, so its size is known
+    // here. Spawning the pty at it means tmux's first paint already fills the
+    // pane, instead of drawing 80x24 and waiting for a resize to repaint it.
+    cols: session.terminal?.cols,
+    rows: session.terminal?.rows,
+  });
+}
+
+/**
+ * Whether a terminal currently occupies space on the page.
+ *
+ * An inactive tab is `display: none`, and an element with no layout box has no
+ * used value for its size: `getComputedStyle` hands back the `height: 100%` it
+ * was written with, verbatim. The fit addon reads that as 100 *pixels*.
+ */
+function isOnScreen(terminal: Terminal | null): boolean {
+  const el = terminal?.element;
+  return !!el && el.offsetWidth > 0 && el.offsetHeight > 0;
+}
+
+/**
+ * Fit a terminal to its pane and tell the pty the new size — but only while
+ * the pane is on screen.
+ *
+ * Measuring a hidden pane proposes a terminal of about 17x9 (see `isOnScreen`),
+ * and that used to be pushed straight to the pty on the way *out* of a tab.
+ * tmux resized its window to match and SIGWINCHed whatever was running into a
+ * corner. A freshly started opencode does not survive that: measured here, its
+ * Bun process crashes outright under roughly 40x12, which left a crash dump
+ * where the TUI had been and its mouse reporting switched on, because a process
+ * that dies in a signal handler sends none of the sequences that turn it off.
+ *
+ * The delay is for the opposite case: a pane that has just been shown may not
+ * have been laid out yet, and would be skipped as hidden.
+ */
+function fitAndPush(sessionId: string, get: () => TerminalState): void {
+  setTimeout(() => {
+    const session = get().sessions[sessionId];
+    if (!session?.terminal || !session.fitAddon || !isOnScreen(session.terminal)) return;
+    session.fitAddon.fit();
+    const socket = getSocket();
+    if (!socket.connected) return;
+    socket.emit("terminal_resize", {
+      sessionId,
+      cols: session.terminal.cols,
+      rows: session.terminal.rows,
+    });
+  }, 50);
+}
+
+/**
+ * Everything a departing pty can leave switched on in the terminal.
+ *
+ * A full-screen program — opencode, an editor, tmux — runs on the alternate
+ * screen with a scroll region, a hidden cursor and its own attributes. Killing
+ * its pty sends none of the sequences that would undo that, so the next shell
+ * drew its prompt inside the dead program's frame. Scrollback is deliberately
+ * kept: this resets modes, it does not wipe what you were looking at.
+ */
+/**
+ * The modes that make a terminal send input nobody asked for.
+ *
+ * A program that enables mouse reporting and exits without disabling it leaves
+ * the terminal reporting every pointer move to a shell that cannot read them,
+ * which is what `35;79;43M` scrolling past is: an SGR mouse report printing as
+ * text.
+ *
+ * Part of a fresh pty's reset and nothing else. It used to be reachable on its
+ * own, for a tmux tab, and that was a one-way door: tmux sends a mode only when
+ * what it believes the terminal is in differs from what the pane wants, so
+ * turning reporting off here — behind tmux's back — meant tmux never sent it
+ * again. A live TUI in that pane lost the mouse until the next attach, which is
+ * not a trade a repaint should make.
+ */
+const INPUT_REPORTING_OFF = [
+  "\x1b[?1000l", // X11 mouse: button press and release
+  "\x1b[?1002l", // cell motion tracking (drag)
+  "\x1b[?1003l", // all motion tracking — the one that spams
+  "\x1b[?1006l", // SGR extended coordinates
+  "\x1b[?1004l", // focus in/out reporting
+].join("");
+
+const RESET_MODES = [
+  "\x1b[?1049l", // leave the alternate screen, back to the normal buffer
+  "\x1b[!p", // soft reset: scroll region, origin mode, character sets
+  "\x1b[?25h", // show the cursor, which a TUI may have hidden
+  "\x1b[0m", // drop colours and attributes
+  INPUT_REPORTING_OFF,
+  "\x1b[?2004l", // bracketed paste
+].join("");
+
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   sessions: {},
-  activeSessionId: null,
   socketConnected: false,
   fontSize: DEFAULT_FONT_SIZE,
   defaultCwd: "",
@@ -55,23 +226,17 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     const socket = getSocket();
 
     socket.on("connect", () => {
+      generation += 1;
       set({ socketConnected: true });
+      usePresenceStore.getState().clear();
 
-      // On reconnect, re-create all existing sessions (server killed PTYs on disconnect)
-      const { sessions } = get();
-      for (const session of Object.values(sessions)) {
-        if (session.status === "disconnected" || session.status === "error") {
-          socket.emit("create_terminal", {
-            sessionId: session.id,
-            cwd: get().defaultCwd || undefined,
-          });
-          set({
-            sessions: {
-              ...get().sessions,
-              [session.id]: { ...get().sessions[session.id], status: "connecting", inTmux: false, inEditor: null },
-            },
-          });
-        }
+      // The server kills a socket's ptys when it goes, so every session from an
+      // earlier connection needs a new one. Keying this on the generation
+      // rather than on `status` is what makes it reliable: a session left
+      // marked "connected" across a drop used to be skipped here, leaving a tab
+      // that looked fine, ignored every keystroke, and never redrew.
+      for (const session of Object.values(get().sessions)) {
+        if (session.gen !== generation) requestPty(session.id, get, set);
       }
     });
 
@@ -81,18 +246,52 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const { sessions } = get();
       const updated: Record<string, (typeof sessions)[string]> = {};
       for (const [id, session] of Object.entries(sessions)) {
+        // The modes are not reset here any more. The pty survives a short drop
+        // now, so this screen may be mid-paint in something that is still
+        // running — and leaving the alternate screen under it would strand the
+        // repaint on the normal buffer. A pty that turns out to be new gets the
+        // reset when it says so, which is what the reset was ever for.
         updated[id] = { ...session, status: "disconnected" };
       }
       set({ sessions: updated });
     });
 
-    socket.on("terminal_ready", (data: { sessionId: string }) => {
+    // Two handshake refusals, both of which retrying cannot fix, so each
+    // replaces the app with something actionable instead of a spinner:
+    // "unauthorized" is a missing or stale session cookie (expired, or
+    // invalidated by a password change), and "busy" is another device holding
+    // the single app session.
+    socket.on("connect_error", (err: Error & { data?: { since?: number } }) => {
+      if (err?.message === "unauthorized") {
+        useAuthStore.getState().lock();
+        return;
+      }
+      if (err?.message === "busy") {
+        usePresenceStore.getState().setBusy(err.data?.since ?? null);
+        socket.disconnect();
+      }
+    });
+
+    // Another device took the session. Stand down and stay down: reconnecting
+    // on our own would be a tug of war over the same lock, and the gate has a
+    // Check now button for when the user wants back in.
+    socket.on("displaced", () => {
+      usePresenceStore.getState().setDisplaced();
+      socket.disconnect();
+    });
+
+    socket.on("terminal_ready", (data: { sessionId: string; reattached?: boolean }) => {
       const { sessions } = get();
       const session = sessions[data.sessionId];
       if (!session) return;
 
-      const connectedMsg = "\x1b[1;32mConnected!\x1b[0m\r\n";
-      if (session.terminal) {
+      // Nothing is said to a reattached pty. It is the same shell, still
+      // running, and its own output is about to continue from wherever it had
+      // got to — a greeting written into that, or a mode reset under it, would
+      // corrupt whatever it is drawing. A fresh pty is a new shell, and both
+      // are exactly what a new shell wants.
+      const connectedMsg = data.reattached ? "" : `${RESET_MODES}\x1b[1;32mConnected!\x1b[0m\r\n`;
+      if (session.terminal && connectedMsg) {
         session.terminal.write(connectedMsg);
       }
       set({
@@ -105,6 +304,14 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           },
         },
       });
+
+      // The PTY is spawned at 80x24 and the server drops a resize for a session
+      // it hasn't created yet, so a terminal that measured itself before the
+      // PTY existed never got its real size across. A shell reflows at its next
+      // prompt and hides it; tmux paints a whole screen the moment it attaches,
+      // so a tmux tab sat drawn at 80x24 until some unrelated layout change
+      // resized the pane. Push the size here, where the PTY is known to exist.
+      fitAndPush(data.sessionId, get);
     });
 
     socket.on("terminal_output", (data: { sessionId: string; data: string }) => {
@@ -132,7 +339,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const session = sessions[data.sessionId];
       if (!session) return;
 
-      const errorMsg = "\r\n\x1b[1;31mError: " + data.error + "\x1b[0m";
+      const errorMsg = `\r\n\x1b[1;31mError: ${data.error}\x1b[0m`;
       if (session.terminal) {
         session.terminal.write(errorMsg);
       }
@@ -154,7 +361,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const session = sessions[data.sessionId];
       if (!session) return;
 
-      const msg = "\r\n\x1b[1;33mSession closed (exit " + data.exitCode + ").\x1b[0m";
+      const msg = `\r\n\x1b[1;33mSession closed (exit ${data.exitCode}).\x1b[0m`;
       if (session.terminal) {
         session.terminal.write(msg);
       }
@@ -167,7 +374,13 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     });
   },
 
-  createSession: (sessionId, name, cwd) => {
+  // Nothing retries on its own: the session is held by a device this one
+  // cannot touch, so the only honest trigger is the user asking.
+  retryNow: () => {
+    getSocket().connect();
+  },
+
+  createSession: (sessionId, name, cwd, tmuxSession, tmuxSessionId) => {
     const { sessions } = get();
     const socket = getSocket();
 
@@ -177,20 +390,35 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         [sessionId]: {
           id: sessionId,
           name: name || `Terminal ${Object.keys(sessions).length + 1}`,
-          status: "connecting",
+          status: socket.connected ? "connecting" : "disconnected",
           terminal: null,
           fitAddon: null,
           error: null,
           outputBuffer: [],
-          inTmux: false,
-          inEditor: null,
+          tmuxSession,
+          tmuxSessionId,
+          // Not this generation yet: until the pty is asked for, the connect
+          // handler is the one that should ask.
+          gen: -1,
           cdCwd: "",
         },
       },
-      activeSessionId: sessionId,
     });
 
-    socket.emit("create_terminal", { sessionId, cwd: cwd || get().defaultCwd || undefined });
+    // Socket.IO buffers emits made while offline, which would create this twice
+    // once the connect handler also asks. Leave it to that handler instead.
+    if (socket.connected) requestPty(sessionId, get, set, cwd);
+  },
+
+  resetModes: (sessionId) => {
+    get().sessions[sessionId]?.terminal?.write(RESET_MODES);
+  },
+
+  restartSession: (sessionId) => {
+    const session = get().sessions[sessionId];
+    if (!session) return;
+    session.terminal?.write("\r\n\x1b[2;37mReconnecting…\x1b[0m\r\n");
+    requestPty(sessionId, get, set);
   },
 
   registerTerminal: (sessionId, terminal, fitAddon) => {
@@ -213,20 +441,31 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   sendInput: (sessionId, data) => {
     const socket = getSocket();
-    if (socket.connected) {
+    const session = get().sessions[sessionId];
+    if (socket.connected && session?.status === "connected") {
       socket.emit("terminal_input", { sessionId, data });
     }
   },
 
-  resizeTerminal: (sessionId, rows, cols) => {
-    const socket = getSocket();
-    if (socket.connected) {
-      socket.emit("terminal_resize", { sessionId, cols, rows });
+  pasteInput: (sessionId, text) => {
+    const terminal = get().sessions[sessionId]?.terminal;
+    // Nothing has read the program's modes yet, so there is nothing to decide
+    // the markers from. Sending it as keys is the old behaviour, not a fix.
+    if (!terminal) {
+      get().sendInput(sessionId, text);
+      return;
     }
+    // Comes back through `onData`, so it still goes out as `sendInput`.
+    terminal.paste(text);
+  },
+
+  runInput: (sessionId, command) => {
+    get().pasteInput(sessionId, command);
+    get().sendInput(sessionId, "\r");
   },
 
   closeSession: (sessionId) => {
-    const { sessions, activeSessionId } = get();
+    const { sessions } = get();
     const session = sessions[sessionId];
     if (!session) return;
 
@@ -240,69 +479,43 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     const newSessions = { ...sessions };
     delete newSessions[sessionId];
 
-    const remainingIds = Object.keys(newSessions);
-    const newActiveId =
-      activeSessionId === sessionId
-        ? remainingIds.length > 0
-          ? remainingIds[remainingIds.length - 1]
-          : null
-        : activeSessionId;
-
-    set({ sessions: newSessions, activeSessionId: newActiveId });
+    set({ sessions: newSessions });
   },
 
-  setActiveSession: (sessionId) => {
-    set({ activeSessionId: sessionId });
-    const { sessions } = get();
-    const session = sessions[sessionId];
-    if (session?.fitAddon && session.terminal) {
-      setTimeout(() => session.fitAddon!.fit(), 50);
-    }
-  },
+  refitSession: (sessionId) => fitAndPush(sessionId, get),
 
-  renameSession: (sessionId, name) => {
+  renameSession: (sessionId, name, tmuxSession, tmuxSessionId) => {
     const { sessions } = get();
     const session = sessions[sessionId];
     if (!session) return;
     set({
-      sessions: { ...sessions, [sessionId]: { ...session, name } },
+      sessions: {
+        ...sessions,
+        // Reconnecting re-attaches by this name, so a stale one would land the
+        // tab in a brand new session beside the one it was showing.
+        [sessionId]: {
+          ...session,
+          name,
+          ...(tmuxSession ? { tmuxSession } : {}),
+          ...(tmuxSessionId ? { tmuxSessionId } : {}),
+        },
+      },
     });
   },
 
   setFontSize: (size) => {
     set({ fontSize: size });
+    useWorkspaceStore.getState().setFontSize(size);
     // Apply to all existing terminal instances
     const { sessions } = get();
     for (const session of Object.values(sessions)) {
-      if (session.terminal) {
-        session.terminal.options.fontSize = size;
-        if (session.fitAddon) {
-          session.fitAddon.fit();
-          const socket = getSocket();
-          if (socket.connected) {
-            socket.emit("terminal_resize", {
-              sessionId: session.id,
-              cols: session.terminal.cols,
-              rows: session.terminal.rows,
-            });
-          }
-        }
-      }
+      if (!session.terminal) continue;
+      session.terminal.options.fontSize = size;
+      // A hidden pane keeps the new size and re-fits when it is next shown.
+      fitAndPush(session.id, get);
     }
   },
   setDefaultCwd: (cwd) => set({ defaultCwd: cwd }),
-  setInTmux: (sessionId, inTmux) => {
-    const { sessions } = get();
-    const session = sessions[sessionId];
-    if (!session) return;
-    set({ sessions: { ...sessions, [sessionId]: { ...session, inTmux } } });
-  },
-  setInEditor: (sessionId, editor) => {
-    const { sessions } = get();
-    const session = sessions[sessionId];
-    if (!session) return;
-    set({ sessions: { ...sessions, [sessionId]: { ...session, inEditor: editor } } });
-  },
   setCdCwd: (sessionId, cwd) => {
     const { sessions } = get();
     const session = sessions[sessionId];

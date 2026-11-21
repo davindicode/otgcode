@@ -1,6 +1,13 @@
-import { marked } from "marked";
-import { lazy, Suspense, useMemo, useState } from "react";
-import { rewriteLocalAssets } from "~/lib/markdown";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import DownloadIcon from "~/components/DownloadIcon";
+import RefreshIcon from "~/components/RefreshIcon";
+import { clearDraft, readDraft, writeDraft } from "~/lib/drafts";
+import { isSaveShortcut } from "~/lib/keys";
+import { renderMarkdown, rewriteLocalAssets, sanitizeHtml } from "~/lib/markdown";
+import { useRestoredScroll } from "~/lib/useRestoredScroll";
+import { readView, saveView } from "~/lib/viewState";
+import { showToast } from "~/stores/toastStore";
+import { useWorkspaceStore } from "~/stores/workspaceStore";
 import CopyPathButton from "./CopyPathButton";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
@@ -8,8 +15,21 @@ const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 interface CodeEditorProps {
   path: string;
   content: string;
-  onSave: (content: string) => void;
-  onClose: () => void;
+  /**
+   * Writes the file, answering whether it got there. A refusal — the file
+   * changed on disk, the write failed — has to be distinguishable, because
+   * the editor clears its unsaved state on the strength of it.
+   */
+  onSave: (content: string) => Promise<boolean>;
+  /** Re-read the file from disk; it may have changed since the tab opened. */
+  onReload: () => void;
+  /** Bumped per reload, so one that reads identical bytes still lands here. */
+  reloadCount: number;
+  /** It already has, and the pane is saying so. */
+  stale: boolean;
+  /** Told whenever there are edits not on disk — the same fact the save
+   * button's enabled state shows, so closing the tab can warn about them. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 const PREVIEWABLE = new Set(["md", "markdown", "html", "htm", "ipynb"]);
@@ -56,13 +76,18 @@ function getLanguage(path: string): string {
 
 function MarkdownPreview({ content, fontSize, path }: { content: string; fontSize: number; path: string }) {
   const html = useMemo(() => {
-    marked.setOptions({ breaks: true, gfm: true });
-    return rewriteLocalAssets(marked.parse(content) as string, path);
+    // Sanitised before the rewrite, which re-serialises what is left of it.
+    return rewriteLocalAssets(renderMarkdown(content), path);
   }, [content, path]);
+
+  const ref = useRef<HTMLDivElement>(null);
+  const onScroll = useRestoredScroll(ref, path, "previewScroll");
 
   return (
     <div
-      className="prose prose-invert max-w-none p-4 overflow-auto h-full bg-[#0d0d1a]"
+      ref={ref}
+      onScroll={onScroll}
+      className="prose prose-invert max-w-none p-4 overflow-auto h-full bg-app"
       style={{ fontSize: `${fontSize}px` }}
       dangerouslySetInnerHTML={{ __html: html }}
     />
@@ -110,7 +135,10 @@ function joinSource(s: string | string[] | undefined): string {
   return Array.isArray(s) ? s.join("") : s;
 }
 
-function NotebookPreview({ content, fontSize }: { content: string; fontSize: number }) {
+function NotebookPreview({ content, fontSize, path }: { content: string; fontSize: number; path: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const onScroll = useRestoredScroll(ref, path, "previewScroll");
+
   const cells = useMemo(() => {
     try {
       const nb = JSON.parse(content);
@@ -122,18 +150,23 @@ function NotebookPreview({ content, fontSize }: { content: string; fontSize: num
 
   if (cells.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-500 text-sm">Could not parse notebook</div>
+      <div className="flex items-center justify-center h-full text-ink-faint text-sm">Could not parse notebook</div>
     );
   }
 
   return (
-    <div className="overflow-auto h-full bg-[#0d0d1a] p-4 space-y-3" style={{ fontSize: `${fontSize}px` }}>
+    <div
+      ref={ref}
+      onScroll={onScroll}
+      className="overflow-auto h-full bg-app p-4 space-y-3"
+      style={{ fontSize: `${fontSize}px` }}
+    >
       {cells.map((cell, i) => (
-        <div key={i} className="rounded border border-gray-700 overflow-hidden">
+        <div key={i} className="rounded-control border border-line overflow-hidden">
           {/* Cell header */}
-          <div className="flex items-center gap-2 px-3 py-1 bg-[#16162a] text-xs text-gray-400">
+          <div className="flex items-center gap-2 px-3 py-1 bg-surface text-xs text-ink-dim">
             <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+              className={`px-1.5 py-0.5 rounded-control text-[10px] font-medium ${
                 cell.cell_type === "code" ? "bg-blue-900/50 text-blue-300" : "bg-green-900/50 text-green-300"
               }`}
             >
@@ -142,24 +175,25 @@ function NotebookPreview({ content, fontSize }: { content: string; fontSize: num
             <span>[{i + 1}]</span>
           </div>
           {/* Cell source */}
-          <div className="bg-[#1a1a2e]">
+          <div className="bg-raised">
             {cell.cell_type === "markdown" ? (
               <div
                 className="prose prose-invert prose-sm max-w-none p-3"
                 dangerouslySetInnerHTML={{
-                  __html: marked.parse(joinSource(cell.source)) as string,
+                  __html: renderMarkdown(joinSource(cell.source)),
                 }}
               />
             ) : (
-              <pre className="p-3 text-sm text-gray-200 overflow-x-auto font-mono">{joinSource(cell.source)}</pre>
+              <pre className="p-3 text-sm text-ink-muted overflow-x-auto font-mono">{joinSource(cell.source)}</pre>
             )}
           </div>
           {/* Cell outputs */}
           {cell.outputs && cell.outputs.length > 0 && (
-            <div className="border-t border-gray-700 bg-[#0d0d1a] p-3">
+            <div className="border-t border-line bg-app p-3">
               {cell.outputs.map((output, j) => {
                 const text = joinSource(output.text) || joinSource(output.data?.["text/plain"]) || "";
-                const html = joinSource(output.data?.["text/html"]);
+                // A notebook's own HTML output, which is as arbitrary as its source.
+                const html = sanitizeHtml(joinSource(output.data?.["text/html"]));
                 const imgRaw = output.data?.["image/png"];
                 const imgData = Array.isArray(imgRaw) ? imgRaw[0] : imgRaw;
 
@@ -173,7 +207,7 @@ function NotebookPreview({ content, fontSize }: { content: string; fontSize: num
                     ) : imgData ? (
                       <img src={`data:image/png;base64,${imgData}`} alt="output" className="max-w-full" />
                     ) : text ? (
-                      <pre className="text-sm text-gray-300 overflow-x-auto font-mono whitespace-pre-wrap">{text}</pre>
+                      <pre className="text-sm text-ink-muted overflow-x-auto font-mono whitespace-pre-wrap">{text}</pre>
                     ) : null}
                   </div>
                 );
@@ -186,127 +220,441 @@ function NotebookPreview({ content, fontSize }: { content: string; fontSize: num
   );
 }
 
-export default function CodeEditor({ path, content, onSave, onClose }: CodeEditorProps) {
+/** Quiet period before a keystroke reaches storage. */
+const DRAFT_DEBOUNCE_MS = 500;
+
+const MODES = ["edit", "plain", "preview"] as const;
+type Mode = (typeof MODES)[number];
+
+/** Narrows what came back from storage, which is a string and may be anything. */
+const isMode = (value: string | undefined): value is Mode => MODES.includes(value as Mode);
+
+/** Quiet period before a scroll offset is written down. */
+const SCROLL_SETTLE_MS = 400;
+
+const MODE_LABELS: Record<Mode, string> = { edit: "Edit", plain: "Plain", preview: "Preview" };
+const MODE_HINTS: Record<Mode, string> = {
+  edit: "Full code editor",
+  plain: "Easier select & copy",
+  preview: "Rendered output",
+};
+
+/**
+ * The slice of Monaco's editor we actually use. Structural rather than an
+ * import so the type doesn't drag the whole editor package into scope.
+ */
+interface MonacoHandle {
+  trigger: (source: string, handlerId: string, payload: unknown) => void;
+  focus: () => void;
+  getModel: () => { canUndo: () => boolean; canRedo: () => boolean } | null;
+  addCommand: (keybinding: number, handler: () => void) => void;
+  getScrollTop: () => number;
+  setScrollTop: (top: number) => void;
+  onDidScrollChange: (listener: () => void) => void;
+}
+
+export default function CodeEditor({
+  path,
+  content,
+  onSave,
+  onReload,
+  reloadCount,
+  stale,
+  onDirtyChange,
+}: CodeEditorProps) {
   const ext = getExt(path);
   const canPreview = PREVIEWABLE.has(ext);
-  const [value, setValue] = useState(content);
-  const [dirty, setDirty] = useState(false);
-  const [mode, setMode] = useState<"edit" | "plain" | "preview">(canPreview ? "preview" : "edit");
-  const [editorFontSize, setEditorFontSize] = useState(6);
-  const isHtml = ext === "html" || ext === "htm";
-  const [htmlZoom, setHtmlZoom] = useState(100);
+  /**
+   * What was being typed when the page last went away, read once at mount.
+   *
+   * Restored rather than offered: the file is on screen either way, and a
+   * prompt asking whether to keep your own unsaved work is a question with
+   * one sensible answer. It comes back dirty, with the save button lit and
+   * the asterisk in the header, so what is on screen is not what is on disk
+   * and the editor says so. A draft that matches the file exactly is not
+   * worth restoring — it is what someone else already saved.
+   */
+  const [draft] = useState(() => readDraft(path));
+  const [value, setValue] = useState(draft ?? content);
+  const [dirty, setDirty] = useState(draft !== null && draft !== content);
+  /** How this file was last being read: which mode, zoom and scroll offset. */
+  const [saved] = useState(() => readView(path));
+  // Opening a file shows it; editing it is a choice you make. Markdown and
+  // friends have a rendered form, everything else gets plain text — so what
+  // you land in never depends on the extension beyond that.
+  const [mode, setMode] = useState<Mode>(isMode(saved.mode) ? saved.mode : canPreview ? "preview" : "plain");
+  const [modeMenu, setModeMenu] = useState(false);
+  const modeMenuRef = useRef<HTMLDivElement>(null);
+  /** False until the first render's effects have run. */
+  const mounted = useRef(false);
+  const monacoRef = useRef<MonacoHandle | null>(null);
+  // Reloading over unsaved work would throw it away silently, so the first tap
+  // only warns. Clears itself, so an armed button cannot sit waiting.
+  const [discardArmed, setDiscardArmed] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
-  const handleChange = (v: string | undefined) => {
-    if (v !== undefined) {
-      setValue(v);
-      setDirty(v !== content);
+  const editorFontSize = useWorkspaceStore((s) => s.editorFontSize);
+  const monacoTheme = useWorkspaceStore((s) => (s.theme === "light" ? "light" : "vs-dark"));
+  const isHtml = ext === "html" || ext === "htm";
+  const [htmlZoom, setHtmlZoom] = useState(saved.htmlZoom ?? 100);
+
+  /**
+   * The bytes a save of ours wrote, so the file coming back down can be told
+   * apart from news about it.
+   */
+  const written = useRef<string | null>(null);
+  /** The buffer as it stands, for the async paths that cannot close over it. */
+  const latest = useRef(value);
+  latest.current = value;
+  const lastReload = useRef(reloadCount);
+
+  // `value` is only seeded from `content` at mount, so a changed file has to be
+  // taken up here. Keeps the chosen mode and zoom, which a remount would reset.
+  //
+  // Watches the reload counter as well as the content, because a reload whose
+  // bytes match what is already loaded leaves `content` identical — and then
+  // this did nothing at all. Discarding edits by reloading was the visible
+  // case: the file on disk still held what the tab had read, so the editor kept
+  // the unsaved changes the second tap had just agreed to throw away.
+  // Not on the first run, which is what the state above is already set to —
+  // and which would otherwise overwrite a restored draft with the file.
+  useEffect(() => {
+    const asked = reloadCount !== lastReload.current;
+    lastReload.current = reloadCount;
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
     }
+    /**
+     * Our own save coming back is not a changed file, and must not be taken
+     * up: the pane hands down the bytes it just wrote, and the buffer may have
+     * moved past them — a save over a tunnel takes long enough to keep typing
+     * through. Copying them back in undid that typing, and did it loudly:
+     * Monaco replaces its entire document when its `value` prop disagrees with
+     * its model, which leaves the caret at the end of the file. A pointer
+     * jumping to the bottom of the document mid-edit was this.
+     *
+     * The mark is not touched here either. `handleSave` knows the bytes it
+     * sent, so it is the one that can say whether the buffer is still them.
+     */
+    if (!asked && content === written.current) {
+      written.current = null;
+      return;
+    }
+    setValue(content);
+    setDirty(false);
+    setDiscardArmed(false);
+  }, [content, reloadCount]);
+
+  useEffect(() => {
+    saveView(path, { mode, htmlZoom });
+  }, [path, mode, htmlZoom]);
+
+  /**
+   * How far down the file had been read, kept across a reload.
+   *
+   * One offset for both text views, which is right because they are the same
+   * monospace text at the same size — switching between them should not jump,
+   * and it already did not. Preview keeps `previewScroll` instead: it is a
+   * rendered document of a different height, so an offset from the source
+   * means nothing in it.
+   */
+  const plainRef = useRef<HTMLTextAreaElement>(null);
+  const settle = useRef(0);
+  const rememberScroll = (top: number) => {
+    clearTimeout(settle.current);
+    settle.current = window.setTimeout(() => saveView(path, { scroll: top }), SCROLL_SETTLE_MS);
+  };
+  useEffect(() => () => clearTimeout(settle.current), []);
+
+  // Monaco does its own scrolling, so it is asked rather than observed; the
+  // textarea is a plain element and has the event. Both land in one place.
+  useEffect(() => {
+    if (mode !== "plain") return;
+    const el = plainRef.current;
+    if (el) el.scrollTop = saved.scroll ?? 0;
+  }, [mode, saved.scroll]);
+
+  /**
+   * Mirror the buffer into the browser while it differs from the file.
+   *
+   * One effect for both halves, so there is nothing to remember to call:
+   * saving and discarding both end with `dirty` false, and clearing on that
+   * is how a draft stops existing. Debounced, because this runs on every
+   * keystroke and storage is synchronous — and flushed on `pagehide`, which
+   * is the last thing that runs before a phone evicts a backgrounded tab, so
+   * the tail of what was typed goes with it.
+   */
+  useEffect(() => {
+    if (!dirty || value === content) {
+      clearDraft(path);
+      return;
+    }
+    const flush = () => writeDraft(path, value);
+    const id = setTimeout(flush, DRAFT_DEBOUNCE_MS);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [dirty, value, content, path]);
+
+  // Reported rather than read: the tab strip needs it to know whether its X
+  // would throw work away, and it is derived state here, not there.
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+
+  /**
+   * Reload, unless that would throw away unsaved work: the first tap then only
+   * says so, and the second goes through. Not a dialog, because a two-tap
+   * button is already the pattern the remove-command control uses.
+   */
+  const reload = () => {
+    if (dirty && !discardArmed) {
+      setDiscardArmed(true);
+      showToast("Unsaved changes — tap reload again to discard them");
+      setTimeout(() => setDiscardArmed(false), 4000);
+      return;
+    }
+    setDiscardArmed(false);
+    // Agreeing to lose the edits has to lose the browser's copy of them too.
+    // Re-reading the file tears this editor down — the pane shows a spinner
+    // while it reads — and a draft left behind is restored on the way back,
+    // which made the second tap re-read the file and hand the edits straight
+    // back with the asterisk still on.
+    clearDraft(path);
+    onReload();
   };
 
-  const handleSave = () => {
-    onSave(value);
-    setDirty(false);
+  // Asks Monaco rather than shadowing it with a second stack: two histories
+  // over one editor would disagree the moment someone pressed Ctrl+Z.
+  const refreshHistory = useCallback(() => {
+    const model = monacoRef.current?.getModel();
+    setCanUndo(!!model?.canUndo());
+    setCanRedo(!!model?.canRedo());
+  }, []);
+
+  const handleChange = (v: string | undefined) => {
+    if (v === undefined) return;
+    setValue(v);
+    setDirty(v !== content);
+    refreshHistory();
+  };
+
+  const history = (direction: "undo" | "redo") => {
+    monacoRef.current?.trigger("toolbar", direction, null);
+    monacoRef.current?.focus();
+    // Monaco applies the edit synchronously but settles its stack after.
+    queueMicrotask(refreshHistory);
+  };
+
+  useEffect(refreshHistory, [refreshHistory]);
+
+  useEffect(() => {
+    if (!modeMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setModeMenu(false);
+    };
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest("[data-mode-trigger]")) return;
+      if (modeMenuRef.current && !modeMenuRef.current.contains(target as Node)) setModeMenu(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [modeMenu]);
+
+  /**
+   * Only clean once the file is actually written.
+   *
+   * This used to clear the unsaved mark the moment it asked. A save the server
+   * refused because the file had moved on disk raises a dialog with an
+   * Overwrite and a Keep editing — and taking Keep editing left an editor with
+   * no asterisk, a disabled save button, and edits that were still only in it.
+   * Then the browser copy was cleared on the same signal, which turned that
+   * into losing them. The forced save from that dialog is answered for too:
+   * the file it writes comes back down as new content, and the effect that
+   * follows a changed file clears the mark.
+   */
+  const handleSave = async () => {
+    const snapshot = value;
+    if (!(await onSave(snapshot))) return;
+    written.current = snapshot;
+    // Clean, unless something was typed while the write was in flight: the
+    // file holds the snapshot and the buffer has moved past it.
+    setDirty(latest.current !== snapshot);
+  };
+
+  /**
+   * Ctrl/Cmd+S saves the file instead of opening the browser's "save page"
+   * dialog. Bound on this pane rather than the document: every tab stays
+   * mounted, so a document listener would fire in editors the user isn't
+   * looking at. Keystrokes bubble from the focused editor, and an unfocused
+   * pane can't receive them.
+   *
+   * And this is the only binding, deliberately. Monaco's own
+   * `editor.addCommand(CtrlCmd | KeyS, …)` used to sit beside it, which in a
+   * split broke saving outright: monaco's keybinding service is a single
+   * global singleton, a command registered with no `when` clause is an
+   * unconditional rule, and two open editors each registered that same rule.
+   * The resolver picks one, so Ctrl+S in either editor ran the winner's
+   * handler — which closed over the *other* editor's state, found it not
+   * dirty, and returned having done nothing. Monaco also stops propagation
+   * for anything it resolves, so this handler never got the chance to be
+   * right. Giving the command a per-editor `when` context would have fixed
+   * its aim; registering no global keybinding at all fixes the cause.
+   */
+  const handlePaneKeyDown = (e: React.KeyboardEvent) => {
+    if (!isSaveShortcut(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (dirty) handleSave();
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-[#16162a] border-b border-gray-700 shrink-0">
-        <span
-          className="text-sm text-gray-300 whitespace-nowrap min-w-0 flex-1 overflow-hidden text-ellipsis select-none"
-          title={path}
-        >
-          {path}
-        </span>
-        <CopyPathButton path={path} />
+    <div className="flex flex-col h-full" onKeyDown={handlePaneKeyDown}>
+      <div className="bar-edge flex items-center gap-2 px-3 py-1.5 bg-surface border-b border-line shrink-0">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="min-w-0 truncate text-sm text-ink-muted select-none" title={path}>
+            {path}
+          </span>
+          <CopyPathButton path={path} />
+        </div>
+        <div className="min-w-2 flex-1" />
         <div className="flex items-center gap-1.5 shrink-0">
-          <div className="flex items-center bg-[#0d0d1a] rounded overflow-hidden border border-gray-700">
-            <button
-              onClick={() => setMode("edit")}
-              className={`px-2 py-0.5 text-xs transition-colors ${
-                mode === "edit" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => setMode("plain")}
-              title="Plain text — easier selection & copy on mobile"
-              className={`px-2 py-0.5 text-xs transition-colors ${
-                mode === "plain" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              Plain
-            </button>
-            {canPreview && (
+          {/* Undo/redo: the keyboard has them, so a phone should too — the
+              same reasoning as the save button beside Ctrl+S. */}
+          {mode === "edit" && (
+            <div className="flex items-center gap-1">
               <button
-                onClick={() => setMode("preview")}
-                className={`px-2 py-0.5 text-xs transition-colors ${
-                  mode === "preview" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
-                }`}
+                type="button"
+                onClick={() => history("undo")}
+                disabled={!canUndo}
+                title="Undo (Ctrl+Z)"
+                aria-label="Undo"
+                className="relief rounded-control p-1 text-ink-muted hover:text-ink"
               >
-                Preview
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 14L4 9l5-5" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 9h10a6 6 0 010 12h-3" />
+                </svg>
               </button>
+              <button
+                type="button"
+                onClick={() => history("redo")}
+                disabled={!canRedo}
+                title="Redo (Ctrl+Y)"
+                aria-label="Redo"
+                className="relief rounded-control p-1 text-ink-muted hover:text-ink"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 14l5-5-5-5" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 9H10a6 6 0 000 12h3" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* One dropdown instead of up to three side-by-side buttons: the bar
+              also carries the path, and this is a pick-one choice. */}
+          <div className="relative">
+            <button
+              type="button"
+              data-mode-trigger=""
+              onClick={() => setModeMenu((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={modeMenu}
+              className={`relief flex items-center gap-1 rounded-control px-2 py-0.5 text-xs ${
+                modeMenu ? "text-ink" : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              {MODE_LABELS[mode]}
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {modeMenu && (
+              <div
+                ref={modeMenuRef}
+                role="menu"
+                className="glass absolute right-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-panel py-1"
+              >
+                {MODES.filter((m) => m !== "preview" || canPreview).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      setMode(m);
+                      setModeMenu(false);
+                    }}
+                    className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs transition-colors hover:bg-hover ${
+                      mode === m ? "text-ink" : "text-ink-muted"
+                    }`}
+                  >
+                    <span>
+                      {MODE_LABELS[m]}
+                      <span className="block text-[10px] text-ink-faint">{MODE_HINTS[m]}</span>
+                    </span>
+                    {mode === m && (
+                      <svg
+                        className="h-3.5 w-3.5 shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
           {/* Font size / Zoom controls */}
           {isHtml && mode === "preview" ? (
-            <div className="flex items-center gap-1 border border-gray-700 rounded overflow-hidden">
+            <div className="flex items-center gap-1 border border-line rounded-control overflow-hidden">
               <button
                 onClick={() => setHtmlZoom((z) => Math.max(25, z - 25))}
-                className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700"
+                className="px-2 py-0.5 text-xs text-ink-dim hover:text-ink hover:bg-control"
               >
                 -
               </button>
               <button
                 onClick={() => setHtmlZoom(100)}
-                className="px-2 py-0.5 text-[10px] text-gray-400 hover:text-white hover:bg-gray-700 tabular-nums"
+                className="px-2 py-0.5 text-[10px] text-ink-dim hover:text-ink hover:bg-control tabular-nums"
               >
                 {htmlZoom}%
               </button>
               <button
                 onClick={() => setHtmlZoom((z) => Math.min(300, z + 25))}
-                className="px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700"
+                className="px-2 py-0.5 text-xs text-ink-dim hover:text-ink hover:bg-control"
               >
                 +
               </button>
             </div>
           ) : (
-            <div className="flex items-center border border-gray-700 rounded overflow-hidden">
-              <button
-                onClick={() => setEditorFontSize((s) => Math.max(6, s - 1))}
-                className="px-1.5 py-0.5 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors leading-none"
-              >
-                <span className="text-[9px] font-bold">a</span>
-              </button>
-              <span className="text-[10px] text-gray-500 w-5 text-center tabular-nums">{editorFontSize}</span>
-              <button
-                onClick={() => setEditorFontSize((s) => Math.min(32, s + 1))}
-                className="px-1.5 py-0.5 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors leading-none"
-              >
-                <span className="text-[14px] font-bold">A</span>
-              </button>
-            </div>
+            <span />
           )}
           <a
             href={`/api/files/download?path=${encodeURIComponent(path)}`}
             download
-            className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+            className="relief p-1 text-ink-muted hover:text-ink rounded-control"
             title="Download"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"
-              />
-            </svg>
+            <DownloadIcon />
           </a>
           {dirty && <span className="text-xs text-yellow-500">*</span>}
           <button
             onClick={handleSave}
             disabled={!dirty}
-            className="p-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
+            className="p-1 relief-accent disabled:bg-control disabled:text-ink-faint text-white rounded-control transition-colors"
             title="Save"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -319,22 +667,32 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
             </svg>
           </button>
           <button
-            onClick={onClose}
-            className="p-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
-            title="Close"
+            onClick={reload}
+            className={`relief p-1 rounded-control ${
+              stale || discardArmed
+                ? "glow text-amber-300 ring-2 ring-inset ring-amber-400/70"
+                : "text-ink-muted hover:text-ink"
+            }`}
+            title={
+              discardArmed
+                ? "Tap again to discard your edits and reload"
+                : stale
+                  ? "Changed on disk — reload"
+                  : "Reload from disk"
+            }
+            aria-label="Reload from disk"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <RefreshIcon className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
+      {/* Toolbar */}
 
       {/* Content */}
       <div className="flex-1 min-h-0">
         {mode === "preview" && canPreview ? (
           ext === "ipynb" ? (
-            <NotebookPreview content={value} fontSize={editorFontSize} />
+            <NotebookPreview content={value} fontSize={editorFontSize} path={path} />
           ) : ext === "html" || ext === "htm" ? (
             <HtmlPreview content={value} zoom={htmlZoom} />
           ) : (
@@ -344,18 +702,20 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
           // Native textarea: mobile gets real selection handles + OS "Select All",
           // which Monaco's custom-rendered editor does not support on touch.
           <textarea
+            ref={plainRef}
             readOnly
             value={value}
+            onScroll={(e) => rememberScroll(e.currentTarget.scrollTop)}
             spellCheck={false}
             autoCapitalize="off"
             autoCorrect="off"
-            className="w-full h-full resize-none bg-[#0d0d1a] text-gray-200 font-mono p-3 outline-none border-0 selection:bg-blue-600/40"
+            className="w-full h-full resize-none bg-app text-ink-muted font-mono p-3 outline-none border-0 selection:bg-blue-600/40"
             style={{ fontSize: `${editorFontSize}px`, lineHeight: 1.6 }}
           />
         ) : (
           <Suspense
             fallback={
-              <div className="flex items-center justify-center h-full text-gray-500 text-sm">Loading editor...</div>
+              <div className="flex items-center justify-center h-full text-ink-faint text-sm">Loading editor...</div>
             }
           >
             <MonacoEditor
@@ -363,7 +723,14 @@ export default function CodeEditor({ path, content, onSave, onClose }: CodeEdito
               language={getLanguage(path)}
               value={value}
               onChange={handleChange}
-              theme="vs-dark"
+              onMount={(editor) => {
+                const handle = editor as unknown as MonacoHandle;
+                monacoRef.current = handle;
+                if (saved.scroll) handle.setScrollTop(saved.scroll);
+                handle.onDidScrollChange(() => rememberScroll(handle.getScrollTop()));
+                refreshHistory();
+              }}
+              theme={monacoTheme}
               options={{
                 minimap: { enabled: false },
                 fontSize: editorFontSize,

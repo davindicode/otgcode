@@ -1,6 +1,6 @@
-export const DEFAULT_FONT_SIZE = 6;
-export const MIN_FONT_SIZE = 6;
-export const MAX_FONT_SIZE = 24;
+// Defined alongside the persisted-settings schema so there is one source of
+// truth for what a valid font size is.
+export { DEFAULT_FONT_SIZE, MAX_FONT_SIZE, MIN_FONT_SIZE } from "./workspace.shared";
 
 function getAppPort(): number {
   if (typeof document === "undefined") return 0;
@@ -12,7 +12,7 @@ function getAppPort(): number {
 }
 
 export function isPortBlocked(port: number): string | null {
-  if (isNaN(port) || port < 1 || port > 65535) {
+  if (Number.isNaN(port) || port < 1 || port > 65535) {
     return "Invalid port number";
   }
   // Privileged ports (except 80, 443)

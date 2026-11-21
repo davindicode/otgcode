@@ -1,12 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import RefreshIcon from "~/components/RefreshIcon";
+import { apiPost } from "~/lib/api";
+import { readCommitDraft, writeCommitDraft } from "~/lib/drafts";
+import { errorMessage } from "~/lib/errors";
+import { shellQuote } from "~/lib/shell";
+import { isTabVisible, useTabsStore } from "~/stores/tabsStore";
 import { useTerminalStore } from "~/stores/terminalStore";
-
-interface QuickKey {
-  label: string;
-  key: string;
-  title: string;
-}
+import { showToast } from "~/stores/toastStore";
+import { useWorkspaceStore } from "~/stores/workspaceStore";
+import CommandChips, { type Chip } from "./CommandChips";
+import { CLI_VENDORS, CODE_COMMON_KEYS, type QuickKey } from "./cliKeys";
+import {
+  COMBO_MODES,
+  COMBO_SETS,
+  type ComboMode,
+  type ComboSet,
+  comboSequence,
+  FN_COMBO_KEYS,
+  NAV_COMBO_KEYS,
+  SYMBOL_COMBO_KEYS,
+} from "./combos";
+import DropUpSelect from "./DropUpSelect";
+import { dragScroll, wheelScroll } from "./dragScroll";
 
 interface QuickKeyGroup {
   label: string;
@@ -16,7 +31,7 @@ interface QuickKeyGroup {
 
 const TERMINAL_GROUPS: QuickKeyGroup[] = [
   {
-    label: "cmds",
+    label: "commands",
     title: "Common commands (executed immediately)",
     keys: [
       { label: "ls", key: "ls\n", title: "List files" },
@@ -34,176 +49,21 @@ const TERMINAL_GROUPS: QuickKeyGroup[] = [
   },
 ];
 
-// Always-visible nav keys (shown below text input)
-const NAV_KEYS: QuickKey[] = [
-  { label: "Enter", key: "\r", title: "Enter / Confirm" },
-  { label: "Bksp", key: "\x7f", title: "Backspace" },
-];
-
-// Less common nav keys (shown after NAV_KEYS)
-const NAV_TAIL: QuickKey[] = [
-  { label: "Esc", key: "\x1b", title: "Escape" },
-  { label: "Tab", key: "\t", title: "Autocomplete" },
-  { label: "PgUp", key: "\x1b[5~", title: "Page up" },
-  { label: "PgDn", key: "\x1b[6~", title: "Page down" },
-  { label: "y", key: "y", title: "Yes — approve / confirm (tmux kill-pane, Claude prompts, etc.)" },
-  { label: "n", key: "n", title: "No — deny / decline" },
-];
-
-// Arrow keys pinned to the end of the bar
-const NAV_ARROWS: QuickKey[] = [
-  { label: "↑", key: "\x1b[A", title: "Up / Previous command" },
-  { label: "↓", key: "\x1b[B", title: "Down / Next command" },
-  { label: "←", key: "\x1b[D", title: "Cursor left" },
-  { label: "→", key: "\x1b[C", title: "Cursor right" },
-];
-
-const NANO_KEYS: QuickKey[] = [
-  { label: "Ctrl+O save", key: "\x0f", title: "Write out (save)" },
-  { label: "Ctrl+W search", key: "\x17", title: "Search" },
-  { label: "Ctrl+K cut", key: "\x0b", title: "Cut line" },
-  { label: "Ctrl+U paste", key: "\x15", title: "Paste" },
-  { label: "Ctrl+G help", key: "\x07", title: "Help" },
-  { label: "Ctrl+\\ replace", key: "\x1c", title: "Search & replace" },
-  { label: "Ctrl+C pos", key: "\x03", title: "Show cursor position" },
-  { label: "Ctrl+_ goto", key: "\x1f", title: "Go to line number" },
-];
-
-const VIM_KEYS: QuickKey[] = [
-  { label: ":w", key: ":w\n", title: "Write (save)" },
-  { label: ":q", key: ":q\n", title: "Quit" },
-  { label: ":wq", key: ":wq\n", title: "Write & quit" },
-  { label: ":q!", key: ":q!\n", title: "Force quit" },
-  { label: "Esc", key: "\x1b", title: "Normal mode" },
-  { label: "i", key: "i", title: "Insert mode" },
-  { label: "a", key: "a", title: "Append" },
-  { label: "o", key: "o", title: "Open line below" },
-  { label: "dd", key: "dd", title: "Delete line" },
-  { label: "yy", key: "yy", title: "Yank line" },
-  { label: "p", key: "p", title: "Paste" },
-  { label: "u", key: "u", title: "Undo" },
-  { label: "Ctrl+R", key: "\x12", title: "Redo" },
-  { label: "/", key: "/", title: "Search" },
-  { label: "n", key: "n", title: "Next match" },
-  { label: "gg", key: "gg", title: "Go to top" },
-  { label: "G", key: "G", title: "Go to bottom" },
-];
-
-const TMUX_KEYS: QuickKey[] = [
-  { label: "c new", key: "\x02c", title: "New window" },
-  { label: "n next", key: "\x02n", title: "Next window" },
-  { label: "p prev", key: "\x02p", title: "Previous window" },
-  { label: "0", key: "\x020", title: "Window 0" },
-  { label: "1", key: "\x021", title: "Window 1" },
-  { label: "2", key: "\x022", title: "Window 2" },
-  { label: "3", key: "\x023", title: "Window 3" },
-  { label: "4", key: "\x024", title: "Window 4" },
-  { label: "5", key: "\x025", title: "Window 5" },
-  { label: '" hsplit', key: '\x02"', title: "Split horizontal" },
-  { label: "% vsplit", key: "\x02%", title: "Split vertical" },
-  { label: "o pane", key: "\x02o", title: "Next pane" },
-  { label: "x kill", key: "\x02x", title: "Kill pane" },
-  { label: "z zoom", key: "\x02z", title: "Toggle zoom pane" },
-  { label: "[ scroll", key: "\x02[", title: "Scroll/copy mode (Esc to exit)" },
-  { label: "] paste", key: "\x02]", title: "Paste from tmux buffer" },
-  { label: ", rename", key: "\x02,", title: "Rename window" },
-  { label: "w list", key: "\x02w", title: "List windows" },
-  { label: "s sessions", key: "\x02s", title: "List sessions" },
-  { label: ": cmd", key: "\x02:", title: "Command prompt" },
-];
-
-// Common key combos shared across all coding CLIs
-// (y/n live in NAV_TAIL — always-visible below the input — since they're also
-// useful for tmux confirms and other action contexts.)
-const CODE_COMMON_KEYS: QuickKey[] = [
-  { label: "Ctrl+C", key: "\x03", title: "Cancel / interrupt / quit" },
-  { label: "Ctrl+L", key: "\x0c", title: "Clear screen (Claude/Codex) / View logs (OpenCode)" },
-  { label: "Ctrl+G", key: "\x07", title: "Open external editor (Claude/Codex)" },
-  { label: "Esc Esc", key: "\x1b\x1b", title: "Rewind history (Claude) / Edit prev message (Codex)" },
-];
-
-// Per-vendor CLI groups: launch commands, keys, and slash commands
-interface CliVendor {
-  name: string;
-  keys: QuickKey[];
-  launch: { label: string; title: string; command: string }[];
-  slashCmds: { label: string; title: string; command: string }[];
-}
-
-const CLI_VENDORS: CliVendor[] = [
-  {
-    name: "claude",
-    keys: [
-      { label: "Shift+Tab", key: "\x1b[Z", title: "Cycle permission modes" },
-      { label: "Ctrl+O", key: "\x0f", title: "Toggle full transcript view" },
-      { label: "Ctrl+R", key: "\x12", title: "Reverse history search" },
-      { label: "Alt+T", key: "\x1bt", title: "Toggle extended thinking" },
-      { label: "Alt+P", key: "\x1bp", title: "Model picker" },
-    ],
-    launch: [
-      { label: "claude", title: "Interactive mode", command: "claude\n" },
-      { label: "yolo", title: "Skip all permission checks", command: "claude --dangerously-skip-permissions\n" },
-      {
-        label: "plan",
-        title: "Read-only plan mode",
-        command: "claude --allowedTools Read,Glob,Grep,WebSearch,WebFetch\n",
-      },
-    ],
-    slashCmds: [
-      { label: "/clear", title: "Clear conversation context", command: "/clear\n" },
-      { label: "/compact", title: "Compact conversation to save context", command: "/compact\n" },
-      { label: "/cost", title: "Show token usage and cost", command: "/cost\n" },
-      { label: "/help", title: "Show available commands", command: "/help\n" },
-      { label: "/model", title: "Show or switch model", command: "/model\n" },
-      { label: "/exit", title: "Exit Claude Code", command: "/exit\n" },
-      { label: "/config", title: "Open config", command: "/config\n" },
-      { label: "/memory", title: "Edit CLAUDE.md memory", command: "/memory\n" },
-      { label: "/review", title: "Review a PR", command: "/review\n" },
-      { label: "/vim", title: "Toggle vim mode", command: "/vim\n" },
-    ],
-  },
-  {
-    name: "codex",
-    keys: [
-      { label: "Shift+Tab", key: "\x1b[Z", title: "Cycle approval modes" },
-      { label: "Ctrl+O", key: "\x0f", title: "Choose environment (cloud)" },
-    ],
-    launch: [
-      { label: "suggest", title: "Proposes changes for approval", command: "codex --approval-mode suggest\n" },
-      {
-        label: "auto-edit",
-        title: "Applies file changes, asks for commands",
-        command: "codex --approval-mode auto-edit\n",
-      },
-      { label: "full-auto", title: "Runs without confirmation", command: "codex --approval-mode full-auto\n" },
-    ],
-    slashCmds: [
-      { label: "/help", title: "Show available commands", command: "/help\n" },
-      { label: "/model", title: "Show or switch model", command: "/model\n" },
-      { label: "/exit", title: "Exit Codex", command: "/exit\n" },
-      { label: "/clear", title: "Clear conversation", command: "/clear\n" },
-      { label: "/approval", title: "Change approval mode", command: "/approval\n" },
-    ],
-  },
-  {
-    name: "opencode",
-    keys: [
-      { label: "Ctrl+O", key: "\x0f", title: "Model selection dialog" },
-      { label: "Ctrl+K", key: "\x0b", title: "Command dialog" },
-      { label: "Ctrl+N", key: "\x0e", title: "New session" },
-      { label: "Ctrl+X", key: "\x18", title: "Cancel generation" },
-      { label: "Ctrl+S", key: "\x13", title: "Send message" },
-      { label: "Ctrl+A", key: "\x01", title: "Switch session" },
-    ],
-    launch: [{ label: "opencode", title: "Interactive mode", command: "opencode\n" }],
-    slashCmds: [
-      { label: "/help", title: "Show available commands", command: "/help\n" },
-      { label: "/exit", title: "Exit OpenCode", command: "/exit\n" },
-      { label: "/clear", title: "Clear conversation", command: "/clear\n" },
-      { label: "/compact", title: "Compact context", command: "/compact\n" },
-    ],
-  },
-];
+/**
+ * Answering a coding CLI: its multiple-choice prompts are an arrow-key list,
+ * and taking back a typo is Bksp. Both sit next to Enter because all three are
+ * one interaction — read the question, move, confirm.
+ *
+ * Sequences come from the nav set rather than being respelled here, so DEL vs
+ * BS and `CSI A` vs `SS3 A` are decided in one place.
+ */
+const CODE_NAV_KEYS: QuickKey[] = [
+  { label: "Bksp", title: "Backspace" },
+  { label: "↑", title: "Up — previous option" },
+  { label: "↓", title: "Down — next option" },
+  { label: "←", title: "Left" },
+  { label: "→", title: "Right" },
+].map((k) => ({ ...k, key: comboSequence(k.label, "none") }));
 
 // Git quick action commands
 const GIT_QUICK_CMDS: { label: string; title: string; command: string }[] = [
@@ -220,128 +80,259 @@ const GIT_QUICK_CMDS: { label: string; title: string; command: string }[] = [
 ];
 
 // Tab IDs
-const STICKY_TAB = "__sticky__";
-const TMUX_TAB = "__tmux__";
-const NANO_TAB = "__nano__";
-const VIM_TAB = "__vim__";
-const CODE_TAB = "__code__";
-const GIT_TAB = "__git__";
-const CD_TAB = "__cd__";
+// Matches the .drawer transition in app.css.
+const DRAWER_MS = 280;
 
-type StickyMode = "ctrl" | "ctrl+shift" | "alt" | "alt+shift";
-
-const STICKY_MODES: { id: StickyMode; label: string }[] = [
-  { id: "ctrl", label: "Ctrl+" },
-  { id: "ctrl+shift", label: "Ctrl+Shift+" },
-  { id: "alt", label: "Alt+" },
-  { id: "alt+shift", label: "Alt+Shift+" },
+// Controls for the session a tmux tab is attached to. No session list or
+// switch: the tab is bound to one session and choosing one happens in the +
+// picker. No detach either — closing the tab detaches, and the session keeps
+// running, which is the whole point of it.
+/**
+ * General tmux control, kept in the top line rather than in a group: every
+ * group can open a list or a prompt, and Esc is the way back out of all of
+ * them. Which group is selected should not decide whether you can leave.
+ */
+const TMUX_GENERAL_KEYS: QuickKey[] = [
+  // Not copy mode: Escape cancels it under `mode-keys emacs` and only clears
+  // the selection under vi. `q` in the scroll group leaves it either way.
+  { label: "Esc", key: "\x1b", title: "Leave a tmux list or prompt" },
+  { label: "Enter", key: "\r", title: "Confirm" },
 ];
 
-function getStickyKey(ch: string, mode: StickyMode): string {
-  const isLetter = ch >= "A" && ch <= "Z";
-  switch (mode) {
-    case "ctrl":
-      // Ctrl+Letter = control code, Ctrl+Digit = send via CSI u
-      return isLetter ? String.fromCharCode(ch.charCodeAt(0) - 64) : `\x1b[${ch.charCodeAt(0)};5u`;
-    case "ctrl+shift":
-      return `\x1b[${ch.charCodeAt(0)};6u`;
-    case "alt":
-      return `\x1b${isLetter ? ch.toLowerCase() : ch}`;
-    case "alt+shift":
-      return `\x1b${ch}`;
-  }
-}
+// Grouped by what each control acts on, one group shown at a time.
+const TMUX_GROUPS: { label: string; keys: QuickKey[] }[] = [
+  {
+    label: "windows",
+    keys: [
+      { label: "c new", key: "\x02c", title: "New window" },
+      { label: "n next", key: "\x02n", title: "Next window" },
+      { label: "p prev", key: "\x02p", title: "Previous window" },
+      { label: "l last", key: "\x02l", title: "Last window used" },
+      { label: ", rename", key: "\x02,", title: "Rename this window" },
+      { label: "& kill", key: "\x02&", title: "Kill this window" },
+      { label: "w list", key: "\x02w", title: "List windows — Esc to leave" },
+    ],
+  },
+  {
+    label: "panes",
+    keys: [
+      { label: '" hsplit', key: '\x02"', title: "Split horizontally" },
+      { label: "% vsplit", key: "\x02%", title: "Split vertically" },
+      // Directional selection is the only way around a split layout that does
+      // not involve counting, and a phone has no prefix-and-arrow to press.
+      { label: "←", key: "\x02\x1b[D", title: "Select the pane to the left" },
+      { label: "→", key: "\x02\x1b[C", title: "Select the pane to the right" },
+      { label: "↑", key: "\x02\x1b[A", title: "Select the pane above" },
+      { label: "↓", key: "\x02\x1b[B", title: "Select the pane below" },
+      { label: "o next", key: "\x02o", title: "Next pane in order" },
+      { label: "; last", key: "\x02;", title: "Last pane used" },
+      { label: "q nums", key: "\x02q", title: "Show pane numbers — type one to select it" },
+      { label: "space", key: "\x02 ", title: "Next layout" },
+      { label: "z zoom", key: "\x02z", title: "Toggle zoom on this pane" },
+      { label: "x kill", key: "\x02x", title: "Kill this pane" },
+    ],
+  },
+  /**
+   * Scrolling this pane's output, which is copy mode whether or not you came
+   * for the copying. It is its own group because reading back through a build
+   * log is not the same errand as copying a line out of it, and the keys that
+   * do it were sitting behind a tab labelled `copy`.
+   *
+   * Only the entry carries the prefix; the rest are the keys copy mode itself
+   * reads. All of them are bound the same way in both `copy-mode` and
+   * `copy-mode-vi`, so none of them depends on how `mode-keys` is set:
+   * PPage/NPage page, Ctrl+arrow scrolls a line, and `q` cancels.
+   */
+  {
+    label: "scroll",
+    keys: [
+      { label: "[ scroll", key: "\x02[", title: "Scroll back through this pane's output" },
+      { label: "PgUp", key: "\x1b[5~", title: "Page up" },
+      { label: "PgDn", key: "\x1b[6~", title: "Page down" },
+      { label: "↑ line", key: "\x1b[1;5A", title: "Scroll up one line" },
+      { label: "↓ line", key: "\x1b[1;5B", title: "Scroll down one line" },
+      { label: "q exit", key: "q", title: "Leave scroll mode" },
+    ],
+  },
+  /**
+   * What is left of copy mode once scrolling has its own group: finding a line
+   * and pasting one back.
+   *
+   * `n` and `N` walk the matches in either key table. The prompt that starts a
+   * search does not — `/` and `?` are vi's, and `mode-keys emacs` puts it on
+   * Ctrl+R — so both are offered and each says which it is. Not emacs's
+   * forward search: that is Ctrl+S, which outside copy mode is XOFF, and a
+   * mistap would stop the terminal's output with nothing on screen saying why.
+   */
+  {
+    label: "copy",
+    keys: [
+      { label: "? up", key: "?", title: "Search backward — vi mode-keys" },
+      { label: "/ down", key: "/", title: "Search forward — vi mode-keys" },
+      { label: "^R find", key: "\x12", title: "Search backward — emacs mode-keys" },
+      { label: "n next", key: "n", title: "Next match" },
+      { label: "N prev", key: "N", title: "Previous match" },
+      { label: "] paste", key: "\x02]", title: "Paste the tmux buffer" },
+    ],
+  },
+  {
+    label: "session",
+    keys: [
+      { label: "$ rename", key: "\x02$", title: "Rename this session" },
+      { label: ": cmd", key: "\x02:", title: "tmux command prompt — Esc to leave" },
+      { label: "? keys", key: "\x02?", title: "List tmux key bindings — Esc to leave" },
+    ],
+  },
+];
 
-interface TmuxSession {
-  name: string;
-  windows: number;
-  attached: boolean;
-}
+const TMUX_TAB = "__tmux__";
+const KB_TAB = "__keyboard__";
 
-export default function InputBox() {
+/**
+ * What the keyboard's bottom row is showing. One list, because a modifier set,
+ * a coding CLI and git are all "a bar of keys with something above it" — they
+ * were four tabs duplicating the same two rows.
+ */
+type KbMode = "main" | `cli:${string}` | "git";
+
+/** The git form line, chosen the way a combo modifier is. */
+type GitForm = "commit" | "config";
+const GIT_FORMS: { id: GitForm; label: string }[] = [
+  { id: "commit", label: "commit" },
+  { id: "config", label: "config" },
+];
+const CD_TAB = "__cd__";
+
+/**
+ * The command-line helpers for one terminal or tmux tab.
+ *
+ * One instance per tab, not one shared instance bound to whichever tab is
+ * active: the open drawer, the typed text, the picked CLI and the cd listing
+ * are all things a tab should keep while you work in another one.
+ */
+export default function InputBox({ sessionId }: { sessionId: string }) {
   const [text, setText] = useState("");
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
-  const [tmuxSessions, setTmuxSessions] = useState<TmuxSession[]>([]);
-  const [tmuxLoading, setTmuxLoading] = useState(false);
-  const [toolVersions, setToolVersions] = useState<{
-    tmux: string | null;
-    nano: string | null;
-    vim: string | null;
-    claude: string | null;
-    codex: string | null;
-    opencode: string | null;
-  }>({ tmux: null, nano: null, vim: null, claude: null, codex: null, opencode: null });
-  const toolVersionsFetched = useRef(false);
-  const [tmuxNewName, setTmuxNewName] = useState("");
-  const [editorFileName, setEditorFileName] = useState("");
+  // What is currently painted. Lags `activeGroup` on close so the drawer can
+  // animate shut instead of vanishing.
+  const [drawerGroup, setDrawerGroup] = useState<string | null>(null);
+  const customCommands = useWorkspaceStore((s) => s.customCommands);
+  const hiddenCommands = useWorkspaceStore((s) => s.hiddenCommands);
+  const addCommand = useWorkspaceStore((s) => s.addCommand);
+  const removeCommand = useWorkspaceStore((s) => s.removeCommand);
+  const restoreCommand = useWorkspaceStore((s) => s.restoreCommand);
+  const customSlash = useWorkspaceStore((s) => s.customSlash);
+  const hiddenSlash = useWorkspaceStore((s) => s.hiddenSlash);
+  const addSlash = useWorkspaceStore((s) => s.addSlash);
+  const removeSlash = useWorkspaceStore((s) => s.removeSlash);
+  const restoreSlash = useWorkspaceStore((s) => s.restoreSlash);
+  const [tmuxGroup, setTmuxGroup] = useState(TMUX_GROUPS[0].label);
   const [cdDirs, setCdDirs] = useState<string[]>([]);
   const [cdLoading, setCdLoading] = useState(false);
-  const [stickyMode, setStickyMode] = useState<StickyMode>("ctrl");
-  const [codeVendorIdx, setCodeVendorIdx] = useState(0);
-  const [codeVendorOpen, setCodeVendorOpen] = useState(false);
-  const codeVendorBtnRef = useRef<HTMLButtonElement>(null);
-  const codeVendorMenuRef = useRef<HTMLDivElement>(null);
-  const [gitCommitMsg, setGitCommitMsg] = useState("");
+  /** Why the picker has nothing to show, when that is the answer. */
+  const [cdError, setCdError] = useState<string | null>(null);
+  const [comboMode, setComboMode] = useState<ComboMode>("none");
+  const [kbMode, setKbMode] = useState<KbMode>("main");
+  /** Which set of keys `main` is showing. Only it has sets. */
+  const [keySet, setKeySet] = useState<ComboSet>("nav");
+  const [gitForm, setGitForm] = useState<GitForm>("commit");
+  /** Which window this tab's tmux client is on, as tmux reports it. */
+  const [tmuxWindow, setTmuxWindow] = useState<string | null>(null);
+  const [windowTarget, setWindowTarget] = useState("");
+  // Seeded from the browser: see `writeCommitDraft`. The rest of this
+  // component's state is deliberately not.
+  const [gitCommitMsg, setGitCommitMsg] = useState(() => readCommitDraft(sessionId) ?? "");
   const [gitConfigName, setGitConfigName] = useState("");
   const [gitConfigEmail, setGitConfigEmail] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const activeSessionId = useTerminalStore((s) => s.activeSessionId);
+
+  useEffect(() => {
+    if (activeGroup) {
+      setDrawerGroup(activeGroup);
+      return;
+    }
+    const timer = setTimeout(() => setDrawerGroup(null), DRAWER_MS);
+    return () => clearTimeout(timer);
+  }, [activeGroup]);
   const sendInput = useTerminalStore((s) => s.sendInput);
-  const setInTmux = useTerminalStore((s) => s.setInTmux);
-  const setInEditor = useTerminalStore((s) => s.setInEditor);
+  const pasteInput = useTerminalStore((s) => s.pasteInput);
+  const runInput = useTerminalStore((s) => s.runInput);
+  const resetModes = useTerminalStore((s) => s.resetModes);
   const setCdCwd = useTerminalStore((s) => s.setCdCwd);
   const sessions = useTerminalStore((s) => s.sessions);
+  /**
+   * Whether this tab is the one its pane is drawing — which is what makes this
+   * drawer visible. Not the focused tab: in a split the other pane's keyboard
+   * is on screen too, and its listing goes stale the same way.
+   */
+  const visible = useTabsStore((s) => isTabVisible(s, sessionId));
 
   // Close vendor dropdown on outside click
-  useEffect(() => {
-    if (!codeVendorOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (codeVendorBtnRef.current?.contains(e.target as Node)) return;
-      if (codeVendorMenuRef.current?.contains(e.target as Node)) return;
-      setCodeVendorOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [codeVendorOpen]);
 
-  const activeSession = activeSessionId ? sessions[activeSessionId] : null;
-  const inTmux = activeSession?.inTmux ?? false;
-  const inEditor = activeSession?.inEditor ?? null;
-  const cdCwd = activeSession?.cdCwd ?? "";
+  const session = sessions[sessionId] ?? null;
+  // A tmux tab runs tmux as its process, so this is also "am I in tmux".
+  const tmuxSession = session?.tmuxSession;
+  const cdCwd = session?.cdCwd ?? "";
 
   // --- Handlers ---
+  /**
+   * Put what was typed into the program's own input, and stop there.
+   *
+   * `pasteInput`, not `runInput`: Enter is not ours to send. A TUI's prompt is
+   * somewhere to draft in — send a paragraph, read it back, send another, and
+   * submit when it reads right — and a tmux session keeps that draft across a
+   * reconnect. Appending Enter took that away and submitted on every Send.
+   * Enter is a key on the row below, so sending it is one tap when it is
+   * wanted.
+   *
+   * The text goes as written, trailing newlines and all: a newline inside a
+   * paste is a newline, and the only ones in there are the ones that were
+   * typed.
+   */
   const handleSend = () => {
-    if (!activeSessionId || !text) return;
-    sendInput(activeSessionId, text + "\n");
+    if (!sessionId || !text.trim()) return;
+    pasteInput(sessionId, text);
     setText("");
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
     textareaRef.current?.focus();
   };
 
-  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setText(e.target.value);
-    const ta = e.target;
-    ta.style.height = "auto";
-    ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+  /** The one input field that outlives the page, so every edit goes through here. */
+  const editCommitMsg = (message: string) => {
+    setGitCommitMsg(message);
+    writeCommitDraft(sessionId, message);
   };
 
+  const commitGit = () => {
+    const message = gitCommitMsg.trim();
+    if (!sessionId || !message) return;
+    runInput(sessionId, `git commit -m ${shellQuote(message)}`);
+    editCommitMsg("");
+  };
+
+  const setGitIdentity = () => {
+    if (!sessionId) return;
+    if (gitConfigName.trim()) runInput(sessionId, `git config --global user.name ${shellQuote(gitConfigName.trim())}`);
+    if (gitConfigEmail.trim())
+      runInput(sessionId, `git config --global user.email ${shellQuote(gitConfigEmail.trim())}`);
+  };
+
+  /**
+   * A key, and only ever a key: these are short vetted sequences that are
+   * supposed to reach the program's own bindings. Text the user wrote goes
+   * through `runInput` instead, which is the difference that stops a
+   * sentence from being read as a burst of keystrokes.
+   */
   const handleQuickKey = useCallback(
     (key: string) => {
-      if (!activeSessionId) return;
-      if (key.length === 2 && key.charCodeAt(0) < 0x20 && key.charCodeAt(1) >= 0x20) {
-        sendInput(activeSessionId, key[0]);
-        setTimeout(() => sendInput(activeSessionId, key[1]), 50);
-      } else {
-        sendInput(activeSessionId, key);
-      }
+      if (sessionId) sendInput(sessionId, key);
     },
-    [activeSessionId, sendInput],
+    [sessionId, sendInput],
   );
 
   // Long-press repeat with scroll detection
   const repeatRef = useRef<{
     timeout: ReturnType<typeof setTimeout>;
-    interval: ReturnType<typeof setInterval>;
+    interval: ReturnType<typeof setInterval> | null;
     fired: boolean;
     startX: number;
     startY: number;
@@ -356,7 +347,7 @@ export default function InputBox() {
         const interval = setInterval(() => handleQuickKey(key), 80);
         if (repeatRef.current) repeatRef.current.interval = interval;
       }, 120);
-      repeatRef.current = { timeout, interval: null as any, fired: false, startX: x, startY: y };
+      repeatRef.current = { timeout, interval: null, fired: false, startX: x, startY: y };
     },
     [handleQuickKey],
   );
@@ -364,7 +355,8 @@ export default function InputBox() {
   const cancelRepeat = useCallback(() => {
     if (repeatRef.current) {
       clearTimeout(repeatRef.current.timeout);
-      clearInterval(repeatRef.current.interval);
+      // null until the hold actually starts repeating.
+      if (repeatRef.current.interval) clearInterval(repeatRef.current.interval);
       repeatRef.current = null;
     }
   }, []);
@@ -399,102 +391,183 @@ export default function InputBox() {
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   });
 
-  // Fetch tool versions (re-fetch each time a tool tab is opened to catch new installs)
-  const fetchToolVersions = async () => {
-    try {
-      const res = await fetch("/api/tool-versions");
-      const data = await res.json();
-      setToolVersions(data);
-    } catch {}
+  const modeLabel = comboMode === "none" ? "" : (COMBO_MODES.find((m) => m.id === comboMode)?.label ?? "");
+
+  // One keyboard per thing you are typing at: the terminal itself, or a
+  // program with its own keys. Five options, where listing every key set here
+  // made nine and buried claude between function and symbols.
+  const KB_MODES: { id: KbMode; label: string }[] = [
+    { id: "main", label: "main" },
+    ...CLI_VENDORS.map((v) => ({ id: `cli:${v.name}` as KbMode, label: v.name })),
+    { id: "git", label: "git" },
+  ];
+  // Which keys `main` is showing, and nothing when another keyboard is up.
+  const comboSet = kbMode === "main" ? keySet : null;
+  const vendor = kbMode.startsWith("cli:") ? CLI_VENDORS.find((v) => `cli:${v.name}` === kbMode) : undefined;
+
+  /** The bottom row's keys for the current combo set, modifier already applied. */
+  /** `Ctrl+A`, or `A — sends "a"` where a key and its output differ visibly. */
+  const sentLabel = (label: string, seq: string) =>
+    seq.length === 1 && seq >= " " && seq !== label ? `${label} — sends "${seq}"` : label;
+
+  const comboKeys = (): { label: string; seq: string; title: string }[] => {
+    if (comboSet === "numbers") {
+      return "0123456789".split("").map((ch) => ({
+        label: ch,
+        seq: comboSequence(ch, comboMode),
+        title: sentLabel(`${modeLabel}${ch}`, comboSequence(ch, comboMode)),
+      }));
+    }
+    if (comboSet === "letters") {
+      return "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((ch) => ({
+        // Labelled with the key, like a keyboard: `A` sends `a` unmodified.
+        label: ch,
+        seq: comboSequence(ch, comboMode),
+        // A key labelled `A` that sends `a` is worth spelling out; a control
+        // code is not, so only a printable result is named.
+        title: sentLabel(`${modeLabel}${ch}`, comboSequence(ch, comboMode)),
+      }));
+    }
+    if (comboSet === "nav" || comboSet === "function") {
+      return (comboSet === "nav" ? NAV_COMBO_KEYS : FN_COMBO_KEYS).map((key) => ({
+        label: key.label,
+        seq: comboSequence(key.label, comboMode),
+        title: sentLabel(`${modeLabel}${key.title}`, comboSequence(key.label, comboMode)),
+      }));
+    }
+    if (comboSet === "symbols") {
+      return SYMBOL_COMBO_KEYS.map((key) => ({
+        label: key.label,
+        seq: comboSequence(key.label, comboMode),
+        title: `${modeLabel}${key.label} — ${key.title}`,
+      }));
+    }
+    return [];
   };
 
-  // Initial fetch
+  // Both the name and the window move without telling us: tmux's rename prompt
+  // finishes whenever the user finishes typing, and the window changes from the
+  // keys below or from inside the pane. So while the tmux controls are open,
+  // ask. Bounded to that: the drawer is not open for long.
   useEffect(() => {
-    if (toolVersionsFetched.current) return;
-    toolVersionsFetched.current = true;
-    fetchToolVersions();
-  }, []);
+    if (drawerGroup !== TMUX_TAB || !sessionId || !tmuxSession) return;
+    let live = true;
+    const sync = async () => {
+      const place = await useTabsStore.getState().syncTmuxTab(sessionId);
+      if (live) setTmuxWindow(place?.window ?? null);
+    };
+    sync();
+    const id = setInterval(sync, 3000);
+    return () => {
+      live = false;
+      clearInterval(id);
+    };
+  }, [drawerGroup, sessionId, tmuxSession]);
 
-  // When the active terminal tab changes while the cd picker is open, resync
-  // to that terminal's current cwd (the cd panel is per-terminal stateful).
-  useEffect(() => {
-    if (activeGroup !== CD_TAB) return;
-    setCdDirs([]);
-    if (activeSessionId) fetchDirs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSessionId]);
+  /**
+   * Put the terminal back to a usable state after a program left it wrong.
+   *
+   * What that means depends on what the tab is.
+   *
+   * A plain terminal gets the full mode reset — leaving the alternate screen is
+   * how you get out of a dead TUI's buffer — then Ctrl+L, which every shell and
+   * editor reads as "redraw" and none reads as a command.
+   *
+   * A tmux tab is only ever asked to repaint, which tmux does authoritatively.
+   * It used to have its reporting modes cleared here first, and that quietly
+   * broke the thing it was pressed to fix: tmux sends a mode only when what it
+   * believes the terminal is in differs from what the pane wants, so switching
+   * reporting off underneath it meant tmux never switched it back on. A repaint
+   * brought the screen back and took the mouse with it — no scrolling, no
+   * clicking into the line being typed — until the session was re-attached.
+   * tmux owns the modes in its own panes; this asks it for a redraw and leaves
+   * them alone.
+   */
+  const resetTerminal = async () => {
+    if (!sessionId) return;
+    if (tmuxSession) {
+      try {
+        await apiPost("/api/tmux/sessions", { op: "refresh", name: tmuxSession });
+      } catch (err: unknown) {
+        showToast(errorMessage(err, "Could not refresh the session"));
+      }
+      return;
+    }
+    resetModes(sessionId);
+    sendInput(sessionId, "\x0c");
+  };
+
+  /**
+   * Any window index. Asks the server to run `select-window` rather than
+   * typing into tmux's command prompt, which cannot be driven by a burst of
+   * keystrokes, and rather than prefix-and-digit, which stops at 9.
+   */
+  const goToWindow = async () => {
+    const index = windowTarget.trim();
+    if (!tmuxSession || !/^\d{1,4}$/.test(index)) return;
+    try {
+      await apiPost("/api/tmux/sessions", { op: "select-window", name: tmuxSession, window: index });
+      setWindowTarget("");
+      setTmuxWindow(index);
+    } catch (err: unknown) {
+      showToast(errorMessage(err, `Could not go to window ${index}`));
+    }
+  };
+
+  /**
+   * A chip. The trailing newline in a chip's command is what says "and run
+   * it": that one is a command line, and goes as text with its own Enter.
+   * A chip without one is a key sequence, and is meant to be taken for
+   * keystrokes — a slash command opens its CLI's palette by being typed, and
+   * would not if it arrived as a paste.
+   */
+  const runChip = (command: string) => {
+    if (!sessionId) return;
+    if (command.endsWith("\n")) runInput(sessionId, command.slice(0, -1));
+    else sendInput(sessionId, command);
+  };
 
   const toggleGroup = (id: string) => {
     if (activeGroup === id) {
       setActiveGroup(null);
     } else {
       setActiveGroup(id);
-      if (id === TMUX_TAB && !inTmux) fetchTmuxSessions();
-      if (id === CD_TAB) fetchDirs();
-      if ([TMUX_TAB, NANO_TAB, VIM_TAB, CODE_TAB].includes(id)) fetchToolVersions();
     }
   };
 
-  // Tmux
-  const fetchTmuxSessions = async () => {
-    setTmuxLoading(true);
-    try {
-      const res = await fetch("/api/tmux/sessions");
-      const data = await res.json();
-      setTmuxSessions(data.sessions || []);
-    } catch {
-      setTmuxSessions([]);
-    }
-    setTmuxLoading(false);
-  };
-
-  const handleTmuxAttach = (name: string) => {
-    if (!activeSessionId) return;
-    // Set extended-keys off inline via shell command to avoid visible tmux prompt flicker
-    sendInput(activeSessionId, `tmux set -g extended-keys off 2>/dev/null; tmux attach -t ${name}\n`);
-    setInTmux(activeSessionId, true);
-    setActiveGroup(null);
-  };
-
-  const handleTmuxNew = () => {
-    if (!activeSessionId || !tmuxNewName.trim()) return;
-    sendInput(activeSessionId, `tmux set -g extended-keys off 2>/dev/null; tmux new -s ${tmuxNewName.trim()}\n`);
-    setTmuxNewName("");
-    setInTmux(activeSessionId, true);
-    setActiveGroup(null);
-  };
-
-  const handleTmuxDetach = () => {
-    if (!activeSessionId) return;
-    sendInput(activeSessionId, "\x02");
-    setTimeout(() => {
-      sendInput(activeSessionId, "d");
-      setInTmux(activeSessionId, false);
-      setActiveGroup(null);
-    }, 50);
-  };
-
-  // cd directory picker — always scoped to the currently-active terminal session
-  const fetchDirs = async (dir?: string) => {
-    const sessionId = activeSessionId;
-    if (!sessionId) return;
-    setCdLoading(true);
-    try {
-      // If no dir specified, detect this terminal's actual CWD first
-      let targetDir = dir;
-      if (!targetDir) {
-        try {
-          const cwdRes = await fetch(`/api/terminal/cwd?sessionId=${sessionId}&inTmux=${inTmux}`);
-          const cwdData = await cwdRes.json();
-          if (cwdData.cwd) targetDir = cwdData.cwd;
-        } catch {}
-      }
-      const query = targetDir ? `?dir=${encodeURIComponent(targetDir)}&showHidden=false` : "?showHidden=false";
-      const res = await fetch(`/api/files/list${query}`);
-      const data = await res.json();
-      if (!data.error) {
-        // Only apply the result if the user hasn't switched to a different tab while we were fetching
-        if (useTerminalStore.getState().activeSessionId === sessionId) {
+  /**
+   * The directory picker, always scoped to this tab's own terminal.
+   *
+   * `dir` given means the user picked it, so it is listed as asked. Without
+   * one the terminal is asked where it is — and if it cannot say, that is the
+   * answer and the picker shows it. There is no falling back to the default
+   * directory: every button here sends a `cd`, so a picker listing somewhere
+   * the terminal is not would move it somewhere nobody chose.
+   */
+  const fetchDirs = useCallback(
+    async (dir?: string) => {
+      if (!sessionId) return;
+      setCdLoading(true);
+      try {
+        let targetDir = dir;
+        if (!targetDir) {
+          const place = await (await fetch(`/api/terminal/cwd?sessionId=${sessionId}`)).json();
+          targetDir = typeof place.cwd === "string" ? place.cwd : "";
+          if (!targetDir) {
+            setCdDirs([]);
+            setCdError("Could not read the working directory of this terminal.");
+            setCdLoading(false);
+            return;
+          }
+        }
+        const res = await fetch(`/api/files/list?dir=${encodeURIComponent(targetDir)}&showHidden=false`);
+        const data = await res.json();
+        if (data.error) {
+          setCdDirs([]);
+          setCdError(data.error);
+        } else if (useTerminalStore.getState().sessions[sessionId]) {
+          // Drop the result if the tab was closed while we were fetching.
+          setCdError(null);
           setCdCwd(sessionId, data.dir);
           setCdDirs(
             (data.entries || [])
@@ -502,107 +575,84 @@ export default function InputBox() {
               .map((e: { name: string }) => e.name),
           );
         }
+      } catch {
+        setCdDirs([]);
+        setCdError("Could not reach the server.");
       }
-    } catch {
-      setCdDirs([]);
-    }
-    setCdLoading(false);
-  };
+      setCdLoading(false);
+    },
+    [sessionId, setCdCwd],
+  );
+
+  /**
+   * The listing is a snapshot of where the terminal was, and the terminal moves
+   * without saying so — a typed `cd`, a program that changes directory, a tmux
+   * window switch. So the trigger is the panel being on screen rather than the
+   * tap that opened it: the drawer stays open across a tab switch, and coming
+   * back used to re-show the directory the tab was in when it was first
+   * opened, which on a fresh tab is the login directory.
+   */
+  useEffect(() => {
+    if (drawerGroup !== CD_TAB || !visible) return;
+    fetchDirs();
+  }, [drawerGroup, visible, fetchDirs]);
 
   const handleCdTo = (dir: string) => {
-    if (!activeSessionId) return;
+    if (!sessionId) return;
     const absPath = dir === ".." ? cdCwd.replace(/\/[^/]+$/, "") || "/" : `${cdCwd}/${dir}`;
-    sendInput(activeSessionId, `cd '${absPath}'\n`);
+    runInput(sessionId, `cd ${shellQuote(absPath)}`);
     fetchDirs(absPath);
   };
 
   const handleCdHome = () => {
-    if (!activeSessionId) return;
-    sendInput(activeSessionId, "cd ~\n");
-    fetchDirs(); // No dir param = defaults to HOME
+    if (!sessionId) return;
+    runInput(sessionId, "cd ~");
+    // `~` is the shell's to expand, so the listing follows from asking the
+    // terminal again rather than from a path guessed on this side.
+    fetchDirs();
   };
 
   // Editors
-  const handleOpenEditor = (editor: "nano" | "vim") => {
-    if (!activeSessionId || !editorFileName.trim()) return;
-    sendInput(activeSessionId, `${editor} ${editorFileName.trim()}\n`);
-    setEditorFileName("");
-    setInEditor(activeSessionId, editor);
-    setActiveGroup(editor === "nano" ? NANO_TAB : VIM_TAB);
-  };
-
-  const handleExitNano = () => {
-    if (!activeSessionId) return;
-    sendInput(activeSessionId, "\x18");
-    setInEditor(activeSessionId, null);
-    setActiveGroup(null);
-  };
-
-  const handleExitVim = () => {
-    if (!activeSessionId) return;
-    sendInput(activeSessionId, "\x1b");
-    setTimeout(() => {
-      sendInput(activeSessionId, ":q!\n");
-      setInEditor(activeSessionId, null);
-      setActiveGroup(null);
-    }, 50);
-  };
-
-  const handleSaveExitVim = () => {
-    if (!activeSessionId) return;
-    sendInput(activeSessionId, "\x1b");
-    setTimeout(() => {
-      sendInput(activeSessionId, ":wq\n");
-      setInEditor(activeSessionId, null);
-      setActiveGroup(null);
-    }, 50);
-  };
 
   // --- Styles ---
-  const tabBase =
-    "px-2.5 py-0.5 text-[11px] rounded border whitespace-nowrap transition-colors shrink-0 select-none touch-manipulation";
-  const tabDisabledAction = `${tabBase} bg-[#151520] text-gray-600 border-gray-700/50 cursor-not-allowed`;
-  const tabDisabledApp = `${tabBase} bg-[#151520] text-gray-600 border-gray-700/50 cursor-not-allowed`;
-  // Action tabs (cmds, cd, code, sticky) — blue
-  const actionTabOff = `${tabBase} bg-[#1a1e2e] text-blue-400 hover:text-blue-200 hover:bg-[#1a2a3e] border-blue-800`;
-  const actionTabOn = `${tabBase} bg-[#1a2a3e] text-blue-200 border-blue-500`;
-  // App tabs (nano, vim, tmux) — green
-  const appTabOff = `${tabBase} bg-[#1a2e1e] text-green-400 hover:text-green-200 hover:bg-[#1a3e2a] border-green-800`;
-  const appTabOn = `${tabBase} bg-[#1a3e2a] text-green-200 border-green-500`;
-
-  // Popup action buttons: neutral gray
+  const tabBase = "px-2.5 py-0.5 text-[11px] rounded-control whitespace-nowrap shrink-0 select-none touch-manipulation";
+  const tabDisabled = `${tabBase} bg-disabled text-ink-ghost cursor-not-allowed`;
+  // Action tabs (keyboard, commands, navigate) — blue. `relief` supplies the raised
+  // body; the tinted fill underneath only shows through on the active one.
+  // Native terminal tabs (text, cmds, cd, combos) — blue
+  const actionTabOff = `${tabBase} relief text-tab-action-ink`;
+  const actionTabOn = `${tabBase} relief glow bg-tab-action-on text-tab-action-ink-on ring-2 ring-inset ring-blue-400/70`;
+  // CLI tool tabs (code, git) — purple
+  // In-app tabs (tmux) — green
+  const appTabOff = `${tabBase} relief text-tab-app-ink`;
+  const appTabOn = `${tabBase} relief glow bg-tab-app-on text-tab-app-ink-on ring-2 ring-inset ring-green-400/70`;
+  const cliTabOff = `${tabBase} relief text-tab-cli-ink`;
+  const cliTabOn = `${tabBase} relief glow bg-tab-cli-on text-tab-cli-ink-on ring-2 ring-inset ring-purple-400/70`;
+  // Popup action buttons — same raised treatment as Send, tinted by role.
   const keyBtn =
-    "px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-gray-400 hover:text-white hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-gray-700 whitespace-nowrap transition-colors select-none touch-manipulation";
-  const exitBtn =
-    "px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-red-400 hover:text-red-300 hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-red-800 whitespace-nowrap transition-colors select-none touch-manipulation";
-  const saveExitBtn =
-    "px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-green-400 hover:text-green-300 hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-green-800 whitespace-nowrap transition-colors select-none touch-manipulation";
+    "px-2 py-0.5 text-[11px] relief text-ink-muted hover:text-ink rounded-control whitespace-nowrap select-none touch-manipulation";
 
-  // --- Determine which tabs to show ---
-  // Editor mode (nano/vim): only editor tab + sticky (+ tmux if in tmux)
-  // Tmux mode: all action tabs + tmux tab (no nano/vim — can't track state inside tmux)
-  // Plain terminal: all action tabs + all app tabs
-  const isEditorMode = inEditor !== null;
+  // The drawer is the same for a terminal tab and a tmux tab now, so there is
+  // no per-mode tab set to work out.
+  const SECTORS = {
+    native: { on: actionTabOn, off: actionTabOff },
+    cli: { on: cliTabOn, off: cliTabOff },
+    app: { on: appTabOn, off: appTabOff },
+  } as const;
 
-  const tabBtn = (id: string, label: string, title: string, disabled?: boolean, kind: "action" | "app" = "action") => (
+  const tabBtn = (
+    id: string,
+    label: string,
+    title: string,
+    disabled?: boolean,
+    sector: keyof typeof SECTORS = "native",
+  ) => (
     <button
       key={id}
       onClick={() => !disabled && toggleGroup(id)}
       disabled={disabled}
       title={title}
-      className={
-        disabled
-          ? kind === "app"
-            ? tabDisabledApp
-            : tabDisabledAction
-          : activeGroup === id
-            ? kind === "app"
-              ? appTabOn
-              : actionTabOn
-            : kind === "app"
-              ? appTabOff
-              : actionTabOff
-      }
+      className={disabled ? tabDisabled : activeGroup === id ? SECTORS[sector].on : SECTORS[sector].off}
     >
       {label}
     </button>
@@ -610,601 +660,442 @@ export default function InputBox() {
 
   // Resolve which key group to show in the popup
   const activeStandardGroup =
-    activeGroup && ![STICKY_TAB, TMUX_TAB, NANO_TAB, VIM_TAB, CODE_TAB, GIT_TAB, CD_TAB].includes(activeGroup)
-      ? TERMINAL_GROUPS.find((g) => g.label === activeGroup)
+    drawerGroup && ![TMUX_TAB, KB_TAB, CD_TAB].includes(drawerGroup)
+      ? TERMINAL_GROUPS.find((g) => g.label === drawerGroup)
       : null;
+
+  const isCmdsGroup = activeStandardGroup?.label === "commands";
+  // Built-ins the user removed drop out; their own commands are appended.
+  const visibleCommands: Chip[] = !activeStandardGroup
+    ? []
+    : isCmdsGroup
+      ? [
+          ...activeStandardGroup.keys
+            .filter((k) => !hiddenCommands.includes(k.label))
+            .map((k) => ({ label: k.label, command: k.key, title: k.title })),
+          ...customCommands.map((c) => ({
+            label: c.label,
+            command: `${c.command}\n`,
+            title: c.command,
+            custom: true,
+          })),
+        ]
+      : activeStandardGroup.keys.map((k) => ({ label: k.label, command: k.key, title: k.title }));
 
   return (
     <div
-      className="bg-[#16162a] border-t border-gray-700 shrink-0 overflow-hidden terminal-focus-area rounded-sm"
+      className="bg-surface border-t border-line shrink-0 overflow-hidden terminal-focus-area rounded-sm"
       style={{ minWidth: 0 }}
     >
-      {/* Tab bar */}
-      <div className="border-b border-gray-700/50 overflow-x-auto scrollbar-none" style={{ minWidth: 0 }}>
-        <div className="flex items-center gap-1 px-2 py-1 w-max">
-          {/* Action tabs (blue) — always in same order, hidden in editor mode */}
-          {!isEditorMode && TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !activeSessionId))}
-          {!isEditorMode && tabBtn(CD_TAB, "cd", "Change directory", !activeSessionId)}
-          {tabBtn(STICKY_TAB, STICKY_MODES.find((m) => m.id === stickyMode)?.label || "Ctrl+", "Modifier combos")}
-          {!isEditorMode && tabBtn(CODE_TAB, "code", "Coding CLI launchers & keys", !activeSessionId)}
-          {!isEditorMode && tabBtn(GIT_TAB, "git", "Git actions", !activeSessionId)}
-          {/* App tabs (green) — nano/vim hidden in tmux mode, shown with active indicator in editor mode */}
-          {!inTmux &&
-            tabBtn(
-              NANO_TAB,
-              inEditor === "nano" ? "nano \u2318" : "nano",
-              inEditor === "nano" ? "nano commands" : "Open file in nano",
-              !activeSessionId && inEditor !== "nano",
-              "app",
-            )}
-          {!inTmux &&
-            tabBtn(
-              VIM_TAB,
-              inEditor === "vim" ? "vim \u2318" : "vim",
-              inEditor === "vim" ? "vim commands" : "Open file in vim",
-              !activeSessionId && inEditor !== "vim",
-              "app",
-            )}
-          {tabBtn(
-            TMUX_TAB,
-            inTmux ? "tmux \u2318" : "tmux",
-            inTmux ? "tmux commands" : "tmux sessions",
-            !activeSessionId && !inTmux,
-            "app",
-          )}
+      {/* Tab bar. Two halves: the tabs scroll, the controls on the right do
+          not — they are not things to choose between, so they keep their place
+          however far the tabs are scrolled. */}
+      <div className="flex items-center border-b border-line/50" style={{ minWidth: 0 }}>
+        <div onPointerDown={dragScroll} onWheel={wheelScroll} className="min-w-0 flex-1 overflow-x-auto scrollbar-none">
+          <div className="flex w-max items-center gap-1 px-2 py-1">
+            {tabBtn(KB_TAB, "keyboard", "Type, and the keys a terminal needs", !sessionId)}
+            {TERMINAL_GROUPS.map((g) => tabBtn(g.label, g.label, g.title, !sessionId))}
+            {/* navigate works on a tmux tab too: the server resolves the pane
+            that tab's own tmux client is looking at, so it follows you between
+            windows. A tmux tab then also gets its session's controls, last
+            because they act on the session rather than on a directory. */}
+            {tabBtn(CD_TAB, "navigate", "Move to another directory", !sessionId)}
+            {tmuxSession && tabBtn(TMUX_TAB, "tmux", `Controls for session "${tmuxSession}"`, false, "app")}
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1 px-2 py-1">
+          <button
+            type="button"
+            onClick={resetTerminal}
+            disabled={!sessionId}
+            title={
+              tmuxSession ? "Repaint: ask tmux to redraw this pane" : "Reset: clear leftover terminal modes and redraw"
+            }
+            aria-label={tmuxSession ? "Repaint the pane" : "Reset the terminal"}
+            className="p-1.5 text-ink-dim transition-colors hover:text-ink disabled:pointer-events-none disabled:text-ink-ghost"
+          >
+            <RefreshIcon className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
-      {/* Standard key group popup (cmds) */}
-      {activeStandardGroup && (
-        <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5">
-          <div className="flex flex-wrap gap-1">
-            {activeStandardGroup.keys.map((qk) => (
-              <button
-                key={qk.label}
-                {...repeatProps(qk.key)}
-                disabled={!activeSessionId}
-                title={qk.title}
-                className={keyBtn}
-              >
-                {qk.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* cd directory picker */}
-      {activeGroup === CD_TAB && (
-        <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5">
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-[11px] text-gray-500">cd</span>
-            <span
-              className="text-[10px] text-gray-600 overflow-hidden text-ellipsis whitespace-nowrap flex-1"
-              title={cdCwd}
-            >
-              {cdCwd}
-            </span>
-          </div>
-          {cdLoading ? (
-            <span className="text-[11px] text-gray-500">Loading...</span>
-          ) : (
-            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-              <button
-                onClick={() => handleCdTo("..")}
-                disabled={!activeSessionId}
-                className={`${keyBtn} text-yellow-400 hover:text-yellow-300`}
-                title="Go up one directory"
-              >
-                ..
-              </button>
-              <button
-                onClick={handleCdHome}
-                disabled={!activeSessionId}
-                className={`${keyBtn} text-blue-400 hover:text-blue-300`}
-                title="Go to home directory"
-              >
-                ~
-              </button>
-              {cdDirs.map((dir) => (
-                <button
-                  key={dir}
-                  onClick={() => handleCdTo(dir)}
-                  disabled={!activeSessionId}
-                  className="px-2 py-0.5 text-[11px] bg-[#1a1e2e] text-purple-400 hover:text-purple-200 hover:bg-[#2a2e4a] disabled:text-gray-600 rounded border border-purple-800/50 whitespace-nowrap transition-colors select-none touch-manipulation"
-                  title={`cd ${dir}`}
-                >
-                  {dir}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Sticky modifier popup */}
-      {activeGroup === STICKY_TAB && (
-        <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5">
-          <div className="flex items-center gap-1 mb-1.5">
-            {STICKY_MODES.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setStickyMode(m.id)}
-                className={`px-2 py-0.5 text-[10px] rounded border transition-colors select-none ${
-                  stickyMode === m.id
-                    ? "bg-blue-600 text-white border-blue-500"
-                    : "bg-[#1a1a2e] text-gray-500 hover:text-white border-gray-700"
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {"0123456789".split("").map((ch) => (
-              <button
-                key={ch}
-                {...repeatProps(getStickyKey(ch, stickyMode))}
-                disabled={!activeSessionId}
-                title={`${STICKY_MODES.find((m) => m.id === stickyMode)?.label}${ch}`}
-                className={keyBtn}
-              >
-                {ch}
-              </button>
-            ))}
-            {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((ch) => (
-              <button
-                key={ch}
-                {...repeatProps(getStickyKey(ch, stickyMode))}
-                disabled={!activeSessionId}
-                title={`${STICKY_MODES.find((m) => m.id === stickyMode)?.label}${ch}`}
-                className={keyBtn}
-              >
-                {ch}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Nano popup: commands when inside, file opener when outside */}
-      {activeGroup === NANO_TAB && inEditor === "nano" && (
-        <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5">
-          <div className="flex flex-wrap gap-1">
-            {NANO_KEYS.map((qk) => (
-              <button
-                key={qk.label}
-                {...repeatProps(qk.key)}
-                disabled={!activeSessionId}
-                title={qk.title}
-                className={keyBtn}
-              >
-                {qk.label}
-              </button>
-            ))}
-            <button onClick={handleExitNano} disabled={!activeSessionId} title="Exit nano (Ctrl+X)" className={exitBtn}>
-              exit
-            </button>
-          </div>
-        </div>
-      )}
-      {activeGroup === NANO_TAB && inEditor !== "nano" && (
-        <div className="border-b border-gray-700/50 bg-[#12122a] px-3 py-2">
-          {!toolVersions.nano ? (
-            <span className="text-[11px] text-yellow-400">
-              nano is not installed. Install it via your package manager.
-            </span>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-gray-500">nano{toolVersions.nano ? ` v${toolVersions.nano}` : ""}</span>
-              <input
-                value={editorFileName}
-                onChange={(e) => setEditorFileName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("nano")}
-                placeholder="filename or path..."
-                className="flex-1 bg-[#1a1a2e] text-white border border-gray-700 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+      {/* One animating container for every drawer: grid-template-rows 0fr->1fr
+          transitions to the content's own height, which differs per drawer. */}
+      <div className="drawer" data-open={activeGroup ? "true" : "false"}>
+        <div className="drawer-inner">
+          {/* Standard key group popup (cmds) */}
+          {activeStandardGroup && (
+            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
+              <CommandChips
+                chips={visibleCommands}
+                hidden={hiddenCommands}
+                disabled={!sessionId}
+                chipClass={keyBtn}
+                dialogTitle="Add command"
+                dialogHint="Becomes a button in the cmds group. Runs immediately."
+                commandPlaceholder="./deploy.sh --prod"
+                onRun={runChip}
+                onAdd={(label, command) => addCommand({ label, command })}
+                onRemove={removeCommand}
+                onRestore={restoreCommand}
               />
-              <button
-                onClick={() => handleOpenEditor("nano")}
-                disabled={!editorFileName.trim() || !activeSessionId}
-                className="px-2 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
-              >
-                Open
-              </button>
             </div>
           )}
-        </div>
-      )}
 
-      {/* Vim popup: commands when inside, file opener when outside */}
-      {activeGroup === VIM_TAB && inEditor === "vim" && (
-        <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5">
-          <div className="flex flex-wrap gap-1">
-            {VIM_KEYS.map((qk) => (
-              <button
-                key={qk.label}
-                {...repeatProps(qk.key)}
-                disabled={!activeSessionId}
-                title={qk.title}
-                className={keyBtn}
-              >
-                {qk.label}
-              </button>
-            ))}
-            <button
-              onClick={handleSaveExitVim}
-              disabled={!activeSessionId}
-              title="Save and exit (:wq)"
-              className={saveExitBtn}
-            >
-              save+exit
-            </button>
-            <button onClick={handleExitVim} disabled={!activeSessionId} title="Force quit (:q!)" className={exitBtn}>
-              quit
-            </button>
-          </div>
-        </div>
-      )}
-      {activeGroup === VIM_TAB && inEditor !== "vim" && (
-        <div className="border-b border-gray-700/50 bg-[#12122a] px-3 py-2">
-          {!toolVersions.vim ? (
-            <span className="text-[11px] text-yellow-400">
-              vim is not installed. Install it via your package manager.
-            </span>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-gray-500">vim v{toolVersions.vim}</span>
-              <input
-                value={editorFileName}
-                onChange={(e) => setEditorFileName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleOpenEditor("vim")}
-                placeholder="filename or path..."
-                className="flex-1 bg-[#1a1a2e] text-white border border-gray-700 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <button
-                onClick={() => handleOpenEditor("vim")}
-                disabled={!editorFileName.trim() || !activeSessionId}
-                className="px-2 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
-              >
-                Open
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tmux popup: commands when inside, sessions when outside */}
-      {activeGroup === TMUX_TAB && inTmux && (
-        <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5">
-          <div className="flex flex-wrap gap-1">
-            {TMUX_KEYS.map((qk) => (
-              <button
-                key={qk.label}
-                {...repeatProps(qk.key)}
-                disabled={!activeSessionId}
-                title={qk.title}
-                className={keyBtn}
-              >
-                {qk.label}
-              </button>
-            ))}
-            <button onClick={handleTmuxDetach} disabled={!activeSessionId} title="Detach from tmux" className={exitBtn}>
-              detach
-            </button>
-          </div>
-        </div>
-      )}
-      {activeGroup === TMUX_TAB && !inTmux && (
-        <div className="border-b border-gray-700/50 bg-[#12122a] px-3 py-2">
-          {!toolVersions.tmux ? (
-            <span className="text-[11px] text-yellow-400">
-              tmux is not installed. Install it via your package manager.
-            </span>
-          ) : (
-            <>
-              <span className="text-[10px] text-gray-600 float-right">v{toolVersions.tmux}</span>
-              {tmuxLoading ? (
-                <span className="text-[11px] text-gray-500">Loading...</span>
-              ) : tmuxSessions.length === 0 ? (
-                <span className="text-[11px] text-gray-500">No tmux sessions running</span>
+          {/* cd directory picker */}
+          {drawerGroup === CD_TAB && (
+            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
+              {/* Nothing but the reason, when there is no directory to stand
+                  on. Every chip below sends a `cd`, so showing a path the
+                  terminal is not in offers buttons that move it somewhere
+                  nobody picked — which is what the default directory did. */}
+              {cdError ? (
+                <span className="text-[11px] text-red-400">{cdError}</span>
               ) : (
-                <div className="flex flex-col gap-1 mb-2">
-                  {tmuxSessions.map((s) => (
-                    <div key={s.name} className="flex items-center gap-2">
+                <>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="shrink-0 text-[11px] text-ink-faint">current</span>
+                    <span
+                      className="text-[10px] text-ink-ghost overflow-hidden text-ellipsis whitespace-nowrap flex-1"
+                      title={cdCwd}
+                    >
+                      {cdCwd}
+                    </span>
+                  </div>
+                  {/* Only on the first fetch. The re-check on coming back to
+                      the tab usually lands on the same directory, and
+                      replacing the chips with "Loading..." each time made
+                      returning flicker. */}
+                  {cdLoading && cdDirs.length === 0 ? (
+                    <span className="text-[11px] text-ink-faint">Loading...</span>
+                  ) : (
+                    <div className="chip-rows flex flex-wrap gap-1">
                       <button
-                        onClick={() => handleTmuxAttach(s.name)}
-                        className="flex-1 text-left px-2 py-1 text-[11px] bg-[#1a1a2e] text-gray-300 hover:text-white hover:bg-[#2a2a4a] rounded border border-gray-700 transition-colors"
+                        onClick={() => handleCdTo("..")}
+                        disabled={!sessionId}
+                        className={`${keyBtn} text-yellow-400 hover:text-yellow-300`}
+                        title="Go up one directory"
                       >
-                        <span className="font-medium">{s.name}</span>
-                        <span className="text-gray-500 ml-2">{s.windows}w</span>
-                        {s.attached && <span className="text-green-500 ml-1">(attached)</span>}
+                        ..
                       </button>
                       <button
-                        onClick={() => {
-                          if (!activeSessionId) return;
-                          sendInput(activeSessionId, `tmux kill-session -t ${s.name}\n`);
-                          setTimeout(fetchTmuxSessions, 500);
-                        }}
-                        className="p-1 text-gray-500 hover:text-red-400 transition-colors"
-                        title={`Kill session ${s.name}`}
+                        onClick={handleCdHome}
+                        disabled={!sessionId}
+                        className={`${keyBtn} text-blue-400 hover:text-blue-300`}
+                        title="Go to home directory"
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        ~
                       </button>
+                      {cdDirs.map((dir) => (
+                        <button
+                          key={dir}
+                          onClick={() => handleCdTo(dir)}
+                          disabled={!sessionId}
+                          className="px-2 py-0.5 text-[11px] relief text-purple-300 hover:text-purple-100 rounded-control whitespace-nowrap select-none touch-manipulation"
+                          title={`cd ${dir}`}
+                        >
+                          {dir}
+                        </button>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  value={tmuxNewName}
-                  onChange={(e) => setTmuxNewName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleTmuxNew()}
-                  placeholder="New session name..."
-                  className="flex-1 bg-[#1a1a2e] text-white border border-gray-700 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <button
-                  onClick={handleTmuxNew}
-                  disabled={!tmuxNewName.trim() || !activeSessionId}
-                  className="px-2 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
-                >
-                  Create
-                </button>
-              </div>
-            </>
+            </div>
           )}
-        </div>
-      )}
 
-      {/* Code tab: common keys + selected vendor panel */}
-      {activeGroup === CODE_TAB &&
-        (() => {
-          const vendor = CLI_VENDORS[codeVendorIdx] || CLI_VENDORS[0];
-          return (
-            <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5 max-h-64 overflow-y-auto">
-              {/* Common keys (no header) */}
-              <div className="flex flex-wrap gap-1 mb-1.5">
-                {CODE_COMMON_KEYS.map((qk) => (
+          {drawerGroup === TMUX_TAB && tmuxSession && (
+            <div className="border-b border-line/50 bg-panel px-2 py-1.5">
+              {/* Where you are, how to get out, and how to get somewhere —
+                  none of which should depend on the group below. */}
+              <div onPointerDown={dragScroll} onWheel={wheelScroll} className="scroll-row flex items-center gap-1">
+                <span className="shrink-0 text-[10px] text-ink-faint">
+                  session <span className="font-medium text-blue-300">{tmuxSession}</span>
+                  {tmuxWindow !== null && (
+                    <>
+                      {" "}
+                      · window <span className="font-medium text-blue-300">{tmuxWindow}</span>
+                    </>
+                  )}
+                </span>
+                <span aria-hidden="true" className="mx-0.5 shrink-0 select-none text-ink-ghost">
+                  |
+                </span>
+                {TMUX_GENERAL_KEYS.map((qk) => (
                   <button
                     key={qk.label}
                     {...repeatProps(qk.key)}
-                    disabled={!activeSessionId}
+                    disabled={!sessionId}
                     title={qk.title}
-                    className={keyBtn}
+                    className={`${keyBtn} shrink-0`}
                   >
                     {qk.label}
                   </button>
                 ))}
-              </div>
-              {/* Selected vendor: toggle selector left, buttons right */}
-              <div className="flex items-start gap-1.5 border-t border-gray-700/50 pt-1.5">
+                <span aria-hidden="true" className="mx-0.5 shrink-0 select-none text-ink-ghost">
+                  |
+                </span>
+                {/* Any index, not just the ones that fit on a row of buttons.
+                    tmux's prefix-and-digit only reaches 0-9; this goes through
+                    select-window, so window 12 is as reachable as window 2. */}
+                <span className="shrink-0 text-[10px] text-ink-ghost">go to</span>
+                <input
+                  value={windowTarget}
+                  onChange={(e) => setWindowTarget(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  onKeyDown={(e) => e.key === "Enter" && goToWindow()}
+                  inputMode="numeric"
+                  placeholder="#"
+                  aria-label="Window index"
+                  className="field w-12 shrink-0 px-2 py-0.5 text-[11px]"
+                />
                 <button
-                  ref={codeVendorBtnRef}
-                  onClick={() => setCodeVendorOpen((v) => !v)}
-                  className="text-[10px] text-gray-400 hover:text-white font-medium flex items-center gap-0.5 pt-0.5 select-none shrink-0"
+                  onClick={goToWindow}
+                  disabled={!windowTarget || !sessionId}
+                  title="Select that window"
+                  className={`${keyBtn} shrink-0`}
                 >
-                  <svg
-                    className="w-2.5 h-2.5 transition-transform"
-                    style={{ transform: codeVendorOpen ? "rotate(90deg)" : "rotate(0deg)" }}
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M6 4l8 6-8 6V4z" />
-                  </svg>
-                  {vendor.name}
+                  Go
                 </button>
-                {codeVendorOpen &&
-                  createPortal(
-                    <div
-                      ref={codeVendorMenuRef}
-                      className="fixed bg-[#1a1a2e] border border-gray-600 rounded shadow-lg min-w-[80px] py-0.5"
-                      style={{
-                        zIndex: 9999,
-                        ...(() => {
-                          const r = codeVendorBtnRef.current?.getBoundingClientRect();
-                          return r ? { left: r.left, bottom: window.innerHeight - r.top + 4 } : {};
-                        })(),
-                      }}
-                    >
-                      {CLI_VENDORS.map((v, i) => (
-                        <button
-                          key={v.name}
-                          onClick={() => {
-                            setCodeVendorIdx(i);
-                            setCodeVendorOpen(false);
-                          }}
-                          className={`block w-full text-left px-3 py-1 text-[11px] hover:bg-[#2a2a4a] transition-colors ${i === codeVendorIdx ? "text-blue-400" : "text-gray-300"}`}
-                        >
-                          {v.name}
-                        </button>
-                      ))}
-                    </div>,
-                    document.body,
-                  )}
-                <div className="flex flex-wrap gap-1 min-w-0">
-                  {/* Launch buttons (purple) */}
-                  {vendor.launch.map((cmd) => (
+              </div>
+
+              <div className="mt-1.5 flex items-start gap-1.5 border-t border-line/50 pt-1.5">
+                <DropUpSelect
+                  value={tmuxGroup}
+                  options={TMUX_GROUPS.map((g) => ({ id: g.label, label: g.label }))}
+                  onChange={setTmuxGroup}
+                />
+                <div
+                  onPointerDown={dragScroll}
+                  onWheel={wheelScroll}
+                  className="scroll-row flex min-w-0 items-center gap-1"
+                >
+                  {(TMUX_GROUPS.find((g) => g.label === tmuxGroup) ?? TMUX_GROUPS[0]).keys.map((qk) => (
                     <button
-                      key={`${vendor.name}-${cmd.label}`}
-                      onClick={() => {
-                        if (activeSessionId) sendInput(activeSessionId, cmd.command);
-                      }}
-                      disabled={!activeSessionId}
-                      title={cmd.title}
-                      className="px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-purple-400 hover:text-purple-200 hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-purple-800/60 whitespace-nowrap transition-colors select-none"
-                    >
-                      {cmd.label}
-                    </button>
-                  ))}
-                  {/* Vendor-specific keys */}
-                  {vendor.keys.map((qk) => (
-                    <button
-                      key={`${vendor.name}-${qk.label}`}
+                      key={qk.label}
                       {...repeatProps(qk.key)}
-                      disabled={!activeSessionId}
+                      disabled={!sessionId}
                       title={qk.title}
-                      className={keyBtn}
+                      className={`${keyBtn} shrink-0`}
                     >
                       {qk.label}
-                    </button>
-                  ))}
-                  {/* Slash commands (cyan) */}
-                  {vendor.slashCmds.map((cmd) => (
-                    <button
-                      key={`${vendor.name}-${cmd.label}`}
-                      onClick={() => {
-                        if (activeSessionId) sendInput(activeSessionId, cmd.command);
-                      }}
-                      disabled={!activeSessionId}
-                      title={cmd.title}
-                      className="px-2 py-0.5 text-[11px] bg-[#1a1a2e] text-cyan-400 hover:text-cyan-200 hover:bg-[#2a2a4a] disabled:text-gray-600 rounded border border-cyan-800/60 whitespace-nowrap transition-colors select-none"
-                    >
-                      {cmd.label}
                     </button>
                   ))}
                 </div>
               </div>
             </div>
-          );
-        })()}
+          )}
 
-      {/* Git tab: quick actions + commit + config */}
-      {activeGroup === GIT_TAB && (
-        <div className="border-b border-gray-700/50 bg-[#12122a] px-2 py-1.5 max-h-48 overflow-y-auto">
-          {/* Git quick actions */}
-          <div className="flex flex-wrap gap-1 mb-1.5">
-            {GIT_QUICK_CMDS.map((cmd) => (
-              <button
-                key={cmd.label}
-                onClick={() => {
-                  if (activeSessionId) sendInput(activeSessionId, cmd.command);
-                }}
-                disabled={!activeSessionId}
-                title={cmd.title}
-                className={keyBtn}
+          {/*
+            The keyboard. Three fixed rows: what you type, what qualifies it,
+            and the keys themselves. A modifier set, a coding CLI and git were
+            three tabs each repeating that shape, so they are modes of one tab
+            instead — and every row stays one line high, scrolling sideways,
+            so opening the keyboard never changes how much terminal you can see.
+          */}
+          {drawerGroup === KB_TAB && (
+            <div className="border-b border-line/50 bg-panel px-2 pt-1.5 pb-0.5">
+              {/* 1. The input itself. */}
+              <div className="flex gap-2 pb-1.5">
+                <textarea
+                  ref={textareaRef}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Type anything... (Enter for newline)"
+                  rows={1}
+                  className="field scrollbar-none flex-1 resize-none overflow-y-auto rounded-panel px-3 py-2 text-[16px] leading-5"
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!text || !sessionId}
+                  aria-label="Send"
+                  title="Send to the terminal — Enter to submit"
+                  className="relief-accent shrink-0 self-end rounded-panel p-2.5 text-white transition-colors disabled:bg-control disabled:text-ink-faint"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* 2. The mode, and whatever qualifies it. The mode selector is
+                  pinned left and anything the mode adds sits to its right. */}
+              <div className="flex items-center gap-1.5 border-t border-line/50 pt-1.5">
+                <DropUpSelect value={kbMode} options={KB_MODES} onChange={setKbMode} />
+
+                {comboSet && (
+                  <>
+                    <DropUpSelect
+                      name="mode"
+                      tint="sky"
+                      value={keySet}
+                      options={COMBO_SETS.map((set) => ({ id: set, label: set }))}
+                      onChange={setKeySet}
+                    />
+                    <DropUpSelect
+                      name="combo"
+                      tint="emerald"
+                      value={comboMode}
+                      options={COMBO_MODES}
+                      onChange={setComboMode}
+                    />
+                  </>
+                )}
+
+                {vendor &&
+                  (() => {
+                    const prefix = `${vendor.name}:`;
+                    const slashChips: Chip[] = [
+                      ...vendor.slashCmds
+                        .filter((c) => !hiddenSlash.includes(prefix + c.label))
+                        .map((c) => ({ label: c.label, command: c.command, title: c.title })),
+                      ...customSlash
+                        .filter((c) => c.vendor === vendor.name)
+                        .map((c) => ({ label: c.label, command: c.command, title: c.command, custom: true })),
+                    ];
+                    return (
+                      <div className="min-w-0 flex-1">
+                        <CommandChips
+                          layout="row"
+                          chips={slashChips}
+                          hidden={hiddenSlash.filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length))}
+                          disabled={!sessionId}
+                          chipClass="px-2 py-0.5 text-[11px] relief text-cyan-300 hover:text-cyan-100 rounded-control whitespace-nowrap select-none"
+                          dialogTitle={`Add ${vendor.name} slash command`}
+                          dialogHint={`Typed into ${vendor.name} when tapped — press Enter to run. Saved for ${vendor.name} only.`}
+                          commandPlaceholder="/review"
+                          onRun={runChip}
+                          onAdd={(label, command) => addSlash({ vendor: vendor.name, label, command })}
+                          onRemove={(label, isCustom) => removeSlash(vendor.name, label, isCustom)}
+                          onRestore={(label) => restoreSlash(vendor.name, label)}
+                        />
+                      </div>
+                    );
+                  })()}
+
+                {kbMode === "git" && (
+                  <>
+                    <DropUpSelect value={gitForm} options={GIT_FORMS} onChange={setGitForm} />
+                    {gitForm === "commit" ? (
+                      <>
+                        <input
+                          value={gitCommitMsg}
+                          onChange={(e) => editCommitMsg(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && commitGit()}
+                          placeholder="commit message..."
+                          className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
+                        />
+                        <button
+                          onClick={commitGit}
+                          disabled={!gitCommitMsg.trim() || !sessionId}
+                          className="shrink-0 rounded-control relief-accent relief-success px-2 py-0.5 text-[11px] text-white"
+                        >
+                          Commit
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          value={gitConfigName}
+                          onChange={(e) => setGitConfigName(e.target.value)}
+                          placeholder="user.name"
+                          className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
+                        />
+                        <input
+                          value={gitConfigEmail}
+                          onChange={(e) => setGitConfigEmail(e.target.value)}
+                          placeholder="user.email"
+                          className="field min-w-0 flex-1 px-2 py-0.5 text-[11px]"
+                        />
+                        <button
+                          onClick={setGitIdentity}
+                          disabled={!sessionId || (!gitConfigName.trim() && !gitConfigEmail.trim())}
+                          className="shrink-0 rounded-control relief-accent px-2 py-0.5 text-[11px] text-white transition-colors disabled:bg-control disabled:text-ink-faint"
+                        >
+                          Set
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* 3. The keys. One line, scrolled sideways — never taller. */}
+              <div
+                onPointerDown={dragScroll}
+                onWheel={wheelScroll}
+                className="scroll-row mt-1.5 flex items-center gap-1 border-t border-line/50 pt-1.5"
               >
-                {cmd.label}
-              </button>
-            ))}
-          </div>
-          {/* Git commit with message input */}
-          <div className="flex items-center gap-1.5 mb-1.5 border-t border-gray-700/50 pt-1.5">
-            <span className="text-[10px] text-gray-600 shrink-0">commit</span>
-            <input
-              value={gitCommitMsg}
-              onChange={(e) => setGitCommitMsg(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && gitCommitMsg.trim() && activeSessionId) {
-                  const escaped = gitCommitMsg.replace(/'/g, "'\\''");
-                  sendInput(activeSessionId, `git commit -m '${escaped}'\n`);
-                  setGitCommitMsg("");
-                }
-              }}
-              placeholder="commit message..."
-              className="flex-1 bg-[#1a1a2e] text-white border border-gray-700 rounded px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
-            />
-            <button
-              onClick={() => {
-                if (activeSessionId && gitCommitMsg.trim()) {
-                  const escaped = gitCommitMsg.replace(/'/g, "'\\''");
-                  sendInput(activeSessionId, `git commit -m '${escaped}'\n`);
-                  setGitCommitMsg("");
-                }
-              }}
-              disabled={!gitCommitMsg.trim() || !activeSessionId}
-              className="px-2 py-0.5 text-[11px] bg-green-700 hover:bg-green-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors shrink-0"
-            >
-              Commit
-            </button>
-          </div>
-          {/* Git config (name + email) */}
-          <div className="flex items-center gap-1.5 border-t border-gray-700/50 pt-1.5">
-            <span className="text-[10px] text-gray-600 shrink-0">config</span>
-            <input
-              value={gitConfigName}
-              onChange={(e) => setGitConfigName(e.target.value)}
-              placeholder="user.name"
-              className="flex-1 bg-[#1a1a2e] text-white border border-gray-700 rounded px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
-            />
-            <input
-              value={gitConfigEmail}
-              onChange={(e) => setGitConfigEmail(e.target.value)}
-              placeholder="user.email"
-              className="flex-1 bg-[#1a1a2e] text-white border border-gray-700 rounded px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
-            />
-            <button
-              onClick={() => {
-                if (!activeSessionId) return;
-                if (gitConfigName.trim())
-                  sendInput(activeSessionId, `git config --global user.name '${gitConfigName.trim()}'\n`);
-                if (gitConfigEmail.trim())
-                  sendInput(activeSessionId, `git config --global user.email '${gitConfigEmail.trim()}'\n`);
-              }}
-              disabled={!activeSessionId || (!gitConfigName.trim() && !gitConfigEmail.trim())}
-              className="px-2 py-0.5 text-[11px] bg-blue-700 hover:bg-blue-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors shrink-0"
-            >
-              Set
-            </button>
-          </div>
+                {comboSet &&
+                  comboKeys().map((key) => (
+                    <button
+                      key={key.label}
+                      {...repeatProps(key.seq)}
+                      disabled={!sessionId}
+                      title={key.title}
+                      className={`${keyBtn} shrink-0`}
+                    >
+                      {key.label}
+                    </button>
+                  ))}
+
+                {vendor && (
+                  <>
+                    {/* Start it, then confirm: the two things you reach for
+                        most in a coding CLI, so neither costs a switch of sets.
+                        Bare, with no permission flags — those change between
+                        releases, and a stale flag in a button is worse than
+                        typing the one you want. */}
+                    <button
+                      onClick={() => {
+                        if (sessionId) runInput(sessionId, vendor.name);
+                      }}
+                      disabled={!sessionId}
+                      title={`Start ${vendor.name}`}
+                      className="shrink-0 whitespace-nowrap rounded-control relief select-none px-2 py-0.5 text-[11px] text-purple-300 hover:text-purple-100"
+                    >
+                      {vendor.name}
+                    </button>
+                    <button
+                      {...repeatProps("\r")}
+                      disabled={!sessionId}
+                      title="Enter / confirm"
+                      className={`${keyBtn} shrink-0`}
+                    >
+                      Enter
+                    </button>
+                    {[...CODE_NAV_KEYS, ...CODE_COMMON_KEYS, ...vendor.keys].map((qk) => (
+                      <button
+                        key={`${vendor.name}-${qk.label}`}
+                        {...repeatProps(qk.key)}
+                        disabled={!sessionId}
+                        title={qk.title}
+                        className={`${keyBtn} shrink-0`}
+                      >
+                        {qk.label}
+                      </button>
+                    ))}
+                  </>
+                )}
+
+                {kbMode === "git" &&
+                  GIT_QUICK_CMDS.map((cmd) => (
+                    <button
+                      key={cmd.label}
+                      onClick={() => {
+                        if (sessionId) runChip(cmd.command);
+                      }}
+                      disabled={!sessionId}
+                      title={cmd.title}
+                      className={`${keyBtn} shrink-0`}
+                    >
+                      {cmd.label}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
-      )}
-
-      {/* Text input */}
-      <div className="flex gap-2 px-2 pt-2 pb-1">
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={handleInput}
-          placeholder="Type anything... (Enter for newline)"
-          rows={1}
-          className="flex-1 bg-[#1a1a2e] text-white border border-gray-600 rounded-lg px-3 py-2 text-[16px] leading-5 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
-          style={{ maxHeight: 120 }}
-        />
-        <button
-          onClick={handleSend}
-          disabled={!text || !activeSessionId}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          Send
-        </button>
-      </div>
-
-      {/* Always-visible nav keys */}
-      <div className="flex items-center gap-1 px-2 pb-1.5 overflow-x-auto scrollbar-none">
-        {NAV_KEYS.map((qk) => (
-          <button
-            key={qk.label}
-            {...repeatProps(qk.key)}
-            disabled={!activeSessionId}
-            title={qk.title}
-            className={`${keyBtn} text-[10px] px-1.5`}
-          >
-            {qk.label}
-          </button>
-        ))}
-        {NAV_TAIL.map((qk) => (
-          <button
-            key={qk.label}
-            {...repeatProps(qk.key)}
-            disabled={!activeSessionId}
-            title={qk.title}
-            className={`${keyBtn} text-[10px] px-1.5`}
-          >
-            {qk.label}
-          </button>
-        ))}
-        {NAV_ARROWS.map((qk) => (
-          <button
-            key={qk.label}
-            {...repeatProps(qk.key)}
-            disabled={!activeSessionId}
-            title={qk.title}
-            className={`${keyBtn} text-[10px] px-1.5`}
-          >
-            {qk.label}
-          </button>
-        ))}
       </div>
     </div>
   );

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
 interface RenamableTabProps {
+  /** Tab id, used by the strip's drag-to-reorder hit testing. */
+  id?: string;
+  /** True while this tab is the one being dragged. */
+  dragging?: boolean;
   name: string;
   isActive: boolean;
   existingNames: string[];
@@ -9,9 +13,27 @@ interface RenamableTabProps {
   onClose: () => void;
   icon?: React.ReactNode;
   showClose?: boolean;
+  /** Viewer tabs are named by their file, so renaming them would be a lie. */
+  renamable?: boolean;
+  /** Native tooltip — used to show a viewer tab's full path. */
+  title?: string;
 }
 
+/**
+ * The selected tab's surface, which is also every tab a drag draws.
+ *
+ * Only the selected tab can be dragged, so a tab in motion is always this one
+ * — and the cross-pane ghost is a picture of it. Shared so the two cannot
+ * drift: a drag used to swap this ring for a brighter blue of its own, which
+ * made moving a tab to the other pane look like a different kind of operation
+ * from moving it within one. It is the same operation, so the only difference
+ * now is the shading both of them already had.
+ */
+export const TAB_PILL = "relief text-ink ring-1 ring-inset ring-blue-500/45";
+
 export default function RenamableTab({
+  id,
+  dragging = false,
   name,
   isActive,
   existingNames,
@@ -20,6 +42,8 @@ export default function RenamableTab({
   onClose,
   icon,
   showClose = true,
+  renamable = true,
+  title,
 }: RenamableTabProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(name);
@@ -45,19 +69,23 @@ export default function RenamableTab({
 
   return (
     <div
+      data-tab-id={id}
       onClick={onClick}
       onDoubleClick={(e) => {
+        if (!renamable) return;
         e.stopPropagation();
         setEditing(true);
       }}
-      className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-sm border-r border-gray-800 shrink-0 transition-colors ${
-        isActive
-          ? "bg-[#16162a] text-white border-b-2 border-b-blue-500"
-          : "text-gray-400 hover:text-white hover:bg-[#16162a]/50"
-      }`}
+      title={title}
+      className={`flex shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-control px-3 py-1.5 text-sm my-1 ml-1 ${
+        // Only the selected tab is drawn as a pill. Outlining the others was
+        // tried and read as busier, not clearer — the strip is short enough
+        // that the filled one is unambiguous on its own.
+        isActive ? TAB_PILL : "text-ink-dim transition-colors hover:bg-surface/60 hover:text-ink"
+      } ${dragging ? "opacity-60" : ""}`}
     >
       {icon}
-      {editing ? (
+      {editing && renamable ? (
         <input
           ref={inputRef}
           value={editValue}
@@ -68,7 +96,25 @@ export default function RenamableTab({
           }}
           onBlur={commit}
           onClick={(e) => e.stopPropagation()}
-          className="bg-[#0d0d1a] text-white text-xs border border-gray-600 rounded px-1 py-0.5 w-20 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          /*
+           * Deliberately the same type as the label it replaces, and the same
+           * line box: it was `text-xs` against the tab's `text-sm`, so
+           * double-tapping a tab shrank its name, and `py-0.5` plus the
+           * field's border made the tab taller at the same time.
+           *
+           * `font: inherit` from the preflight carries the tab's 14px/20px
+           * down, so dropping the size class is enough. The pill is then two
+           * pixels taller than that line box — the border — and one pixel of
+           * negative margin each way hands those back, so the outline sits
+           * just outside the name without the tab growing around it. A fixed
+           * height would have done the same arithmetic by clipping the
+           * descenders instead.
+           */
+          className="field -mx-1 -my-px px-1 py-0 leading-5"
+          // Tracks the name rather than sitting at a fixed width, which would
+          // stretch a short tab the moment it was renamed. Capped at the same
+          // 80px the label truncates to.
+          style={{ width: `min(88px, ${Math.max(editValue.length, 4) + 2}ch)` }}
         />
       ) : (
         <span className="truncate max-w-[80px]">{name}</span>
@@ -79,7 +125,7 @@ export default function RenamableTab({
             e.stopPropagation();
             onClose();
           }}
-          className="ml-0.5 p-0.5 rounded hover:bg-gray-600 text-gray-500 hover:text-gray-200 transition-colors"
+          className="ml-0.5 p-0.5 rounded-control hover:bg-control-hover text-ink-faint hover:text-ink-muted transition-colors"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

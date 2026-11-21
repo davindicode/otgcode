@@ -1,7 +1,37 @@
-import { readFile, stat } from "fs/promises";
+import { open, stat } from "node:fs/promises";
+import { basename } from "node:path";
+import { Readable } from "node:stream";
 import { lookup } from "mime-types";
-import { basename } from "path";
+import { fsErrorMessage } from "~/lib/errors";
+import { contentDisposition } from "~/lib/fileTypes";
 import type { Route } from "./+types/files.download";
+
+type ByteRange = { start: number; end: number };
+
+export function parseByteRange(value: string, size: number): ByteRange | null {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(value.trim());
+  if (!match || (!match[1] && !match[2]) || size === 0) return null;
+
+  if (!match[1]) {
+    const suffixLength = Number(match[2]);
+    if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0) return null;
+    return { start: Math.max(0, size - suffixLength), end: size - 1 };
+  }
+
+  const start = Number(match[1]);
+  const requestedEnd = match[2] ? Number(match[2]) : size - 1;
+  if (
+    !Number.isSafeInteger(start) ||
+    !Number.isSafeInteger(requestedEnd) ||
+    start < 0 ||
+    start >= size ||
+    requestedEnd < start
+  ) {
+    return null;
+  }
+
+  return { start, end: Math.min(requestedEnd, size - 1) };
+}
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -12,19 +42,87 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   try {
-    await stat(filePath); // Check it exists
-    const data = await readFile(filePath);
+    const fileStats = await stat(filePath);
+    if (!fileStats.isFile()) {
+      return Response.json({ error: "Path is not a file" }, { status: 400 });
+    }
     const mimeType = lookup(filePath) || "application/octet-stream";
     const name = basename(filePath);
     const inline = url.searchParams.get("inline") === "1";
+    const rangeHeader = request.headers.get("range");
+    const range = rangeHeader ? parseByteRange(rangeHeader, fileStats.size) : undefined;
+    const commonHeaders = {
+      "Accept-Ranges": "bytes",
+      "Content-Type": mimeType,
+      "Content-Disposition": contentDisposition(name, inline),
+      // This route serves a file off the host under the app's own origin, and
+      // `inline=1` asks the browser to render it there. For an .html or .svg
+      // that means its script runs next to the session that drives the
+      // terminals — and markdown preview links straight here, so a README in
+      // a repo you cloned, or anything an agent wrote, could turn "preview
+      // this file" into a shell. That is the threat `renderMarkdown` installs
+      // DOMPurify for, and serving the file itself walked around it.
+      //
+      // `sandbox` with no tokens: scripts off, forms off, opaque origin, so
+      // the document cannot reach back into the app. It applies to documents
+      // only, so an <img>, <video> or <audio> loaded from here is unaffected
+      // — which is every use the preview actually makes of `inline=1`.
+      // `nosniff` closes the same hole from the other side, where the type is
+      // generic enough for a browser to guess HTML on the content.
+      "Content-Security-Policy": "sandbox",
+      "X-Content-Type-Options": "nosniff",
+      // Store it, but ask before reusing it. Every preview URL carries the
+      // file's version, so the bytes behind one never change — except for the
+      // images inside a rendered markdown file, which are addressed by path
+      // alone. `no-cache` keeps both honest: a revalidation is a few hundred
+      // bytes, and what it saves is the file itself.
+      //
+      // Without this nothing was cached at all, so reopening an image fetched
+      // it again — and a GIF played as it downloaded, looping over the part
+      // that had arrived before the rest caught up.
+      "Cache-Control": "private, no-cache",
+      "Last-Modified": fileStats.mtime.toUTCString(),
+    };
 
-    return new Response(data, {
-      headers: {
-        "Content-Type": mimeType,
-        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${name}"`,
-      },
+    // Unchanged since they last saw it. Skipped for a range request, which is
+    // asking about a part of the file rather than the whole of it.
+    const since = request.headers.get("if-modified-since");
+    if (!rangeHeader && since) {
+      // HTTP dates are whole seconds; an mtime is not.
+      const asked = Date.parse(since);
+      if (!Number.isNaN(asked) && Math.floor(fileStats.mtimeMs / 1000) * 1000 <= asked) {
+        return new Response(null, { status: 304, headers: commonHeaders });
+      }
+    }
+
+    if (rangeHeader && !range) {
+      return new Response(null, {
+        status: 416,
+        headers: { ...commonHeaders, "Content-Range": `bytes */${fileStats.size}` },
+      });
+    }
+
+    const start = range?.start ?? 0;
+    const end = range?.end ?? fileStats.size - 1;
+    const contentLength = fileStats.size === 0 ? 0 : end - start + 1;
+    const headers: Record<string, string> = { ...commonHeaders, "Content-Length": String(contentLength) };
+    if (range) headers["Content-Range"] = `bytes ${start}-${end}/${fileStats.size}`;
+
+    if (request.method === "HEAD" || fileStats.size === 0) {
+      return new Response(null, { status: range ? 206 : 200, headers });
+    }
+
+    // Opened before the response exists, so a file we are not allowed to read
+    // fails into the catch below and answers 400. `createReadStream` alone
+    // defers that refusal until the body is already streaming, by which point
+    // the status says 200 and all the caller sees is a dropped connection.
+    const handle = await open(filePath, "r");
+
+    return new Response(Readable.toWeb(handle.createReadStream({ start, end })) as ReadableStream<Uint8Array>, {
+      status: range ? 206 : 200,
+      headers,
     });
-  } catch (err: any) {
-    return Response.json({ error: err.message }, { status: 400 });
+  } catch (err: unknown) {
+    return Response.json({ error: fsErrorMessage(err, "file", filePath) }, { status: 400 });
   }
 }
